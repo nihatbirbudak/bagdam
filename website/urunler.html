@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bağdam — ürünler</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="ico-seal" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>
+      <text x="50" y="57" text-anchor="middle" font-family="Schibsted Grotesk" font-weight="700" font-size="30" fill="currentColor">BA</text>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="index.html"><img src="assets/logo/logo-horizontal.svg" alt="Bağdam"></a>
+    <nav class="nav-links">
+      <a href="urunler.html" class="on">ürünler</a>
+      <a href="gunluk.html">blog</a>
+      <a href="toptan.html">toptan</a>
+      <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
+    </nav>
+    <div class="nav-icons">
+      <a href="uyelik.html" class="nav-icon" aria-label="Üyelik">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+      <a href="sepet.html" class="nav-icon cart" aria-label="Sepet">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h14l-1.4 9.5a2 2 0 0 1-2 1.9H8.4a2 2 0 0 1-2-1.9L5 3H2"/><circle cx="9.5" cy="20.5" r="1.3"/><circle cx="17.5" cy="20.5" r="1.3"/></svg>
+        <span class="mono">(0)</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="promo-bar">
+  <span>Abone ol, ilk <b>2 kutunda %50 indirim</b> kazan — kod: <span class="mono">BAGDAM050</span></span>
+</div>
+
+<main>
+  <section class="prod-tabs" id="prodTabs">
+    <button class="prod-tab active" type="button" data-tab="boxes"><img class="prod-tab-icon" src="assets/icons/boxes.png" alt="">Taze Kutular</button>
+    <button class="prod-tab" type="button" data-tab="dairy"><img class="prod-tab-icon" src="assets/icons/dairy.png" alt="">Süt Ürünleri</button>
+    <button class="prod-tab" type="button" data-tab="firin"><img class="prod-tab-icon" src="assets/icons/firin.png" alt="">Fırın</button>
+    <button class="prod-tab" type="button" data-tab="cellar"><img class="prod-tab-icon" src="assets/icons/cellar.png" alt="">Kiler</button>
+  </section>
+
+  <!-- BOXES -->
+  <section class="prod-panel" id="panel-boxes">
+    <section class="tiers" id="tiers">
+      <div class="tier-slot" id="tierSlotLeft"><!-- filled by JS --></div>
+      <div class="tier-slot" id="tierSlotRight"><!-- filled by JS --></div>
+      <div class="tiers-trust">
+        <div class="trust-item">
+          <img class="trust-icon" src="assets/icons/iptal.png" alt="">
+          <span class="trust-label">İstediğin zaman iptal</span>
+          <span class="trust-sub">Taahhüt yok, tek tıkla bitir.</span>
+        </div>
+        <div class="trust-item">
+          <img class="trust-icon" src="assets/icons/duzenleme.png" alt="">
+          <span class="trust-label">Her hafta düzenle</span>
+          <span class="trust-sub">Salı 23:59'a kadar kutunu değiştir.</span>
+        </div>
+        <div class="trust-item">
+          <img class="trust-icon" src="assets/icons/haftaatla.png" alt="">
+          <span class="trust-label">Bir hafta atla</span>
+          <span class="trust-sub">İptal etmeden ara verme seçeneği.</span>
+        </div>
+        <div class="trust-item">
+          <img class="trust-icon" src="assets/icons/teslimat.png" alt="">
+          <span class="trust-label">Her Cuma kapında</span>
+          <span class="trust-sub">İzmir içi, doğrudan üreticiden — sadece İzmir'e teslim.</span>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- DAIRY -->
+  <section class="prod-panel" id="panel-dairy" hidden>
+    <p class="prod-panel-note">Kutuya dahil değil — istediğin zaman, istediğin kadar ayrı satın alırsın.</p>
+    <div class="pcard-grid" id="dairyGrid"><!-- filled by JS --></div>
+  </section>
+
+  <!-- FIRIN -->
+  <section class="prod-panel" id="panel-firin" hidden>
+    <p class="prod-panel-note">Ekşi mayalı, sabah pişmiş — kutuya bağlı değil, istediğin zaman sipariş ver.</p>
+    <div class="pcard-grid" id="firinGrid"><!-- filled by JS --></div>
+  </section>
+
+  <!-- CELLAR -->
+  <section class="prod-panel" id="panel-cellar" hidden>
+    <p class="prod-panel-note">Zeytinyağı, salça, kavanoz ürünleri — bozulmaz, kutuya bağlı değil.</p>
+    <div class="pcard-grid" id="cellarGrid"><!-- filled by JS --></div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <span class="wordmark small"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></span>
+  <span class="mono">© 2026 — URLA</span>
+</footer>
+
+<script src="assets/products.js"></script>
+<script src="assets/cart.js"></script>
+<script>
+(function () {
+  // ---- tabs ----
+  const tabsEl = document.getElementById("prodTabs");
+  const panels = {
+    boxes: document.getElementById("panel-boxes"),
+    dairy: document.getElementById("panel-dairy"),
+    firin: document.getElementById("panel-firin"),
+    cellar: document.getElementById("panel-cellar"),
+  };
+  function showTab(tab) {
+    tabsEl.querySelectorAll(".prod-tab").forEach((b) => b.classList.toggle("active", b.getAttribute("data-tab") === tab));
+    Object.keys(panels).forEach((key) => { panels[key].hidden = key !== tab; });
+  }
+  tabsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".prod-tab");
+    if (!btn) return;
+    showTab(btn.getAttribute("data-tab"));
+  });
+
+  // ---- dairy / cellar grids ----
+  function pcardHtml(p) {
+    return (
+      '<article class="pcard">' +
+        '<a class="pcard-link" href="urun.html?id=' + p.id + '">' +
+          '<div class="pcard-visual"><img src="' + p.img + '" alt="' + p.name + '" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>' +
+          "<h3>" + p.name + "</h3>" +
+        "</a>" +
+        '<p class="pcard-meta mono">' + p.meta + "</p>" +
+        '<div class="pcard-foot">' +
+          '<p class="pcard-price mono">' + p.price + ' TL <span>/ ' + p.unit + "</span></p>" +
+          '<button class="add-btn" type="button" data-add-to-cart="' + p.id + '">sepete ekle</button>' +
+        "</div>" +
+      "</article>"
+    );
+  }
+  document.getElementById("dairyGrid").innerHTML = PRODUCTS.filter((p) => p.tab === "dairy").map(pcardHtml).join("");
+  document.getElementById("firinGrid").innerHTML = PRODUCTS.filter((p) => p.tab === "firin").map(pcardHtml).join("");
+  document.getElementById("cellarGrid").innerHTML = PRODUCTS.filter((p) => p.tab === "pantry").map(pcardHtml).join("");
+
+  // ---- boxes ----
+  // Picking a tier only stores the choice — the full box editor (items, freq,
+  // subscribe/one-time, price) lives on its own page (kutu.html), same
+  // pattern as urun.html being a product's own page.
+  const tiersEl = document.getElementById("tiers");
+  const tierSlots = [document.getElementById("tierSlotLeft"), document.getElementById("tierSlotRight")];
+
+  function tierCardHtml(t, active, sub) {
+    const half = Math.round(t.price / 2);
+    const promoLine = sub.type === "subscription"
+      ? '<span class="tier-promo mono">ilk 2 kutu ' + half + " TL</span>"
+      : "";
+    return (
+      '<article class="tier-card' + (active ? " active" : "") + '">' +
+        '<div class="tier-card-img"><img src="' + t.img + '" alt="' + t.label + '" loading="lazy"></div>' +
+        '<span class="tier-label">' + t.label + "</span>" +
+        '<span class="tier-desc">Şu an en iyi olan ' + t.count + ' ürünü keşfet.</span>' +
+        '<span class="tier-count mono">' + t.count + " ürün</span>" +
+        '<span class="tier-price mono">' + t.price + " TL <span>/ kutu</span></span>" +
+        promoLine +
+        '<button class="btn tier-pick" type="button" data-tier="' + t.id + '">' +
+          (active ? "kutunu düzenle" : "bunu seç") +
+        "</button>" +
+      "</article>"
+    );
+  }
+
+  function renderTiers() {
+    const sub = BahcedenCart.getSub();
+
+    SUB_TIERS.forEach((t, i) => {
+      if (!tierSlots[i]) return;
+      const active = sub.tierId === t.id;
+      tierSlots[i].innerHTML = tierCardHtml(t, active, sub);
+    });
+
+    tiersEl.querySelectorAll(".tier-pick").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        window.location.href = "kutu.html?tier=" + btn.getAttribute("data-tier");
+      });
+    });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("tab") && panels[params.get("tab")]) {
+    showTab(params.get("tab"));
+  }
+
+  renderTiers();
+})();
+</script>
+
+</body>
+</html>

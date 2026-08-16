@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bahçeden al — seçki</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="ico-seal" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>
+      <text x="50" y="57" text-anchor="middle" font-family="Switzer" font-weight="700" font-size="30" fill="currentColor">BA</text>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="index.html">bahçeden al</a>
+    <nav class="nav-links">
+      <a href="secki.html" class="on">seçki</a>
+      <a href="abonelik.html">abonelik</a>
+      <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
+      <a href="sepet.html" class="cart">sepet <span class="mono">(0)</span></a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="shop-hero">
+    <span class="eyebrow">14 Ağustos — Urla</span>
+    <h1>bu haftaki <em>seçki</em></h1>
+    <p>Tattığımız partilerden sadece yeterince iyi olanı burada. Her ürünün menşei, hasat tarihi ve nasıl seveceğin senin elinde.</p>
+  </section>
+
+  <section class="reco-block">
+    <h2>sana <em>özel</em></h2>
+    <div id="reco"></div>
+  </section>
+
+  <section class="filters" role="group" aria-label="Kategoriler">
+    <button class="chip active" data-filter="tümü">tümü</button>
+    <button class="chip" data-filter="indirim">indirim</button>
+    <button class="chip" data-filter="sebze">sebze</button>
+    <button class="chip" data-filter="meyve">meyve</button>
+    <button class="chip" data-filter="bakliyat">bakliyat</button>
+    <button class="chip" data-filter="süt ürünleri">süt ürünleri</button>
+    <button class="chip" data-filter="fırın">fırın</button>
+    <button class="chip" data-filter="et">et</button>
+    <button class="chip" data-filter="balık">balık</button>
+  </section>
+
+  <section class="shop-grid" id="grid">
+    <article class="pcard" data-category="meyve">
+      <a class="pcard-link" href="urun.html?id=incir">
+        <div class="pcard-visual"><img src="assets/images/fig.jpg" alt="Bardacık İnciri" loading="lazy"><svg class="seal"><use href="#ico-seal"/></svg></div>
+        <h3>Bardacık İnciri</h3>
+      </a>
+      <p class="pcard-meta mono">Kuşçular · Urla — 14.08</p>
+      <div class="pcard-pref" data-pref-axis="olgunluk">
+        <span class="pcard-pref-label mono">olgunluk</span>
+        <div class="toggle-row small">
+          <button class="toggle" type="button">Sert</button>
+          <button class="toggle active" type="button">Tam kıvamında</button>
+          <button class="toggle" type="button">Yumuşak</button>
+        </div>
+      </div>
+      <div class="pcard-foot">
+        <p class="pcard-price mono">249 TL <span>/ 500 g</span></p>
+        <button class="add-btn" type="button" data-add-to-cart="incir">sepete ekle</button>
+      </div>
+    </article>
+    <article class="pcard" data-category="bakliyat">
+      <a class="pcard-link" href="urun.html?id=zeytinyagi">
+        <div class="pcard-visual"><img src="assets/images/oliveoil.jpg" alt="Sızma Zeytinyağı" loading="lazy"><svg class="seal"><use href="#ico-seal"/></svg></div>
+        <h3>Sızma Zeytinyağı</h3>
+      </a>
+      <p class="pcard-meta mono">Kuşçular · Urla — Erken Hasat</p>
+      <div class="pcard-pref" data-pref-axis="yoğunluk">
+        <span class="pcard-pref-label mono">yoğunluk</span>
+        <div class="toggle-row small">
+          <button class="toggle active" type="button">Yoğun &amp; baharatlı</button>
+          <button class="toggle" type="button">Dengeli &amp; yumuşak</button>
+        </div>
+      </div>
+      <div class="pcard-foot">
+        <p class="pcard-price mono">480 TL <span>/ L</span></p>
+        <button class="add-btn" type="button" data-add-to-cart="zeytinyagi">sepete ekle</button>
+      </div>
+    </article>
+    <article class="pcard" data-category="süt ürünleri">
+      <a class="pcard-link" href="urun.html?id=yumurta">
+        <div class="pcard-visual"><img src="assets/images/eggs.jpg" alt="Gezen Tavuk Yumurtası" loading="lazy"><svg class="seal"><use href="#ico-seal"/></svg></div>
+        <h3>Gezen Tavuk Yumurtası</h3>
+      </a>
+      <p class="pcard-meta mono">Güzelbahçe · Urla</p>
+      <div class="pcard-pref" data-pref-axis="boyut">
+        <span class="pcard-pref-label mono">boyut</span>
+        <div class="toggle-row small">
+          <button class="toggle" type="button">S</button>
+          <button class="toggle active" type="button">M</button>
+          <button class="toggle" type="button">L</button>
+        </div>
+      </div>
+      <div class="pcard-foot">
+        <p class="pcard-price mono">89 TL <span>/ 6'lı</span></p>
+        <button class="add-btn" type="button" data-add-to-cart="yumurta">sepete ekle</button>
+      </div>
+    </article>
+    <article class="pcard" data-category="meyve">
+      <a class="pcard-link" href="urun.html?id=uzum">
+        <div class="pcard-visual"><img src="assets/images/grapes.jpg" alt="Urla Karası Üzüm" loading="lazy"><svg class="seal"><use href="#ico-seal"/></svg></div>
+        <h3>Urla Karası Üzüm</h3>
+      </a>
+      <p class="pcard-meta mono">Zeytineli · Urla — 13.08</p>
+      <div class="pcard-foot">
+        <p class="pcard-price mono">159 TL <span>/ 500 g</span></p>
+        <button class="add-btn" type="button" data-add-to-cart="uzum">sepete ekle</button>
+      </div>
+    </article>
+    <article class="pcard" data-category="bakliyat">
+      <a class="pcard-link" href="urun.html?id=ceviz">
+        <div class="pcard-visual"><img src="assets/images/walnuts.jpg" alt="Yaş Ceviz" loading="lazy"><svg class="seal"><use href="#ico-seal"/></svg></div>
+        <h3>Yaş Ceviz</h3>
+      </a>
+      <p class="pcard-meta mono">Bademler · Urla</p>
+      <div class="pcard-foot">
+        <p class="pcard-price mono">310 TL <span>/ kg</span></p>
+        <button class="add-btn" type="button" data-add-to-cart="ceviz">sepete ekle</button>
+      </div>
+    </article>
+    <article class="pcard" data-category="sebze">
+      <a class="pcard-link" href="urun.html?id=pazi">
+        <div class="pcard-visual"><img src="assets/images/chard.jpg" alt="Pazı" loading="lazy"><svg class="seal"><use href="#ico-seal"/></svg></div>
+        <h3>Pazı</h3>
+      </a>
+      <p class="pcard-meta mono">Kuşçular · Urla</p>
+      <div class="pcard-foot">
+        <p class="pcard-price mono">45 TL <span>/ demet</span></p>
+        <button class="add-btn" type="button" data-add-to-cart="pazi">sepete ekle</button>
+      </div>
+    </article>
+    <article class="pcard" data-category="sebze">
+      <a class="pcard-link" href="urun.html?id=domates">
+        <div class="pcard-visual"><img src="assets/images/tomato.jpg" alt="Salkım Domates" loading="lazy"><svg class="seal"><use href="#ico-seal"/></svg></div>
+        <h3>Salkım Domates</h3>
+      </a>
+      <p class="pcard-meta mono">Güzelbahçe · Urla</p>
+      <div class="pcard-pref" data-pref-axis="olgunluk">
+        <span class="pcard-pref-label mono">olgunluk</span>
+        <div class="toggle-row small">
+          <button class="toggle" type="button">Salatalık (sert)</button>
+          <button class="toggle active" type="button">Sofralık (tam olgun)</button>
+        </div>
+      </div>
+      <div class="pcard-foot">
+        <p class="pcard-price mono">65 TL <span>/ kg</span></p>
+        <button class="add-btn" type="button" data-add-to-cart="domates">sepete ekle</button>
+      </div>
+    </article>
+    <article class="pcard" data-category="bakliyat">
+      <a class="pcard-link" href="urun.html?id=zeytin">
+        <div class="pcard-visual"><img src="assets/images/olivebranch.jpg" alt="Sofralık Zeytin" loading="lazy"><svg class="seal"><use href="#ico-seal"/></svg></div>
+        <h3>Sofralık Zeytin</h3>
+      </a>
+      <p class="pcard-meta mono">Kuşçular · Urla</p>
+      <div class="pcard-pref" data-pref-axis="tuzluluk">
+        <span class="pcard-pref-label mono">tuzluluk</span>
+        <div class="toggle-row small">
+          <button class="toggle" type="button">Az tuzlu</button>
+          <button class="toggle active" type="button">Normal</button>
+        </div>
+      </div>
+      <div class="pcard-foot">
+        <p class="pcard-price mono">180 TL <span>/ 500 g</span></p>
+        <button class="add-btn" type="button" data-add-to-cart="zeytin">sepete ekle</button>
+      </div>
+    </article>
+  </section>
+
+  <p class="shop-empty mono" id="empty" hidden>şu an seçkide yok. iyi olan gelince eklenir.</p>
+
+</main>
+
+<footer class="site-foot">
+  <span class="wordmark small">bahçeden al</span>
+  <span class="mono">© 2026 — URLA</span>
+</footer>
+
+<script src="assets/products.js"></script>
+<script src="assets/cart.js"></script>
+<script>
+(function(){
+  BahcedenCart.renderRecommended(document.getElementById('reco'), []);
+})();
+(function(){
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.chip'));
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.pcard'));
+  var empty = document.getElementById('empty');
+  chips.forEach(function(chip){
+    chip.addEventListener('click', function(){
+      chips.forEach(function(c){ c.classList.remove('active'); });
+      chip.classList.add('active');
+      var f = chip.getAttribute('data-filter');
+      var visible = 0;
+      cards.forEach(function(card){
+        var show = (f === 'tümü') || (card.getAttribute('data-category') === f);
+        card.style.display = show ? '' : 'none';
+        if(show) visible++;
+      });
+      empty.hidden = visible !== 0;
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

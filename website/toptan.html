@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bağdam — toptan</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="index.html"><img src="assets/logo/logo-horizontal.svg" alt="Bağdam"></a>
+    <nav class="nav-links">
+      <a href="urunler.html">ürünler</a>
+      <a href="gunluk.html">blog</a>
+      <a href="toptan.html" class="on">toptan</a>
+      <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
+    </nav>
+    <div class="nav-icons">
+      <a href="uyelik.html" class="nav-icon" aria-label="Üyelik">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+      <a href="sepet.html" class="nav-icon cart" aria-label="Sepet">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h14l-1.4 9.5a2 2 0 0 1-2 1.9H8.4a2 2 0 0 1-2-1.9L5 3H2"/><circle cx="9.5" cy="20.5" r="1.3"/><circle cx="17.5" cy="20.5" r="1.3"/></svg>
+        <span class="mono">(0)</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="soon-hero">
+    <img class="soon-icon" src="assets/logo/logo-icon.svg" alt="">
+    <span class="eyebrow">Restoranlar &amp; Şefler İçin</span>
+    <h1>toptan tedarik<br><em>yakında.</em></h1>
+    <p class="soon-text">Aynı kürasyonu, aynı üretici ağını — bu sefer mutfağınız için hazırlıyoruz. Şefler ve restoranlar için doğrudan tedarik hattımız çok yakında açılıyor.</p>
+
+    <form class="notify-form" id="notifyForm">
+      <input type="email" class="notify-input" placeholder="e-posta adresin" required aria-label="E-posta adresin">
+      <button class="cta" type="submit">haberdar ol</button>
+    </form>
+    <p class="notify-msg" id="notifyMsg" hidden>Teşekkürler — toptan hattı açıldığında ilk sana haber vereceğiz.</p>
+  </section>
+
+  <section class="soon-details">
+    <div class="soon-detail">
+      <h3>Aynı üretici ağı</h3>
+      <p>Kutularda kullandığımız aynı İzmir üreticilerinden, mutfak hacminde tedarik.</p>
+    </div>
+    <div class="soon-detail">
+      <h3>İzmir içi, ertesi sabah</h3>
+      <p>Siparişten sonraki gün sabah 7'den önce mutfağınızda. İzmir içi tüm restoranlara aynı teslimat penceresi.</p>
+    </div>
+    <div class="soon-detail">
+      <h3>Şeffaf fiyatlandırma</h3>
+      <p>Sezona ve hacme göre önceden bilinen, sabit bir fiyat listesi.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <span class="wordmark small"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></span>
+  <span class="mono">© 2026 — URLA</span>
+</footer>
+
+<script src="assets/products.js"></script>
+<script src="assets/cart.js"></script>
+<script>
+(function () {
+  document.getElementById("notifyForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    document.getElementById("notifyForm").hidden = true;
+    document.getElementById("notifyMsg").hidden = false;
+  });
+})();
+</script>
+</body>
+</html>

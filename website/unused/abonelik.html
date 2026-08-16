@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bahçeden al — abonelik</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="index.html">bahçeden al</a>
+    <nav class="nav-links">
+      <a href="abonelik.html" class="on">abonelik</a>
+      <a href="urunler.html">ürünler</a>
+      <a href="gunluk.html">günlük</a>
+      <a href="toptan.html">toptan</a>
+      <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
+      <a href="sepet.html" class="cart">sepet <span class="mono">(0)</span></a>
+    </nav>
+  </div>
+</header>
+
+<div class="promo-bar">
+  <span>Abone ol, ilk <b>2 kutunda %50 indirim</b> kazan — kod: <span class="mono">ILKKUTU</span></span>
+</div>
+
+<main>
+  <section class="sub-hero">
+    <span class="eyebrow">Haftalık Kutu</span>
+    <h1>her hafta pazara<br>gitmene gerek yok.<br><em>pazar sana gelsin.</em></h1>
+    <p class="sub-hero-text">Dene, beğen, sonra unut — biz unutmayız. Abone olduğunda kutun her hafta otomatik gelir. İçindekini istediğin gibi değiştir, hiç dokunma, ya da bir hafta atla. İstediğin an iptal et.</p>
+  </section>
+
+  <section class="trust-row">
+    <div class="trust-item">
+      <span class="trust-label">İstediğin zaman iptal</span>
+      <span class="trust-sub">Taahhüt yok, tek tıkla bitir.</span>
+    </div>
+    <div class="trust-item">
+      <span class="trust-label">Her hafta düzenle</span>
+      <span class="trust-sub">Salı 23:59'a kadar kutunu değiştir.</span>
+    </div>
+    <div class="trust-item">
+      <span class="trust-label">Bir hafta atla</span>
+      <span class="trust-sub">İptal etmeden ara ver.</span>
+    </div>
+    <div class="trust-item">
+      <span class="trust-label">Aynı gün toplanır</span>
+      <span class="trust-sub">İzmir içi, doğrudan üreticiden — sadece İzmir'e teslim.</span>
+    </div>
+  </section>
+
+  <section class="order-type">
+    <button class="type-btn active" type="button" data-type="subscription">abone ol</button>
+    <button class="type-btn" type="button" data-type="onetime">tek seferlik sipariş</button>
+  </section>
+
+  <section class="tiers" id="tiers"><!-- filled by JS --></section>
+
+  <section class="box-editor" id="editor" hidden>
+    <div class="box-editor-head">
+      <h2>bu haftaki <em>kutun</em></h2>
+      <div class="cutoff mono" id="cutoff"></div>
+    </div>
+    <p class="box-editor-note">Dokunmazsan bu hafta iyi olanlardan otomatik seçtiğimiz haliyle gider. İstersen her ürünü değiştirebilirsin.</p>
+    <p class="box-editor-note subtle">Doğada iki gün birbirinin aynı olmuyor — bu yüzden kutun bazen burada gördüğünden hafifçe farklı gelebilir.</p>
+
+    <div class="freq-row" id="freqRow">
+      <span class="pcard-pref-label mono">gönderim sıklığı</span>
+      <div class="toggle-row" id="freqToggle"><!-- filled by JS --></div>
+    </div>
+
+    <div class="box-items" id="boxItems"><!-- filled by JS --></div>
+
+    <p class="box-editor-note subtle">Süt ürünleri ve kiler kutuya dahil değil — <a href="urunler.html">ürünler sayfasından</a> ayrı satın alabilirsin.</p>
+
+    <div class="price-summary" id="priceSummary"><!-- filled by JS --></div>
+
+    <div class="box-editor-foot">
+      <button class="skip-btn mono" id="skipBtn" type="button"></button>
+      <button class="cta wide" id="confirmBtn" type="button">haftalık aboneliği başlat</button>
+    </div>
+    <p class="confirm-msg" id="confirmMsg" hidden></p>
+    <p class="cancel-note" id="cancelNote" hidden>Aboneliğin aktif. <a href="#" id="cancelLink">iptal et</a></p>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <span class="wordmark small">bahçeden al</span>
+  <span class="mono">© 2026 — URLA</span>
+</footer>
+
+<script src="assets/products.js"></script>
+<script src="assets/cart.js"></script>
+<script>
+(function () {
+  const tiersEl = document.getElementById("tiers");
+  const editorEl = document.getElementById("editor");
+  const boxItemsEl = document.getElementById("boxItems");
+  const cutoffEl = document.getElementById("cutoff");
+  const skipBtn = document.getElementById("skipBtn");
+  const confirmBtn = document.getElementById("confirmBtn");
+  const confirmMsg = document.getElementById("confirmMsg");
+  const cancelNote = document.getElementById("cancelNote");
+  const cancelLink = document.getElementById("cancelLink");
+  const freqRow = document.getElementById("freqRow");
+  const freqToggle = document.getElementById("freqToggle");
+  const priceSummary = document.getElementById("priceSummary");
+  const typeButtons = document.querySelectorAll(".type-btn");
+
+  function money(n) { return n.toLocaleString("tr-TR"); }
+
+  function renderTiers() {
+    const sub = BahcedenCart.getSub();
+    typeButtons.forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-type") === sub.type);
+    });
+
+    tiersEl.innerHTML = SUB_TIERS.map((t) => {
+      const active = sub.tierId === t.id;
+      const half = Math.round(t.price / 2);
+      const promoLine = sub.type === "subscription"
+        ? '<span class="tier-promo mono">ilk 2 kutu ' + half + " TL</span>"
+        : "";
+      return (
+        '<article class="tier-card' + (active ? " active" : "") + '">' +
+          '<span class="tier-label">' + t.label + "</span>" +
+          '<span class="tier-desc">Şu an en iyi olan ' + t.count + ' ürünü keşfet.</span>' +
+          '<span class="tier-count mono">' + t.count + " ürün</span>" +
+          '<span class="tier-price mono">' + t.price + " TL <span>/ kutu</span></span>" +
+          promoLine +
+          '<span class="tier-note">' + t.note + "</span>" +
+          '<button class="btn tier-pick" type="button" data-tier="' + t.id + '">' +
+            (active ? "seçildi" : "bunu seç") +
+          "</button>" +
+        "</article>"
+      );
+    }).join("");
+
+    tiersEl.querySelectorAll(".tier-pick").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        BahcedenCart.subSetTier(btn.getAttribute("data-tier"));
+        renderTiers();
+        renderEditor();
+      });
+    });
+  }
+
+  function renderEditor() {
+    const sub = BahcedenCart.getSub();
+    const tier = BahcedenCart.subTier();
+    if (!tier) {
+      editorEl.hidden = true;
+      return;
+    }
+    editorEl.hidden = false;
+    confirmMsg.hidden = true;
+
+    const fresh = BahcedenCart.freshProducts();
+    const cutoff = BahcedenCart.nextCutoff();
+    cutoffEl.textContent = "DEĞİŞİKLİK İÇİN: " + BahcedenCart.formatCountdown(cutoff) + " SÜREN VAR";
+
+    freqRow.hidden = sub.type !== "subscription";
+    if (sub.type === "subscription") {
+      freqToggle.innerHTML = FREQ_OPTIONS.map((f) =>
+        '<button class="toggle' + (sub.freq === f.id ? " active" : "") + '" type="button" data-freq="' + f.id + '">' + f.label + "</button>"
+      ).join("");
+      freqToggle.querySelectorAll(".toggle").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          BahcedenCart.subSetFreq(btn.getAttribute("data-freq"));
+          renderEditor();
+        });
+      });
+    }
+
+    boxItemsEl.innerHTML = sub.items.map((id) => {
+      const p = PRODUCTS.find((x) => x.id === id);
+      if (!p) return "";
+      const options = fresh
+        .filter((f) => f.id === id || sub.items.indexOf(f.id) === -1)
+        .map((f) => '<option value="' + f.id + '"' + (f.id === id ? " selected" : "") + ">" + f.name + "</option>")
+        .join("");
+      return (
+        '<div class="box-item">' +
+          '<img src="' + p.img + '" alt="' + p.name + '">' +
+          '<div class="box-item-info">' +
+            "<h3>" + p.name + "</h3>" +
+            '<p class="pcard-meta mono">' + p.meta + "</p>" +
+          "</div>" +
+          '<select class="swap-select" data-slot="' + id + '">' + options + "</select>" +
+        "</div>"
+      );
+    }).join("");
+
+    boxItemsEl.querySelectorAll(".swap-select").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        BahcedenCart.subSwapItem(sel.getAttribute("data-slot"), sel.value);
+        renderEditor();
+      });
+    });
+
+    skipBtn.hidden = sub.type !== "subscription";
+    skipBtn.textContent = sub.skipThisWeek ? "atlamayı iptal et" : "bu hafta atla";
+    skipBtn.classList.toggle("active", sub.skipThisWeek);
+
+    const deliveryFee = BahcedenCart.subDeliveryFee();
+    const isFirst = sub.type === "subscription"; // prototip: her zaman "ilk 2 kutu" fiyatını gösterir
+    const firstPrice = Math.round(tier.price / 2);
+    priceSummary.innerHTML =
+      '<div class="ps-row"><span>' + tier.label + " Kutu" + "</span><span class=\"mono\">" + money(isFirst ? firstPrice : tier.price) + " TL</span></div>" +
+      (isFirst ? '<div class="ps-row ps-note"><span>ilk 2 kutuda %50 indirim uygulandı</span><span class="mono">-' + money(tier.price - firstPrice) + " TL</span></div>" : "") +
+      '<div class="ps-row"><span>Kargo</span><span class="mono">' + (deliveryFee > 0 ? money(deliveryFee) + " TL" : "Dahil") + "</span></div>" +
+      '<div class="ps-row ps-total"><span>Toplam</span><span class="mono">' + money((isFirst ? firstPrice : tier.price) + deliveryFee) + " TL</span></div>";
+
+    confirmBtn.textContent = sub.type === "subscription" ? "haftalık aboneliği başlat" : "siparişi tamamla";
+    confirmBtn.hidden = !!sub.active;
+    cancelNote.hidden = !sub.active;
+  }
+
+  typeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      BahcedenCart.subSetType(btn.getAttribute("data-type"));
+      renderTiers();
+      renderEditor();
+    });
+  });
+
+  skipBtn.addEventListener("click", () => {
+    BahcedenCart.subToggleSkip();
+    renderEditor();
+  });
+
+  confirmBtn.addEventListener("click", () => {
+    const sub = BahcedenCart.getSub();
+    sub.active = true;
+    BahcedenCart.setSub(sub);
+    renderEditor();
+    confirmMsg.hidden = false;
+    confirmMsg.textContent = sub.type !== "subscription"
+      ? "Siparişin alındı. Bu Cuma kapında."
+      : sub.skipThisWeek
+        ? "Aboneliğin aktif. Bu hafta atlandı, gelecek hafta otomatik devam eder."
+        : "Aboneliğin aktif. İlk kutun bu Cuma kapında.";
+  });
+
+  cancelLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    BahcedenCart.subCancel();
+    renderTiers();
+    renderEditor();
+  });
+
+  const preselect = new URLSearchParams(window.location.search).get("tier");
+  if (preselect && SUB_TIERS.some((t) => t.id === preselect) && !BahcedenCart.subTier()) {
+    BahcedenCart.subSetTier(preselect);
+  }
+
+  renderTiers();
+  renderEditor();
+  setInterval(() => {
+    if (!editorEl.hidden) {
+      cutoffEl.textContent = "DEĞİŞİKLİK İÇİN: " + BahcedenCart.formatCountdown(BahcedenCart.nextCutoff()) + " SÜREN VAR";
+    }
+  }, 60000);
+})();
+</script>
+
+</body>
+</html>

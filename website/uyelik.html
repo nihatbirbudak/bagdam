@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bağdam — üyelik</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="index.html"><img src="assets/logo/logo-horizontal.svg" alt="Bağdam"></a>
+    <nav class="nav-links">
+      <a href="urunler.html">ürünler</a>
+      <a href="gunluk.html">blog</a>
+      <a href="toptan.html">toptan</a>
+      <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
+    </nav>
+    <div class="nav-icons">
+      <a href="uyelik.html" class="nav-icon on" aria-label="Üyelik">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+      <a href="sepet.html" class="nav-icon cart" aria-label="Sepet">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h14l-1.4 9.5a2 2 0 0 1-2 1.9H8.4a2 2 0 0 1-2-1.9L5 3H2"/><circle cx="9.5" cy="20.5" r="1.3"/><circle cx="17.5" cy="20.5" r="1.3"/></svg>
+        <span class="mono">(0)</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="shop-hero">
+    <span class="eyebrow">Üyelik</span>
+    <h1>hesabın <em>ve</em> aboneliğin.</h1>
+    <p>Adres ve ödeme bilgilerini buradan güncelle, aboneliğini yönet, değişiklik süren dolmadan kutuna geri dön.</p>
+  </section>
+
+  <section class="account-grid">
+    <div class="account-card account-sub" id="subCard"><!-- filled by JS --></div>
+
+    <div class="account-card account-address">
+      <h2>Teslimat Adresi</h2>
+      <form class="account-form" id="addressForm">
+        <label>Ad Soyad<input type="text" id="addrName" placeholder="Ad Soyad" required></label>
+        <label>Telefon<input type="tel" id="addrPhone" placeholder="05xx xxx xx xx" required></label>
+        <label>Adres<textarea id="addrLine" placeholder="Mahalle, sokak, no, daire" required></textarea></label>
+        <div class="form-row">
+          <label>İlçe<input type="text" id="addrDistrict" placeholder="Örn. Urla" required></label>
+          <label>Posta Kodu<input type="text" id="addrZip" placeholder="35xxx"></label>
+        </div>
+        <button class="cta" type="submit">adresi kaydet</button>
+        <p class="form-msg" id="addrMsg" hidden>Adresin kaydedildi.</p>
+      </form>
+    </div>
+
+    <div class="account-card account-payment">
+      <h2>Ödeme Yöntemi</h2>
+      <p class="account-empty">Kayıtlı ödeme yöntemin yok.</p>
+      <button class="btn" type="button" disabled title="Bu bir tasarım prototipi — ödeme altyapısı henüz bağlı değil">ödeme yöntemi ekle</button>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <span class="wordmark small"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></span>
+  <span class="mono">© 2026 — URLA</span>
+</footer>
+
+<script src="assets/products.js"></script>
+<script src="assets/cart.js"></script>
+<script>
+(function () {
+  function money(n) { return n.toLocaleString("tr-TR"); }
+
+  const subCard = document.getElementById("subCard");
+
+  function renderSub() {
+    const sub = BahcedenCart.getSub();
+    const tier = BahcedenCart.subTier();
+
+    if (!tier) {
+      subCard.innerHTML =
+        '<p class="pcard-meta mono">ABONELİK</p>' +
+        '<p class="account-empty">Henüz bir aboneliğin yok.</p>' +
+        '<a class="cta" href="urunler.html">kutunu oluştur</a>';
+      return;
+    }
+
+    const itemNames = sub.items
+      .map((id) => { const p = PRODUCTS.find((x) => x.id === id); return p ? p.name : ""; })
+      .filter(Boolean)
+      .join(", ");
+
+    const cutoff = BahcedenCart.nextCutoff();
+    const countdown = BahcedenCart.formatCountdown(cutoff);
+    const editable = countdown !== "kilitlendi";
+    const isSub = sub.type === "subscription";
+    const freqLabel = isSub ? (FREQ_OPTIONS.find((f) => f.id === sub.freq) || {}).label : null;
+
+    subCard.innerHTML =
+      '<p class="pcard-meta mono">' + (isSub ? "AKTİF ABONELİK" : "TEK SEFERLİK SİPARİŞ") + "</p>" +
+      "<h2>" + tier.label + "</h2>" +
+      '<p class="pcard-meta mono">' + itemNames + "</p>" +
+      (isSub ? '<p class="account-freq mono">Gönderim: ' + freqLabel + "</p>" : "") +
+      (sub.skipThisWeek ? '<p class="sub-skip-note mono">BU HAFTA ATLANDI</p>' : "") +
+      '<div class="pd-price-row">' +
+        '<span class="price">' + money(tier.price) + ' TL <span class="unit">/ kutu</span></span>' +
+        '<span class="cutoff mono">DEĞİŞİKLİK İÇİN: ' + countdown.toUpperCase() + " SÜREN VAR</span>" +
+      "</div>" +
+      '<div class="account-actions">' +
+        (editable
+          ? '<a class="btn" href="kutu.html?tier=' + tier.id + '">kutunu düzenle</a>'
+          : '<span class="account-locked mono">Bu haftanın değişiklik süresi doldu</span>') +
+        (isSub ? '<button class="btn" type="button" id="skipWeekBtn">' + (sub.skipThisWeek ? "atlamayı iptal et" : "bu hafta atla") + "</button>" : "") +
+      "</div>" +
+      '<p class="cancel-note"><a href="#" id="cancelSubLink">aboneliği iptal et</a></p>';
+
+    const skipWeekBtn = document.getElementById("skipWeekBtn");
+    if (skipWeekBtn) {
+      skipWeekBtn.addEventListener("click", () => {
+        BahcedenCart.subToggleSkip();
+        renderSub();
+      });
+    }
+    document.getElementById("cancelSubLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      BahcedenCart.subCancel();
+      renderSub();
+    });
+  }
+  renderSub();
+
+  const addressForm = document.getElementById("addressForm");
+  const addrMsg = document.getElementById("addrMsg");
+  const existing = BahcedenCart.getAddress();
+  if (existing) {
+    document.getElementById("addrName").value = existing.name || "";
+    document.getElementById("addrPhone").value = existing.phone || "";
+    document.getElementById("addrLine").value = existing.line || "";
+    document.getElementById("addrDistrict").value = existing.district || "";
+    document.getElementById("addrZip").value = existing.zip || "";
+  }
+  addressForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    BahcedenCart.setAddress({
+      name: document.getElementById("addrName").value.trim(),
+      phone: document.getElementById("addrPhone").value.trim(),
+      line: document.getElementById("addrLine").value.trim(),
+      district: document.getElementById("addrDistrict").value.trim(),
+      zip: document.getElementById("addrZip").value.trim(),
+    });
+    addrMsg.hidden = false;
+    clearTimeout(window.__addrMsgTimer);
+    window.__addrMsgTimer = setTimeout(() => { addrMsg.hidden = true; }, 2500);
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="pagetitle">Bağdam — kutu</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="ico-seal" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>
+      <text x="50" y="57" text-anchor="middle" font-family="Switzer" font-weight="700" font-size="30" fill="currentColor">BA</text>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="index.html"><img src="assets/logo/logo-horizontal.svg" alt="Bağdam"></a>
+    <nav class="nav-links">
+      <a href="urunler.html" class="on">ürünler</a>
+      <a href="gunluk.html">blog</a>
+      <a href="toptan.html">toptan</a>
+      <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
+    </nav>
+    <div class="nav-icons">
+      <a href="uyelik.html" class="nav-icon" aria-label="Üyelik">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+      <a href="sepet.html" class="nav-icon cart" aria-label="Sepet">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h14l-1.4 9.5a2 2 0 0 1-2 1.9H8.4a2 2 0 0 1-2-1.9L5 3H2"/><circle cx="9.5" cy="20.5" r="1.3"/><circle cx="17.5" cy="20.5" r="1.3"/></svg>
+        <span class="mono">(0)</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="promo-bar">
+  <span>Abone ol, ilk <b>2 kutunda %50 indirim</b> kazan — kod: <span class="mono">BAGDAM050</span></span>
+</div>
+
+<main>
+  <p class="crumb mono"><a href="urunler.html">← kutulara dön</a></p>
+
+  <section class="product-detail">
+    <div class="pd-visual-col">
+      <div class="pd-visual"><img id="tierImg" src="" alt=""><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+      <div class="pairs-aside">
+        <p class="addons-label mono">bu kutu ile alabilecekleriniz</p>
+        <div class="pairs-mini-list" id="pairsRow"><!-- filled by JS --></div>
+      </div>
+    </div>
+    <div class="pd-body">
+      <p class="pcard-meta mono" id="tierMeta"></p>
+      <h1 id="tierTitle"></h1>
+      <p class="pd-desc" id="tierDesc"></p>
+      <div class="pd-price-row">
+        <span class="price" id="tierPrice"></span>
+        <section class="order-type">
+          <button class="type-btn active" type="button" data-type="subscription">abone ol</button>
+          <button class="type-btn" type="button" data-type="onetime">tek seferlik sipariş</button>
+          <span class="type-info" tabindex="0" title="Abonelere: ilk 2 kutu %50 indirimli, kargo bizden. Tek seferlik alışverişe: indirim yok, kargo ücreti (49 TL) sana ait.">?
+            <span class="type-tip">Abonelere: ilk 2 kutu %50 indirimli, kargo bizden.<br>Tek seferlik alışverişe: indirim yok, kargo ücreti (49 TL) sana ait.</span>
+          </span>
+        </section>
+      </div>
+
+      <p class="box-editor-note">Dokunmazsan bu hafta iyi olanlardan otomatik seçtiğimiz haliyle kutunu doldururuz. İstersen her ürünü aşağıdan değiştirebilirsin.</p>
+
+      <p class="box-editor-note subtle">Doğada iki gün birbirinin aynı olmuyor — bu yüzden kutun her hafta sezondaki en iyi ürünleri sana sunmak için değişiklik gösterebilir. Her hafta senin için seçtiğimiz ürünleri e-posta ve/veya telefonla sana bildiririz.</p>
+
+      <div class="freq-row" id="freqRow">
+        <span class="pcard-pref-label mono">gönderim sıklığı</span>
+        <div class="toggle-row small" id="freqToggle"><!-- filled by JS --></div>
+      </div>
+
+      <div class="price-summary" id="priceSummary"><!-- filled by JS --></div>
+
+      <div class="box-editor-foot">
+        <button class="cta wide" id="confirmBtn" type="button">aboneliği başlat</button>
+      </div>
+      <p class="cancel-note" id="cancelNote" hidden>Aboneliğin aktif. <a href="#" id="cancelLink">iptal et</a></p>
+
+      <div class="box-items-head">
+        <h2>bu haftaki <em>içerik</em></h2>
+        <span class="cutoff mono" id="cutoff"></span>
+      </div>
+      <div class="box-items" id="boxItems"><!-- filled by JS --></div>
+    </div>
+  </section>
+</main>
+
+<button class="scroll-confirm" id="scrollConfirm" type="button" aria-label="Aboneliği başlat butonuna dön">
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+  tamamla
+</button>
+
+<footer class="site-foot">
+  <span class="wordmark small"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></span>
+  <span class="mono">© 2026 — URLA</span>
+</footer>
+
+<script src="assets/products.js"></script>
+<script src="assets/cart.js"></script>
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const tierParam = params.get("tier");
+  if (tierParam && SUB_TIERS.some((t) => t.id === tierParam)) {
+    const current = BahcedenCart.subTier();
+    if (!current || current.id !== tierParam) {
+      BahcedenCart.subSetTier(tierParam);
+    }
+  }
+  if (!BahcedenCart.subTier()) {
+    window.location.href = "urunler.html";
+    return;
+  }
+
+  const tierImgEl = document.getElementById("tierImg");
+  const tierMetaEl = document.getElementById("tierMeta");
+  const tierTitleEl = document.getElementById("tierTitle");
+  const tierDescEl = document.getElementById("tierDesc");
+  const tierPriceEl = document.getElementById("tierPrice");
+  const boxItemsEl = document.getElementById("boxItems");
+  const cutoffEl = document.getElementById("cutoff");
+  const confirmBtn = document.getElementById("confirmBtn");
+  const cancelNote = document.getElementById("cancelNote");
+  const cancelLink = document.getElementById("cancelLink");
+  const freqRow = document.getElementById("freqRow");
+  const freqToggle = document.getElementById("freqToggle");
+  const priceSummary = document.getElementById("priceSummary");
+  const pairsRowEl = document.getElementById("pairsRow");
+  const typeButtons = document.querySelectorAll(".type-btn");
+
+  function money(n) { return n.toLocaleString("tr-TR"); }
+
+  // Uses data-pair-id + a delegated listener (below) instead of
+  // data-add-to-cart, so it never collides with cart.js's one-time
+  // DOMContentLoaded auto-wiring.
+  function pairCardHtml(p) {
+    return (
+      '<article class="pair-mini">' +
+        '<a class="pair-mini-img" href="urun.html?id=' + p.id + '"><img src="' + p.img + '" alt="' + p.name + '" loading="lazy"></a>' +
+        '<div class="pair-mini-info">' +
+          '<a href="urun.html?id=' + p.id + '"><h4>' + p.name + "</h4></a>" +
+          '<p class="pair-mini-price mono">' + p.price + " TL</p>" +
+        "</div>" +
+        '<button class="pair-mini-add" type="button" data-pair-id="' + p.id + '" aria-label="' + p.name + ' sepete ekle">+</button>' +
+      "</article>"
+    );
+  }
+  pairsRowEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-pair-id]");
+    if (!btn) return;
+    BahcedenCart.add(btn.getAttribute("data-pair-id"), null);
+    btn.textContent = "✓";
+    btn.classList.add("added");
+    setTimeout(() => { btn.textContent = "+"; btn.classList.remove("added"); }, 1200);
+  });
+
+  function renderEditor() {
+    const sub = BahcedenCart.getSub();
+    const tier = BahcedenCart.subTier();
+    if (!tier) {
+      window.location.href = "urunler.html";
+      return;
+    }
+
+    document.getElementById("pagetitle").textContent = "Bağdam — " + tier.label;
+    tierImgEl.src = tier.img;
+    tierImgEl.alt = tier.label;
+    tierMetaEl.textContent = tier.note;
+    tierTitleEl.textContent = tier.label;
+    tierDescEl.textContent = "Şu an en iyi olan " + tier.count + " ürünü, senin için tattığımız haliyle kapına getiriyoruz.";
+    tierPriceEl.innerHTML = tier.price + ' TL <span class="unit">/ kutu</span>';
+
+    typeButtons.forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-type") === sub.type);
+    });
+
+    const fresh = BahcedenCart.freshProducts();
+    const cutoff = BahcedenCart.nextCutoff();
+    cutoffEl.textContent = "DEĞİŞİKLİK İÇİN: " + BahcedenCart.formatCountdown(cutoff) + " SÜREN VAR";
+
+    const isSub = sub.type === "subscription";
+    freqRow.classList.toggle("faded", !isSub);
+    freqToggle.innerHTML = FREQ_OPTIONS.map((f) =>
+      '<button class="toggle' + (sub.freq === f.id ? " active" : "") + '" type="button" data-freq="' + f.id + '"' + (isSub ? "" : " disabled") + '>' + f.label + "</button>"
+    ).join("");
+    freqToggle.querySelectorAll(".toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        BahcedenCart.subSetFreq(btn.getAttribute("data-freq"));
+        renderEditor();
+      });
+    });
+
+    boxItemsEl.innerHTML = sub.items.map((id) => {
+      const p = PRODUCTS.find((x) => x.id === id);
+      if (!p) return "";
+      const chosen = (sub.itemPrefs && sub.itemPrefs[id]) || (p.pref ? p.pref.options[p.pref.def] : null);
+      const prefHtml = p.pref
+        ? '<div class="box-item-pref" data-item="' + id + '" data-axis="' + p.pref.label + '">' +
+            '<span class="pcard-pref-label mono">' + p.pref.label + "</span>" +
+            '<div class="toggle-row small">' +
+              p.pref.options.map((opt) =>
+                '<button class="toggle' + (opt === chosen ? " active" : "") + '" type="button" data-value="' + opt + '">' + opt + "</button>"
+              ).join("") +
+            "</div>" +
+          "</div>"
+        : "";
+      const swapOptions = fresh
+        .filter((f) => f.id === id || sub.items.indexOf(f.id) === -1)
+        .map((f) => '<option value="' + f.id + '"' + (f.id === id ? " selected" : "") + ">" + f.name + "</option>")
+        .join("");
+      return (
+        '<div class="box-item">' +
+          '<img src="' + p.img + '" alt="' + p.name + '">' +
+          '<div class="box-item-info">' +
+            "<h3>" + p.name + "</h3>" +
+            '<p class="pcard-meta mono">' + p.location + ", İzmir" + (p.season ? " — " + p.season : "") + "</p>" +
+            prefHtml +
+          "</div>" +
+          '<select class="swap-select" data-slot="' + id + '">' + swapOptions + "</select>" +
+        "</div>"
+      );
+    }).join("");
+
+    const pairIds = ["ekmek", "zeytinyagi", "beyazpeynir", "tereyagi"];
+    pairsRowEl.innerHTML = pairIds
+      .map((id) => PRODUCTS.find((p) => p.id === id))
+      .filter(Boolean)
+      .map(pairCardHtml)
+      .join("");
+
+    const deliveryFee = BahcedenCart.subDeliveryFee();
+    const isFirst = sub.type === "subscription"; // prototip: her zaman "ilk 2 kutu" fiyatını gösterir
+    const firstPrice = Math.round(tier.price / 2);
+    priceSummary.innerHTML =
+      '<div class="ps-row"><span>' + tier.label + "</span><span class=\"mono\">" + money(isFirst ? firstPrice : tier.price) + " TL</span></div>" +
+      (isFirst ? '<div class="ps-row ps-note"><span>ilk 2 kutuda %50 indirim uygulandı</span><span class="mono">-' + money(tier.price - firstPrice) + " TL</span></div>" : "") +
+      '<div class="ps-row"><span>Kargo</span><span class="mono">' + (deliveryFee > 0 ? money(deliveryFee) + " TL" : "Dahil") + "</span></div>" +
+      '<div class="ps-row ps-total"><span>Toplam</span><span class="mono">' + money((isFirst ? firstPrice : tier.price) + deliveryFee) + " TL</span></div>";
+
+    cancelNote.hidden = !sub.active;
+  }
+
+  typeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      BahcedenCart.subSetType(btn.getAttribute("data-type"));
+      renderEditor();
+    });
+  });
+
+  boxItemsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".toggle");
+    if (!btn) return;
+    const wrap = btn.closest(".box-item-pref");
+    BahcedenCart.subSetItemPref(wrap.getAttribute("data-item"), btn.getAttribute("data-value"), wrap.getAttribute("data-axis"));
+    renderEditor();
+  });
+
+  boxItemsEl.addEventListener("change", (e) => {
+    const sel = e.target.closest(".swap-select");
+    if (!sel) return;
+    BahcedenCart.subSwapItem(sel.getAttribute("data-slot"), sel.value);
+    renderEditor();
+  });
+
+  confirmBtn.addEventListener("click", () => {
+    const sub = BahcedenCart.getSub();
+    sub.active = true;
+    BahcedenCart.setSub(sub);
+    window.location.href = "sepet.html";
+  });
+
+  cancelLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    BahcedenCart.subCancel();
+    window.location.href = "urunler.html";
+  });
+
+  renderEditor();
+  setInterval(() => {
+    cutoffEl.textContent = "DEĞİŞİKLİK İÇİN: " + BahcedenCart.formatCountdown(BahcedenCart.nextCutoff()) + " SÜREN VAR";
+  }, 60000);
+
+  // Shows the floating "tamamla" shortcut only once the user has scrolled
+  // past the real confirm button (it's above the viewport) — not while it's
+  // still visible, and not before it's even been reached on page load.
+  const scrollConfirmBtn = document.getElementById("scrollConfirm");
+  const confirmObserver = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0];
+      const scrolledPast = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+      scrollConfirmBtn.classList.toggle("visible", scrolledPast);
+    },
+    { threshold: 0 }
+  );
+  confirmObserver.observe(confirmBtn);
+  scrollConfirmBtn.addEventListener("click", () => {
+    confirmBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+})();
+</script>
+
+</body>
+</html>

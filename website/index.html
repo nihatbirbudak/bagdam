@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bağdam — Urla'dan sofrana</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ICON LIBRARY -->
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="ico-fig" viewBox="0 0 100 100">
+      <ellipse cx="50" cy="52" rx="42" ry="40" fill="var(--surface-deep)"/>
+      <ellipse cx="50" cy="52" rx="32" ry="30" fill="var(--fig)" opacity=".55"/>
+      <ellipse cx="50" cy="52" rx="21" ry="20" fill="var(--fig-deep)"/>
+      <g fill="var(--butter)">
+        <circle cx="43" cy="45" r="1.6"/><circle cx="55" cy="41" r="1.5"/><circle cx="61" cy="50" r="1.6"/>
+        <circle cx="58" cy="60" r="1.5"/><circle cx="47" cy="63" r="1.6"/><circle cx="39" cy="55" r="1.5"/>
+        <circle cx="50" cy="52" r="1.6"/>
+      </g>
+    </symbol>
+    <symbol id="ico-olive" viewBox="0 0 100 100">
+      <path d="M20 70 Q45 30 82 26" stroke="var(--olive-deep)" stroke-width="2.5" fill="none"/>
+      <ellipse cx="34" cy="55" rx="14" ry="17" fill="var(--olive)" transform="rotate(-18 34 55)"/>
+      <ellipse cx="55" cy="42" rx="13" ry="16" fill="var(--olive-deep)" transform="rotate(-10 55 42)"/>
+      <ellipse cx="74" cy="32" rx="12" ry="15" fill="var(--olive)" transform="rotate(-4 74 32)"/>
+      <ellipse cx="30" cy="46" rx="10" ry="4" fill="var(--olive-deep)" transform="rotate(-30 30 46)"/>
+      <ellipse cx="66" cy="24" rx="10" ry="4" fill="var(--olive-deep)" transform="rotate(-15 66 24)"/>
+    </symbol>
+    <symbol id="ico-egg" viewBox="0 0 100 100">
+      <ellipse cx="35" cy="62" rx="20" ry="24" fill="var(--surface-deep)" transform="rotate(-8 35 62)"/>
+      <ellipse cx="63" cy="58" rx="20" ry="25" fill="var(--butter-deep)" opacity=".35" transform="rotate(6 63 58)"/>
+      <ellipse cx="50" cy="46" rx="21" ry="26" fill="var(--surface-deep)" transform="rotate(-2 50 46)"/>
+      <ellipse cx="50" cy="46" rx="21" ry="26" fill="none" stroke="var(--ink)" stroke-opacity=".08" stroke-width="1" transform="rotate(-2 50 46)"/>
+    </symbol>
+    <symbol id="ico-melon" viewBox="0 0 100 100">
+      <circle cx="50" cy="54" r="38" fill="var(--butter)"/>
+      <g stroke="var(--butter-deep)" stroke-width="2" fill="none" opacity=".7">
+        <path d="M50 16 Q30 54 50 92"/><path d="M50 16 Q70 54 50 92"/><path d="M50 16 Q50 54 50 92"/>
+        <path d="M50 16 Q14 40 18 60"/><path d="M50 16 Q86 40 82 60"/>
+      </g>
+      <ellipse cx="50" cy="15" rx="4" ry="3" fill="var(--olive-deep)"/>
+    </symbol>
+    <symbol id="ico-walnut" viewBox="0 0 100 100">
+      <path d="M50 12 C74 12 86 34 86 54 C86 78 70 90 50 90 C30 90 14 78 14 54 C14 34 26 12 50 12 Z" fill="var(--surface-deep)"/>
+      <path d="M50 16 C48 30 52 40 44 50 C36 58 46 66 44 78" stroke="var(--fig-deep)" stroke-width="2.2" fill="none" opacity=".55"/>
+      <path d="M50 16 C52 30 48 40 56 50 C64 58 54 66 56 78" stroke="var(--fig-deep)" stroke-width="2.2" fill="none" opacity=".55"/>
+      <path d="M50 14 L50 90" stroke="var(--ink)" stroke-opacity=".12" stroke-width="1.5"/>
+    </symbol>
+    <symbol id="ico-grape" viewBox="0 0 100 100">
+      <path d="M50 10 L50 24" stroke="var(--olive-deep)" stroke-width="2.5"/>
+      <g fill="var(--fig)">
+        <circle cx="50" cy="30" r="8"/>
+        <circle cx="40" cy="42" r="8"/><circle cx="60" cy="42" r="8"/>
+        <circle cx="32" cy="55" r="8"/><circle cx="50" cy="55" r="8"/><circle cx="68" cy="55" r="8"/>
+        <circle cx="41" cy="68" r="8"/><circle cx="59" cy="68" r="8"/>
+        <circle cx="50" cy="80" r="8"/>
+      </g>
+    </symbol>
+    <symbol id="ico-tomato" viewBox="0 0 100 100">
+      <circle cx="50" cy="56" r="34" fill="var(--tomato)"/>
+      <ellipse cx="40" cy="46" rx="9" ry="6" fill="#fff" opacity=".18"/>
+      <path d="M50 22 L44 30 L50 27 L56 30 Z" fill="var(--olive-deep)"/>
+      <path d="M38 24 Q50 18 62 24" stroke="var(--olive-deep)" stroke-width="2.5" fill="none"/>
+    </symbol>
+    <symbol id="ico-chard" viewBox="0 0 100 100">
+      <path d="M50 8 C22 20 16 56 30 90 C38 76 34 40 50 8 Z" fill="var(--olive)" opacity=".8"/>
+      <path d="M50 8 C78 20 84 56 70 90 C62 76 66 40 50 8 Z" fill="var(--olive-deep)" opacity=".65"/>
+      <path d="M50 10 L48 90" stroke="var(--tomato)" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="ico-seal" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>
+      <text x="50" y="57" text-anchor="middle" font-family="Schibsted Grotesk" font-weight="700" font-size="30" fill="currentColor">BA</text>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="#top"><img src="assets/logo/logo-horizontal.svg" alt="Bağdam"></a>
+    <nav class="nav-links">
+      <a href="urunler.html">ürünler</a>
+      <a href="gunluk.html">blog</a>
+      <a href="toptan.html">toptan</a>
+      <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
+    </nav>
+    <div class="nav-icons">
+      <a href="uyelik.html" class="nav-icon" aria-label="Üyelik">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </a>
+      <a href="sepet.html" class="nav-icon cart" aria-label="Sepet">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h14l-1.4 9.5a2 2 0 0 1-2 1.9H8.4a2 2 0 0 1-2-1.9L5 3H2"/><circle cx="9.5" cy="20.5" r="1.3"/><circle cx="17.5" cy="20.5" r="1.3"/></svg>
+        <span class="mono">(0)</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="promo-bar">
+  <span>Abone ol, ilk <b>2 kutunda %50 indirim</b> kazan — kod: <span class="mono">BAGDAM050</span></span>
+</div>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero">
+    <img class="hero-bg" src="assets/images/hero-crate.jpg" alt="" loading="eager">
+    <img class="hero-icon" src="assets/logo/logo-icon.svg" alt="">
+    <h1 class="hero-title">biz market değiliz.<br><em>seçiciyiz.</em></h1>
+    <p class="hero-sub">İzmir içinde, doğrudan üreticilerden — aynı gün toplanır. Bu hafta bardacık inciri tam kıvamında. Kutunu şimdi oluştur.</p>
+    <a class="btn" href="urunler.html">kutunu oluştur</a>
+  </section>
+
+  <!-- VALUE PILLARS -->
+  <section class="pillars">
+    <div class="pillar">
+      <h3>Mevsiminde</h3>
+      <p>Yılın her ürünü her zaman olmaz. Biz de satmayız.</p>
+    </div>
+    <div class="pillar">
+      <h3>Şeffaf</h3>
+      <p>Hangi bahçeden, kim tarafından, ne zaman toplandığını biliyoruz.</p>
+    </div>
+    <div class="pillar">
+      <h3>Seçilmiş</h3>
+      <p>Haftanın en iyi ürünlerini seçmek bizde, olgunluğunu ve boyutunu manavdaki gibi seçmek sende — kutunu ona göre biz dolduruz.</p>
+    </div>
+    <div class="pillar">
+      <h3>Garantili</h3>
+      <p>Ürün beklentini karşılamadıysa bize söyle — ücretini iade eder ya da bir sonraki siparişine ekleriz.</p>
+    </div>
+  </section>
+
+  <!-- SEZON KUTUSU SHOWCASE -->
+  <section class="showcase">
+    <div class="showcase-img"><img src="assets/images/urunler/sezon.jpg" alt="Sezon Kutusu" loading="lazy"></div>
+    <div class="showcase-text">
+      <span class="eyebrow">İlk 2 Kutu Yarı Fiyatına</span>
+      <h2>Sezon Kutusu</h2>
+      <p>Şu an en iyi olan 10 ürünü, senin için tattığımız haliyle kapına getiriyoruz. Ürünleri değiştirebilir, olgunluk seviyeleri ve boyutlarını isteğine göre seçebilirsin.</p>
+      <a class="btn" href="urunler.html">kutunu oluştur</a>
+    </div>
+    <div class="showcase-products">
+      <h3>Ürünler</h3>
+      <div class="showcase-tabs">
+        <a class="prod-tab" href="urunler.html?tab=boxes"><img class="prod-tab-icon" src="assets/icons/boxes.png" alt="">Taze Kutular</a>
+        <a class="prod-tab" href="urunler.html?tab=dairy"><img class="prod-tab-icon" src="assets/icons/dairy.png" alt="">Süt Ürünleri</a>
+        <a class="prod-tab" href="urunler.html?tab=firin"><img class="prod-tab-icon" src="assets/icons/firin.png" alt="">Fırın</a>
+        <a class="prod-tab" href="urunler.html?tab=cellar"><img class="prod-tab-icon" src="assets/icons/cellar.png" alt="">Kiler</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEASONAL EDITORIAL -->
+  <section class="season">
+    <div class="season-text">
+      <span class="eyebrow">Şu An Sezonda</span>
+      <h2>bardacık inciri, <em>tam kıvamında.</em></h2>
+      <p>Kuşçular'ın taş bahçelerinde, ağustos sıcağında olgunlaşan bardacık inciri yılın yalnızca birkaç haftasında bu kadar iyi oluyor. İnce kabuğu, yoğun aroması ve az bulunan tatlılığıyla Urla'nın en kısa ömürlü lezzetlerinden biri.</p>
+      <a class="btn" href="urunler.html">kutunu oluştur</a>
+    </div>
+    <div class="season-imgs">
+      <div class="season-img"><img src="assets/images/scene-originals/fig.jpg" alt="Bardacık inciri" loading="lazy"></div>
+      <div class="season-img"><img src="assets/images/scene-originals/grapes.jpg" alt="Urla karası üzüm" loading="lazy"></div>
+    </div>
+  </section>
+
+  <!-- CATEGORY CLOUD -->
+  <section class="cloud">
+    <p class="cloud-line">indirim&nbsp; sebze&nbsp; <em>meyve</em>&nbsp; bakliyat</p>
+    <p class="cloud-line"><em>süt ürünleri</em>&nbsp; fırın</p>
+    <a class="btn" href="urunler.html">abone ol</a>
+  </section>
+
+  <!-- BEST OFFERS -->
+  <section class="offers">
+    <div class="offers-head">
+      <h2>öne <em>çıkanlar</em></h2>
+      <p>Süt ürünleri, fırın ve kilerden en çok tercih edilenler — taze, doğrudan üreticiden.</p>
+    </div>
+    <div class="pcard-grid offers-grid">
+      <article class="pcard">
+        <a class="pcard-link" href="urun.html?id=zeytinyagi">
+          <div class="pcard-visual"><img src="assets/images/urunler/zeytinyagi.jpg" alt="Sızma Zeytinyağı" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>Sızma Zeytinyağı</h3>
+        </a>
+        <p class="pcard-meta mono">Kuşçular · Urla — Erken Hasat</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">480 TL <span>/ L</span></p>
+          <button class="add-btn" type="button" data-add-to-cart="zeytinyagi">sepete ekle</button>
+        </div>
+      </article>
+      <article class="pcard">
+        <a class="pcard-link" href="urun.html?id=beyazpeynir">
+          <div class="pcard-visual"><img src="assets/images/urunler/beyazpeynir.jpg" alt="Beyaz İnek Peyniri" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>Beyaz İnek Peyniri</h3>
+        </a>
+        <p class="pcard-meta mono">Bademler · Urla</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">260 TL <span>/ 500 g</span></p>
+          <button class="add-btn" type="button" data-add-to-cart="beyazpeynir">sepete ekle</button>
+        </div>
+      </article>
+      <article class="pcard">
+        <a class="pcard-link" href="urun.html?id=ekmek">
+          <div class="pcard-visual"><img src="assets/images/urunler/ekmek.jpg" alt="Ekşi Mayalı Ekmek" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>Ekşi Mayalı Ekmek</h3>
+        </a>
+        <p class="pcard-meta mono">Güzelbahçe · Urla</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">95 TL <span>/ 800 g somun</span></p>
+          <button class="add-btn" type="button" data-add-to-cart="ekmek">sepete ekle</button>
+        </div>
+      </article>
+      <article class="pcard">
+        <a class="pcard-link" href="kutu.html?tier=sezon">
+          <div class="pcard-visual"><img src="assets/images/urunler/sezon.jpg" alt="Sezon Kutusu" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>Sezon Kutusu</h3>
+        </a>
+        <p class="pcard-meta mono">9–10 ürün · haftalık</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">1099 TL <span>/ kutu</span></p>
+          <a class="add-btn" href="kutu.html?tier=sezon">kutunu seç</a>
+        </div>
+      </article>
+      <article class="pcard">
+        <a class="pcard-link" href="urun.html?id=zeytin">
+          <div class="pcard-visual"><img src="assets/images/urunler/zeytin.jpg" alt="Sofralık Zeytin" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>Sofralık Zeytin</h3>
+        </a>
+        <p class="pcard-meta mono">Kuşçular · Urla</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">180 TL <span>/ 500 g</span></p>
+          <button class="add-btn" type="button" data-add-to-cart="zeytin">sepete ekle</button>
+        </div>
+      </article>
+      <article class="pcard">
+        <a class="pcard-link" href="urun.html?id=yogurt">
+          <div class="pcard-visual"><img src="assets/images/urunler/yogurt.jpg" alt="Süzme Yoğurt" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>Süzme Yoğurt</h3>
+        </a>
+        <p class="pcard-meta mono">Bademler · Urla</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">150 TL <span>/ 700 g kavanoz</span></p>
+          <button class="add-btn" type="button" data-add-to-cart="yogurt">sepete ekle</button>
+        </div>
+      </article>
+      <article class="pcard">
+        <a class="pcard-link" href="urun.html?id=tereyagi">
+          <div class="pcard-visual"><img src="assets/images/urunler/tereyagi.jpg" alt="Tereyağı" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>Tereyağı</h3>
+        </a>
+        <p class="pcard-meta mono">Güzelbahçe · Urla</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">180 TL <span>/ 250 g</span></p>
+          <button class="add-btn" type="button" data-add-to-cart="tereyagi">sepete ekle</button>
+        </div>
+      </article>
+      <article class="pcard">
+        <a class="pcard-link" href="urun.html?id=salca">
+          <div class="pcard-visual"><img src="assets/images/urunler/salca.jpg" alt="Salça" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>Salça</h3>
+        </a>
+        <p class="pcard-meta mono">Güzelbahçe · Urla</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">140 TL <span>/ 500 g kavanoz</span></p>
+          <button class="add-btn" type="button" data-add-to-cart="salca">sepete ekle</button>
+        </div>
+      </article>
+    </div>
+    <a class="showcase-row offers-more" href="urunler.html">tümünü gör <span class="showcase-arrow">↗</span></a>
+  </section>
+
+  <!-- JOURNAL TEASER -->
+  <section class="journal-teaser">
+    <div class="journal-teaser-head">
+      <span class="eyebrow">Blog</span>
+      <h2>son <em>yazılar</em></h2>
+      <a class="btn" href="gunluk.html">tümünü oku</a>
+    </div>
+    <div class="journal-grid">
+      <a class="journal-card" href="gunluk.html#zeytinyagi">
+        <span class="journal-tag mono">Söyleşi · 6 dk</span>
+        <h3>dürüst bir zeytinyağını ne yapar?</h3>
+      </a>
+      <a class="journal-card" href="gunluk.html#incir">
+        <span class="journal-tag mono">Mevsim · 4 dk</span>
+        <h3>bardacık inciri neden bu kadar kısa ömürlü?</h3>
+      </a>
+      <a class="journal-card" href="gunluk.html#kutu">
+        <span class="journal-tag mono">Süreç · 5 dk</span>
+        <h3>perşembe'den cuma'ya: bir kutunun yolculuğu</h3>
+      </a>
+    </div>
+  </section>
+
+  <!-- TWO BLOCKS -->
+  <section class="blocks" id="hikaye">
+    <div class="block block-solid">
+      <span class="eyebrow block-eyebrow">Restoranlar İçin</span>
+      <h2 class="block-heading">toptan tedarik — <em>yakında</em></h2>
+      <p class="block-text">Şefler ve restoranlar için doğrudan tedarik hattımızı hazırlıyoruz.</p>
+      <a class="btn-pill" href="toptan.html">haberdar ol</a>
+    </div>
+    <div class="block block-illust">
+      <img src="assets/images/crate.jpg" alt="Urla'dan gelen sandık" loading="lazy">
+      <a class="btn-pill" href="nasil-seciyoruz.html">hikayemiz</a>
+    </div>
+  </section>
+
+  <!-- FOOTER ACCORDION -->
+  <section class="faq" id="faq">
+    <details>
+      <summary>haftalık kutu</summary>
+      <p>Her hafta perşembe günü tattığımız, seçtiğimiz ürünleri cuma günü kapına kadar getiriyoruz. Abonelik dışında tek tek satış yapmıyoruz.</p>
+    </details>
+    <details>
+      <summary>teslimat</summary>
+      <p>Yalnızca İzmir içi teslimat yapıyoruz. Perşembe toplanan ürün cuma sende.</p>
+    </details>
+    <details>
+      <summary>kaynağımız</summary>
+      <p>İzmir'deki üreticilerle doğrudan çalışıyoruz. Her ürünün kim tarafından, nereden geldiğini biliyoruz.</p>
+    </details>
+    <details>
+      <summary>üyelik</summary>
+      <p>Bağdam Seçkisi üyeleri her hafta önce haber alır, önce seçer.</p>
+    </details>
+  </section>
+
+</main>
+
+<footer class="site-foot">
+  <span class="wordmark small"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></span>
+  <span class="mono">© 2026 — URLA</span>
+</footer>
+
+<script src="assets/products.js"></script>
+<script src="assets/cart.js"></script>
+</body>
+</html>

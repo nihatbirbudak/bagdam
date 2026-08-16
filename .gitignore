@@ -1,0 +1,5 @@
+.DS_Store
+**/.DS_Store
+website/.port
+website/server.log
+website/assets/search_*.json

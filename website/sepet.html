@@ -4,26 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bağdam — sepet</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo/logo-icon.svg">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <header class="nav">
   <div class="nav-inner">
+    <button class="nav-burger" type="button" aria-label="Menü" aria-expanded="false" aria-controls="navLinks">
+      <img class="nav-burger-closed" src="assets/icons/hamburger-kapali.png" alt="">
+      <img class="nav-burger-open" src="assets/icons/hamburger-acik.png" alt="">
+    </button>
     <a class="wordmark" href="index.html"><img src="assets/logo/logo-horizontal.svg" alt="Bağdam"></a>
-    <nav class="nav-links">
-      <a href="urunler.html">ürünler</a>
+    <nav class="nav-links" id="navLinks">
+      <a href="urunler.html">tüm ürünler</a>
       <a href="gunluk.html">blog</a>
       <a href="toptan.html">toptan</a>
       <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
     </nav>
     <div class="nav-icons">
       <a href="uyelik.html" class="nav-icon" aria-label="Üyelik">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-      </a>
-      <a href="sepet.html" class="nav-icon cart on" aria-label="Sepet">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h14l-1.4 9.5a2 2 0 0 1-2 1.9H8.4a2 2 0 0 1-2-1.9L5 3H2"/><circle cx="9.5" cy="20.5" r="1.3"/><circle cx="17.5" cy="20.5" r="1.3"/></svg>
-        <span class="mono">(0)</span>
+        <img src="assets/icons/uye-icon.png" alt="Üyelik">
       </a>
     </div>
   </div>
@@ -31,16 +32,171 @@
 
 <main>
   <section class="shop-hero">
-    <span class="eyebrow">Sepetin</span>
-    <h1>almadan <em>önce</em> son bir bak</h1>
+    <div class="shop-hero-icon-wrap">
+      <div class="floating-cart-fill-row" id="shopHeroFillRow"></div>
+      <img class="shop-hero-icon" src="assets/icons/sepet-1.png" alt="Sepetin">
+    </div>
+    <h1>sipariş öncesi <em>son adımlar</em></h1>
   </section>
 
-  <section class="cart-wrap" id="cartWrap"><!-- filled by JS --></section>
+  <!-- Mobil adım sekmeleri: özet → müşteri → teslimat → ödeme. Masaüstünde
+       gizli (orada sol adımlar + sağ özet yan yana). Giriş yapılınca görünür;
+       her adım tamamlandıkça sonraki açılır ve otomatik geçilir. -->
+  <div class="checkout-steps" id="checkoutSteps" hidden>
+    <button class="checkout-step active" type="button" data-step="summary"><span class="checkout-step-num mono">1</span><span>Özet</span></button>
+    <button class="checkout-step" type="button" data-step="customer" disabled><span class="checkout-step-num mono">2</span><span>Müşteri</span></button>
+    <button class="checkout-step" type="button" data-step="delivery" disabled><span class="checkout-step-num mono">3</span><span>Teslimat</span></button>
+    <button class="checkout-step" type="button" data-step="payment" disabled><span class="checkout-step-num mono">4</span><span>Ödeme</span></button>
+  </div>
+
+  <div class="checkout-layout">
+    <div class="checkout-left">
+      <section class="checkout-auth" id="checkoutAuth">
+        <div class="checkout-auth-tabs">
+          <button class="checkout-auth-tab active" type="button" data-mode="login">giriş yap</button>
+          <button class="checkout-auth-tab" type="button" data-mode="signup">üye ol</button>
+        </div>
+        <div class="checkout-form" id="authFormLogin">
+          <label>E-posta<input type="email" id="loginEmail" placeholder="ornek@eposta.com"></label>
+          <label>Parola<input type="password" id="loginPassword" placeholder="••••••••"></label>
+          <p class="checkout-auth-msg mono" id="loginMsg" hidden></p>
+          <button class="cta wide" type="button" id="loginSubmit">giriş yap</button>
+        </div>
+        <div class="checkout-form" id="authFormSignup" hidden>
+          <label>E-posta<input type="email" id="signupEmail" placeholder="ornek@eposta.com"></label>
+          <label>E-posta (Tekrar)<input type="email" id="signupEmailConfirm" placeholder="ornek@eposta.com"></label>
+          <label>Parola<input type="password" id="signupPassword" placeholder="••••••••"></label>
+          <label>Parola (Tekrar)<input type="password" id="signupPasswordConfirm" placeholder="••••••••"></label>
+          <p class="checkout-auth-msg mono" id="signupMsg" hidden></p>
+          <button class="cta wide" type="button" id="signupSubmit">üye ol</button>
+        </div>
+      </section>
+
+      <div class="checkout-sections" id="checkoutSections" hidden>
+        <section class="checkout-section" id="customerSection">
+          <h2 class="checkout-section-title">
+            <span class="section-title-left">
+              <span class="section-check" id="customerCheck"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+              <span>Müşteri Bilgileri</span>
+            </span>
+            <button class="section-toggle" id="customerToggle" type="button" aria-label="Müşteri bilgilerini aç/kapat">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </h2>
+          <div class="checkout-form" id="customerForm">
+            <label>Ad Soyad<input type="text" id="custName" placeholder="Ad Soyad" required></label>
+            <label>E-posta<input type="email" id="custEmail" placeholder="ornek@eposta.com" required></label>
+            <label>Telefon<input type="tel" id="custPhone" placeholder="05xx xxx xx xx" required></label>
+            <label>Adres<textarea id="custAddress" placeholder="Mahalle, sokak, no, daire" required></textarea></label>
+            <div class="form-row">
+              <label>İlçe
+                <select id="custDistrict" required>
+                  <option value="">Seç</option>
+                  <option value="Urla">Urla</option>
+                  <option value="Çeşme">Çeşme</option>
+                </select>
+              </label>
+              <label>Posta Kodu<input type="text" id="custZip" placeholder="35xxx"></label>
+            </div>
+          </div>
+        </section>
+
+        <section class="checkout-section" id="deliverySection">
+          <h2 class="checkout-section-title">
+            <span class="section-title-left">
+              <span class="section-check" id="deliveryCheck"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+              <span>Teslimat Bilgileri</span>
+            </span>
+            <button class="section-toggle" id="deliveryToggle" type="button" aria-label="Teslimat bilgilerini aç/kapat">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </h2>
+          <div class="checkout-form" id="deliveryForm" hidden>
+            <span class="pcard-pref-label mono">teslimat günü</span>
+            <div class="toggle-list small" id="checkoutDeliveryDay"><!-- filled by JS --></div>
+            <p class="day-note mono" id="checkoutDayNote" hidden></p>
+            <p class="checkout-shipping-note mono" id="checkoutShippingNote"></p>
+          </div>
+        </section>
+
+        <section class="checkout-section" id="paymentSection">
+          <h2 class="checkout-section-title">
+            <span class="section-title-left">
+              <span class="section-check" id="paymentCheck"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+              <span>Ödeme Bilgileri</span>
+            </span>
+            <button class="section-toggle" id="paymentToggle" type="button" aria-label="Ödeme bilgilerini aç/kapat">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </h2>
+          <div class="checkout-form" id="paymentForm" hidden>
+            <div class="payment-method-option">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="1.5"/><path d="M2 9.5h20"/></svg>
+              Kredi Kartı / Banka Kartı
+            </div>
+            <label>Kart Üzerindeki İsim<input type="text" id="cardName" placeholder="Ad Soyad" required></label>
+            <label>Kart Numarası<input type="text" id="cardNumber" placeholder="0000 0000 0000 0000" inputmode="numeric" maxlength="19" required></label>
+            <div class="form-row">
+              <label>Son Kullanma<input type="text" id="cardExpiry" placeholder="AA/YY" inputmode="numeric" maxlength="5" required></label>
+              <label>CVC<input type="text" id="cardCvc" placeholder="123" inputmode="numeric" maxlength="4" required></label>
+            </div>
+          </div>
+        </section>
+
+        <button class="cta wide" id="checkoutComplete" type="button">siparişi tamamla</button>
+        <p class="checkout-success mono" id="checkoutSuccess" hidden>Siparişin alındı — teşekkürler!</p>
+      </div>
+    </div>
+
+    <div class="checkout-right">
+      <section class="checkout-summary" id="cartWrap"><!-- filled by JS --></section>
+    </div>
+  </div>
 </main>
 
 <footer class="site-foot">
-  <span class="wordmark small"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></span>
-  <span class="mono">© 2026 — URLA</span>
+  <div class="site-foot-top">
+    <div class="site-foot-brand">
+      <div class="site-foot-logo-row">
+        <a class="wordmark small" href="index.html" aria-label="Bağdam ana sayfa"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></a>
+      </div>
+    </div>
+    <div class="site-foot-contact-row">
+      <a class="site-foot-contact" href="tel:+905309494093">
+        <img src="assets/icons/mutlu-musteri.png" alt="">
+        <span class="site-foot-contact-text">
+          <span class="site-foot-contact-label mono">mutlu müşteri hattı</span>
+          <span class="site-foot-contact-value">+90 (530) 949 40 93</span>
+        </span>
+      </a>
+      <a class="site-foot-contact site-foot-contact-location" href="https://www.google.com/maps/search/?api=1&query=8034%20Sokak%20No%3A38%20Ku%C5%9F%C3%A7ular%20Urla%20%C4%B0zmir" target="_blank" rel="noopener">
+        <img src="assets/icons/konum.png" alt="">
+        <span class="site-foot-contact-text">
+          <span class="site-foot-contact-label mono">bağdam</span>
+          <span class="site-foot-contact-value">8034 Sokak No:38,<span class="addr-break"> </span>Kuşçular — Urla / İzmir</span>
+        </span>
+      </a>
+    </div>
+    <div class="site-foot-social">
+      <a class="site-foot-ig-link" href="#" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg>
+      </a>
+      <a class="site-foot-yt-link" href="#" aria-label="YouTube">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l6 3-6 3z" fill="currentColor" stroke="none"/></svg>
+      </a>
+    </div>
+  </div>
+  <div class="site-foot-bottom">
+    <div class="site-foot-left mono">
+      <span class="site-foot-copyright">© 2026 — BAĞDAM. TÜM HAKLARI SAKLIDIR.</span>
+      <span class="site-foot-sep">|</span>
+      <a class="policies-link" href="politikalar.html">Tüm Politikalar</a>
+    </div>
+    <a class="site-foot-credit" href="https://youmedya.com/iletisim/" target="_blank" rel="noopener">
+      <span class="mono">designed and powered by</span>
+      <span class="site-foot-credit-logo" role="img" aria-label="You Medya"></span>
+    </a>
+  </div>
 </footer>
 
 <script src="assets/products.js"></script>
@@ -48,41 +204,327 @@
 <script>
 (function () {
   function money(n) { return n.toLocaleString("tr-TR"); }
+  var stepsEl = null, stepBtns = null, stepPanels = null; // mobil adım sekmeleri (aşağıda kurulur)
+
+  // ---- Auth gate: shared login/signup wiring lives in cart.js so
+  // sepet.html and uyelik.html don't each carry their own copy. Giriş/üyelik
+  // durumu her değiştiğinde formlar depodan yeniden dolar — böylece yeni
+  // üye olan biri, önceki üyenin ekranda kalmış bilgilerini görmez.
+  // (wireAuthGate kurulurken bir kez hemen çağrılır — o anda form alanları
+  // henüz tanımlı değil; ilk çağrı atlanır, formlar aşağıda elle dolar.)
+  let formsReady = false;
+  const refreshAuthGate = BahcedenCart.wireAuthGate("checkoutSections", () => {
+    if (!formsReady) return;
+    fillFormsFromStore();
+    render();
+  });
+
+  // ---- Customer form — same address store uyelik.html reads/writes ----
+  const custName = document.getElementById("custName");
+  const custEmail = document.getElementById("custEmail");
+  const custPhone = document.getElementById("custPhone");
+  const custAddress = document.getElementById("custAddress");
+  const custDistrict = document.getElementById("custDistrict");
+  const custZip = document.getElementById("custZip");
+
+  function fillFormsFromStore() {
+    const a = BahcedenCart.getAddress() || {};
+    custName.value = a.name || "";
+    custEmail.value = a.email || "";
+    custPhone.value = a.phone || "";
+    custAddress.value = a.line || "";
+    custDistrict.value = a.district || "";
+    custZip.value = a.zip || "";
+    const c = BahcedenCart.getCard() || {};
+    cardName.value = c.name || "";
+    cardNumber.value = c.number || "";
+    cardExpiry.value = c.expiry || "";
+    cardCvc.value = c.cvc || "";
+  }
+  function saveCustomerForm() {
+    BahcedenCart.setAddress({
+      name: custName.value.trim(),
+      email: custEmail.value.trim(),
+      phone: custPhone.value.trim(),
+      line: custAddress.value.trim(),
+      district: custDistrict.value,
+      zip: custZip.value.trim(),
+    });
+  }
+  // Delivery and Payment stay collapsed to just their title until every
+  // required customer field is filled — same "one step unlocks the next"
+  // pattern as a normal checkout, just without a real backend behind it.
+  // Customer collapses the other way: once it's complete and the next two
+  // steps open up, its own form drops out of the way.
+  const customerSection = document.getElementById("customerSection");
+  const customerForm = document.getElementById("customerForm");
+  const deliverySection = document.getElementById("deliverySection");
+  const paymentSection = document.getElementById("paymentSection");
+  const deliveryForm = document.getElementById("deliveryForm");
+  const paymentForm = document.getElementById("paymentForm");
+
+  function customerComplete() {
+    return !!(
+      custName.value.trim() &&
+      custEmail.value.trim() &&
+      custPhone.value.trim() &&
+      custAddress.value.trim() &&
+      custDistrict.value
+    );
+  }
+
+  // ---- Payment — same saved-card store üyelik.html reads/writes, but only
+  // for subscriptions. A one-time card shouldn't silently become the saved
+  // default payment method on the account. ----
+  const cardName = document.getElementById("cardName");
+  const cardNumber = document.getElementById("cardNumber");
+  const cardExpiry = document.getElementById("cardExpiry");
+  const cardCvc = document.getElementById("cardCvc");
+  fillFormsFromStore();
+  formsReady = true;
+  function paymentComplete() {
+    return !!(
+      cardName.value.trim() &&
+      cardNumber.value.trim() &&
+      cardExpiry.value.trim() &&
+      cardCvc.value.trim()
+    );
+  }
+  function saveCardForm() {
+    const sub = BahcedenCart.getSub();
+    const isSubscription = sub.active && sub.type === "subscription";
+    if (!isSubscription) return;
+    BahcedenCart.setCard({
+      name: cardName.value.trim(),
+      number: cardNumber.value.trim(),
+      expiry: cardExpiry.value.trim(),
+      cvc: cardCvc.value.trim(),
+    });
+  }
+  cardNumber.addEventListener("input", () => {
+    cardNumber.value = cardNumber.value.replace(/\D/g, "").slice(0, 16).replace(/(\d{4})(?=\d)/g, "$1 ");
+  });
+  cardExpiry.addEventListener("input", () => {
+    const digits = cardExpiry.value.replace(/\D/g, "").slice(0, 4);
+    cardExpiry.value = digits.length >= 3 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
+  });
+  [cardName, cardNumber, cardExpiry, cardCvc].forEach((el) => {
+    el.addEventListener("input", () => { saveCardForm(); refreshSections(); });
+  });
+
+  // ---- Section headers: a left-side circle fills in green once that
+  // section's own data is complete; a right-side arrow lets the visitor
+  // open/close any section by hand. Müşteri auto-collapses the moment it's
+  // first complete (freeing up room for Teslimat/Ödeme) — Teslimat and
+  // Ödeme never auto-collapse, only the arrow touches them. ----
+  const sectionState = {
+    customer: { collapsed: false, manual: false },
+    delivery: { collapsed: false, manual: false },
+    payment: { collapsed: false, manual: false },
+  };
+  const sectionEls = {
+    customer: { section: customerSection, form: customerForm, check: document.getElementById("customerCheck"), toggle: document.getElementById("customerToggle") },
+    delivery: { section: deliverySection, form: deliveryForm, check: document.getElementById("deliveryCheck"), toggle: document.getElementById("deliveryToggle") },
+    payment: { section: paymentSection, form: paymentForm, check: document.getElementById("paymentCheck"), toggle: document.getElementById("paymentToggle") },
+  };
+  function renderSectionState(key, complete, locked) {
+    const state = sectionState[key];
+    const els = sectionEls[key];
+    const collapsed = locked || state.collapsed;
+    els.check.classList.toggle("complete", complete);
+    els.section.classList.toggle("locked", collapsed);
+    els.form.hidden = collapsed;
+    els.toggle.disabled = locked;
+    els.toggle.classList.toggle("open", !collapsed);
+  }
+  function refreshSections() {
+    const customerOk = customerComplete();
+    const deliveryOk = !!BahcedenCart.getSub().deliveryDay;
+    const paymentOk = paymentComplete();
+    if (!sectionState.customer.manual) sectionState.customer.collapsed = customerOk;
+    renderSectionState("customer", customerOk, false);
+    renderSectionState("delivery", deliveryOk, !customerOk);
+    renderSectionState("payment", paymentOk, !customerOk);
+    if (typeof refreshSteps === "function") refreshSteps(); // mobil adım sekmeleri
+  }
+  Object.keys(sectionEls).forEach((key) => {
+    sectionEls[key].toggle.addEventListener("click", () => {
+      sectionState[key].manual = true;
+      sectionState[key].collapsed = !sectionState[key].collapsed;
+      refreshSections();
+    });
+  });
+
+  [custName, custEmail, custPhone, custAddress, custZip].forEach((el) => {
+    el.addEventListener("input", () => { saveCustomerForm(); refreshSections(); });
+  });
+  custDistrict.addEventListener("change", () => { saveCustomerForm(); refreshSections(); });
+  refreshSections();
+
+  // ---- Delivery day (order-level — same lock rule as the box editor) ----
+  const deliveryDayToggle = document.getElementById("checkoutDeliveryDay");
+  const shippingNoteEl = document.getElementById("checkoutShippingNote");
+
+  function renderDeliveryDay(deliveryFee) {
+    const sub = BahcedenCart.getSub();
+    // Kesimi geçmiş gün de seçilebilir — sadece bu haftaya yetişmez;
+    // seçildiyse altındaki not teslimatın sonraki haftaya kaldığını söyler.
+    deliveryDayToggle.innerHTML = DELIVERY_DAYS.map((d) => {
+      const isActive = sub.deliveryDay === d.id;
+      return '<button class="toggle' + (isActive ? " active" : "") + '" type="button" data-day="' + d.id + '">' + d.label + "</button>";
+    }).join("");
+    deliveryDayToggle.querySelectorAll(".toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        BahcedenCart.subSetDeliveryDay(btn.getAttribute("data-day"));
+        render();
+      });
+    });
+    const dayNoteEl = document.getElementById("checkoutDayNote");
+    const dayNoteText = BahcedenCart.lockedDayNote(sub.deliveryDay);
+    dayNoteEl.hidden = !dayNoteText;
+    dayNoteEl.textContent = dayNoteText || "";
+    shippingNoteEl.textContent = "Kargo: " + (deliveryFee > 0 ? money(deliveryFee) + " TL" : "Dahil");
+  }
+
+  // ---- Complete checkout (design prototype — no real payment) ----
+  const checkoutCompleteBtn = document.getElementById("checkoutComplete");
+  const checkoutSuccessEl = document.getElementById("checkoutSuccess");
+  checkoutCompleteBtn.addEventListener("click", () => {
+    const requiredEls = document.querySelectorAll(".checkout-left [required]");
+    let valid = true;
+    requiredEls.forEach((el) => {
+      const filled = !!el.value && el.value.trim() !== "";
+      el.classList.toggle("invalid", !filled);
+      if (!filled) valid = false;
+    });
+    if (!valid || !BahcedenCart.getSub().deliveryDay) return;
+    saveCustomerForm();
+
+    // Sipariş kaydı — üyelik sayfasındaki "önceki siparişler" bu listeden
+    // beslenir. Sepet temizlenmeden ÖNCE toplanmalı.
+    const cartItems = BahcedenCart.getCart();
+    const paidSub = BahcedenCart.getSub();
+    const paidTier = paidSub.active ? BahcedenCart.subTier() : null;
+    const orderLines = [];
+    let orderTotal = 0;
+    if (paidTier) {
+      orderLines.push(paidTier.label + " — " + paidTier.count + " ürün");
+      (paidSub.extras || []).forEach((ex) => {
+        const p = PRODUCTS.find((x) => x.id === ex.id);
+        if (p) orderLines.push("+ " + p.name + " (" + ex.label + ")");
+      });
+      orderTotal += paidSub.skipThisWeek ? 0 : paidTier.price + BahcedenCart.subExtrasTotal();
+    }
+    cartItems.forEach((item) => {
+      const p = PRODUCTS.find((x) => x.id === item.id);
+      if (!p) return;
+      orderLines.push(p.name + " × " + item.qty);
+      orderTotal += p.price * item.qty;
+    });
+    const paidIsSubscriber = !!(paidTier && paidSub.type === "subscription");
+    const paidFee = paidIsSubscriber || orderTotal > 1000 ? 0 : (typeof DELIVERY_FEE !== "undefined" ? DELIVERY_FEE : 0);
+    const deliveryDate = BahcedenCart.nextDeliveryDate(paidSub.deliveryDay);
+    BahcedenCart.addOrder({
+      date: Date.now(),
+      deliveryDate: deliveryDate ? deliveryDate.getTime() : null,
+      lines: orderLines,
+      total: orderTotal + paidFee,
+      deliveryDay: paidSub.deliveryDay,
+      type: paidTier ? paidSub.type : "tekli",
+    });
+
+    // Ödeme tamam: sepetteki kutu "satın alınmış" aboneliğe dönüşür — artık
+    // üyelik sayfasındaki aboneliklerimde yönetilir. Sepet de boşalır.
+    if (paidSub.active) {
+      paidSub.active = false;
+      paidSub.purchased = true;
+      BahcedenCart.setSub(paidSub);
+    }
+    BahcedenCart.setCart([]);
+    // Abonelikli kutu ödemesinde üyelik yönlendirmesi eklenir; yalnızca
+    // tekli ürün siparişinde kısa teşekkür yeter.
+    checkoutSuccessEl.innerHTML = paidIsSubscriber
+      ? 'Siparişin alındı — teşekkürler! Aboneliğini <a href="uyelik.html">üyelik sayfandan</a> yönetebilirsin.'
+      : "Siparişin alındı — teşekkürler!";
+    checkoutCompleteBtn.hidden = true;
+    checkoutSuccessEl.hidden = false;
+    // Ödeme alındı: formlar ve adım sekmeleri kapanır, yalnızca teşekkür
+    // mesajı kalır (mobilde kart formu ekranda durmasın).
+    document.body.classList.add("order-done");
+    if (stepsEl) stepsEl.hidden = true;
+  });
+
+  // "Bu haftaki kutuma ekle" az önce kullanıldıysa, boşalan sepette bunun
+  // onay notunu gösterebilmek için akılda tutulur (sayfa görünümü boyunca).
+  let justAddedToBox = false;
 
   function render() {
     const items = BahcedenCart.getCart();
     const sub = BahcedenCart.getSub();
-    const tier = BahcedenCart.subTier();
+    const tier = sub.active ? BahcedenCart.subTier() : null;
     const wrap = document.getElementById("cartWrap");
+    BahcedenCart.renderCategoryPile(document.getElementById("shopHeroFillRow"));
 
     if (!tier && items.length === 0) {
-      wrap.innerHTML =
-        '<p class="cart-empty mono">henüz bir aboneliğin yok.</p>' +
-        '<a class="btn" href="urunler.html">aboneliği başlat</a>';
+      wrap.innerHTML = BahcedenCart.hasPurchasedSub()
+        ? '<h2 class="checkout-section-title">Sipariş Özeti</h2>' +
+          (justAddedToBox
+            ? '<p class="checkout-shipping-note mono">Ürünler bu haftaki kutuna eklendi — ödemesi kutu ücretiyle birlikte çekilecek, kutunla aynı gün teslim edilecek.</p>'
+            : '<p class="cart-empty mono">sepetin boş.</p>') +
+          '<a class="btn" href="uyelik.html">aboneliğini görüntüle</a>'
+        : '<p class="cart-empty mono">henüz bir aboneliğin yok.</p>' +
+          '<a class="btn" href="urunler.html">aboneliği başlat</a>';
+      renderDeliveryDay(0);
+      refreshSections();
       return;
     }
 
     let subtotal = 0;
+    let vat = 0;
     let subBlock = "";
     if (tier) {
-      subtotal += sub.skipThisWeek ? 0 : tier.price;
+      const isSub = sub.type === "subscription";
+      const extras = sub.extras || [];
+      const extrasTotal = BahcedenCart.subExtrasTotal();
+      const lineTotal = sub.skipThisWeek ? 0 : tier.price + extrasTotal;
+      subtotal += lineTotal;
+      if (!sub.skipThisWeek) vat += lineTotal * (0.01 / 1.01);
       const itemNames = sub.items
         .map((id) => { const p = PRODUCTS.find((x) => x.id === id); return p ? p.name : ""; })
         .filter(Boolean)
         .join(", ");
+      const extrasNames = extras
+        .map((ex) => { const p = PRODUCTS.find((x) => x.id === ex.id); return p ? p.name + " (" + ex.label + ")" : ""; })
+        .filter(Boolean)
+        .join(", ");
+      const freq = FREQ_OPTIONS.find((f) => f.id === sub.freq);
+      const freqLabel = freq ? freq.label + (!freq.allDays && sub.deliveryDay ? " — " + (DELIVERY_DAYS.find((d) => d.id === sub.deliveryDay) || {}).label : "") : "";
+      const noteHtml = isSub
+        ? (sub.skipThisWeek
+            ? '<p class="sub-skip-note mono">BU HAFTA ATLANDI</p>'
+            : '<p class="sub-skip-note mono">' + freqLabel.toLocaleUpperCase("tr-TR") + " OTOMATİK GELİR</p>")
+        : "";
+      const controlsHtml =
+        '<div class="qty-row">' +
+          '<a class="cart-remove mono" href="kutu.html?tier=' + tier.id + '">kutuyu düzenle</a>' +
+          '<button class="cart-remove mono" id="subRemove" type="button">kaldır</button>' +
+        "</div>";
       subBlock =
         '<div class="cart-row sub-row">' +
+          '<img src="' + tier.img + '" alt="' + tier.label + '">' +
           '<div class="cart-row-info">' +
-            "<h3>" + tier.label + " — " + tier.count + " ürün</h3>" +
+            "<h3>" + tier.label + " — " + tier.count + " ürün" + (extras.length ? " + " + extras.length + " ekstra" : "") + "</h3>" +
             '<p class="pcard-meta mono">' + itemNames + "</p>" +
-            (sub.skipThisWeek
-              ? '<p class="sub-skip-note mono">BU HAFTA ATLANDI</p>'
-              : '<p class="sub-skip-note mono">HER HAFTA OTOMATİK GELİR</p>') +
-            '<div class="qty-row"><a class="cart-remove mono" href="kutu.html?tier=' + tier.id + '">kutuyu düzenle</a></div>' +
+            (extrasNames ? '<p class="pcard-meta mono">+ EKSTRA: ' + extrasNames + "</p>" : "") +
+            noteHtml +
+            controlsHtml +
           "</div>" +
-          '<span class="price mono">' + (sub.skipThisWeek ? "0 TL" : money(tier.price) + " TL") + "</span>" +
+          '<span class="price mono">' + money(lineTotal) + " TL</span>" +
         "</div>";
     }
+
+    const TRASH_SVG =
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
 
     const rows = items
       .map((item, i) => {
@@ -90,17 +532,20 @@
         if (!p) return "";
         const lineTotal = p.price * item.qty;
         subtotal += lineTotal;
+        vat += lineTotal * (0.01 / 1.01);
+        const isTrash = item.qty === 1;
         return (
           '<div class="cart-row">' +
             '<img src="' + p.img + '" alt="' + p.name + '">' +
             '<div class="cart-row-info">' +
               "<h3>" + p.name + "</h3>" +
               '<p class="pcard-meta mono">' + (item.pref ? item.pref : p.meta) + "</p>" +
-              '<div class="qty-row">' +
-                '<button class="qty-btn" data-idx="' + i + '" data-dir="-1" type="button">–</button>' +
-                '<span class="mono">' + item.qty + "</span>" +
-                '<button class="qty-btn" data-idx="' + i + '" data-dir="1" type="button">+</button>' +
-                '<button class="cart-remove mono" data-idx="' + i + '" type="button">kaldır</button>' +
+              '<div class="qty-stepper-row">' +
+                '<button class="qty-stepper-dec' + (isTrash ? " trash" : "") + '" data-idx="' + i + '" data-dir="-1" type="button" aria-label="' + (isTrash ? "Sepetten kaldır" : "Azalt") + '">' +
+                  (isTrash ? TRASH_SVG : "−") +
+                "</button>" +
+                '<span class="qty-stepper-count mono">' + item.qty + "</span>" +
+                '<button class="qty-stepper-inc" data-idx="' + i + '" data-dir="1" type="button" aria-label="Arttır">+</button>' +
               "</div>" +
             "</div>" +
             '<span class="price mono">' + money(lineTotal) + " TL</span>" +
@@ -109,25 +554,67 @@
       })
       .join("");
 
-    wrap.innerHTML =
-      '<div class="cart-rows">' + subBlock + rows + "</div>" +
-      '<div class="cart-summary">' +
-        '<div class="cart-total"><span>Bu haftaki toplam</span><span class="mono">' + money(subtotal) + " TL</span></div>" +
-        '<p class="cart-note">Teslimat: Perşembe toplanır, Cuma kapında.</p>' +
-        '<button class="cta wide" type="button" disabled title="Bu bir tasarım prototipi — ödeme altyapısı henüz bağlı değil">ödemeye geç</button>' +
-        (tier ? '<p class="cancel-note"><a href="#" id="cancelSub">aboneliği iptal et</a></p>' : "") +
-      "</div>";
+    const vatLines = vat > 0 ? '<div class="cart-vat-row"><span>%1 KDV</span><span class="mono">' + money(Math.round(vat)) + " TL</span></div>" : "";
 
-    const cancelSub = document.getElementById("cancelSub");
-    if (cancelSub) {
-      cancelSub.addEventListener("click", (e) => {
-        e.preventDefault();
-        BahcedenCart.subCancel();
+    // Aktif (satın alınmış) aboneliği olan biri tekli ürün eklediyse iki yol
+    // sunulur: normal akışla hemen ödemek, ya da ürünleri bu haftaki kutuya
+    // taşımak — o zaman ücreti kutu ödemesiyle aynı gün çekilir ve kutuyla
+    // aynı gün teslim edilir.
+    const addToBoxHtml = BahcedenCart.hasPurchasedSub() && items.length > 0
+      ? '<div class="addon-choice">' +
+          '<p><b>Aktif aboneliğin var.</b> Bu ürünleri hemen ödemek için aşağıdaki sipariş adımlarını tamamla — ayrı bir sipariş olarak işlenir, teslimat gününü seçersin. İstersen bu haftaki kutuna ekle: ücreti kutu ödemenle aynı gün çekilir, kutunla aynı gün teslim edilir.</p>' +
+          '<button class="btn" id="addToBoxBtn" type="button">bu haftaki kutuma ekle</button>' +
+        "</div>"
+      : "";
+
+    // Aboneliklerde kargo her zaman dahil; tek ürün/tek seferlik siparişlerde
+    // 1000 TL üzeri ücretsiz, altında sabit kargo ücreti uygulanır.
+    const isSubscriber = !!(tier && sub.type === "subscription");
+    const freeShipping = isSubscriber || subtotal > 1000;
+    const deliveryFee = freeShipping ? 0 : (typeof DELIVERY_FEE !== "undefined" ? DELIVERY_FEE : 0);
+    const grandTotal = subtotal + deliveryFee;
+
+    wrap.innerHTML =
+      '<h2 class="checkout-section-title">Sipariş Özeti</h2>' +
+      '<div class="cart-rows">' + subBlock + rows + "</div>" +
+      addToBoxHtml +
+      '<div class="cart-summary">' +
+        '<div class="cart-total"><span>Toplam</span><span class="mono">' + money(grandTotal) + " TL</span></div>" +
+        '<div class="cart-vat-row"><span>Kargo</span><span class="mono">' + (deliveryFee > 0 ? money(deliveryFee) + " TL" : "Dahil") + "</span></div>" +
+        vatLines +
+      "</div>" +
+      // Mobil adım akışı: özetten sonraki adıma geçiş (masaüstünde gizli).
+      '<button class="cta wide summary-continue" id="summaryContinue" type="button" hidden>devam et</button>';
+
+    const summaryContinue = document.getElementById("summaryContinue");
+    if (summaryContinue) summaryContinue.addEventListener("click", () => showStep("customer"));
+    const addToBoxBtn = document.getElementById("addToBoxBtn");
+    if (addToBoxBtn) {
+      addToBoxBtn.addEventListener("click", () => {
+        BahcedenCart.getCart().forEach((item) => {
+          const p = PRODUCTS.find((x) => x.id === item.id);
+          if (!p) return;
+          BahcedenCart.subAddExtra(item.id, item.qty, item.qty + " × " + p.unit + (item.pref ? " · " + item.pref : ""));
+        });
+        BahcedenCart.setCart([]);
+        justAddedToBox = true;
         render();
       });
     }
 
-    wrap.querySelectorAll(".qty-btn").forEach((btn) => {
+    const subRemove = document.getElementById("subRemove");
+    if (subRemove) {
+      subRemove.addEventListener("click", () => {
+        // Just un-commits it from the cart (active:false) — keeps the box's
+        // tier/items/frequency so it's still there if they come back to it.
+        const s = BahcedenCart.getSub();
+        s.active = false;
+        BahcedenCart.setSub(s);
+        render();
+      });
+    }
+
+    wrap.querySelectorAll(".qty-stepper-dec[data-idx], .qty-stepper-inc[data-idx]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const idx = parseInt(btn.getAttribute("data-idx"), 10);
         const dir = parseInt(btn.getAttribute("data-dir"), 10);
@@ -136,15 +623,80 @@
         render();
       });
     });
-    wrap.querySelectorAll(".cart-remove").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        BahcedenCart.remove(parseInt(btn.getAttribute("data-idx"), 10));
-        render();
-      });
-    });
+
+    renderDeliveryDay(deliveryFee);
+    refreshSections();
   }
 
+  // ---- Mobil adım sekmeleri (≤640px). Masaüstünde çubuk gizli; bölümler
+  // eski akordiyon davranışında kalır. Kilit kuralı aynı: müşteri bilgileri
+  // tamamlanmadan teslimat/ödeme açılmaz. Bir adım tamamlanınca sonrakine
+  // kendiliğinden geçer. Özet sekmesinde "devam et" — "bu haftaki kutuma
+  // ekle" kullanıldıysa (sepet boşalır, kutuya eklenir) devam çıkmaz.
+  stepsEl = document.getElementById("checkoutSteps");
+  stepBtns = stepsEl.querySelectorAll(".checkout-step");
+  stepPanels = {
+    summary: document.querySelector(".checkout-right"),
+    customer: customerSection,
+    delivery: deliverySection,
+    payment: paymentSection,
+  };
+  let currentStep = "summary";
+  let lastAuto = { customer: false, delivery: false };
+  function isMobileSteps() { return window.innerWidth <= 900; }
+  function stepUnlocked(key) {
+    if (key === "summary") return true;
+    const hasItems = BahcedenCart.getCart().length > 0 || BahcedenCart.getSub().active;
+    if (key === "customer") return hasItems;
+    return hasItems && customerComplete(); // delivery & payment
+  }
+  function showStep(key) {
+    if (!stepUnlocked(key)) return;
+    currentStep = key;
+    stepBtns.forEach((b) => b.classList.toggle("active", b.getAttribute("data-step") === key));
+    Object.keys(stepPanels).forEach((k) => stepPanels[k].classList.toggle("step-hidden", isMobileSteps() && k !== key));
+    // Sekmede gösterilen bölüm açık olsun (akordiyonun gizlediği formu aç).
+    if (isMobileSteps() && sectionState[key]) { sectionState[key].manual = true; sectionState[key].collapsed = false; refreshSections(); }
+    if (isMobileSteps()) window.scrollTo({ top: Math.max(0, stepsEl.getBoundingClientRect().top + window.scrollY - 70), behavior: "smooth" });
+  }
+  function refreshSteps() {
+    if (!stepsEl) return; // kurulumdan önce çağrılırsa
+    const loggedIn = BahcedenCart.isLoggedIn();
+    // Sepet boşken (ürün/kutu yok) sekme çubuğu anlamsız — gizli.
+    stepsEl.hidden = !(loggedIn && isMobileSteps() && stepUnlocked("customer"));
+    stepBtns.forEach((b) => {
+      const k = b.getAttribute("data-step");
+      b.disabled = !stepUnlocked(k);
+      const done = (k === "customer" && customerComplete()) || (k === "delivery" && !!BahcedenCart.getSub().deliveryDay) || (k === "payment" && paymentComplete());
+      b.classList.toggle("done", done);
+    });
+    // Otomatik ilerleme: müşteri tamamlandı → teslimat; teslimat günü seçildi → ödeme.
+    if (isMobileSteps() && loggedIn) {
+      if (currentStep === "customer" && customerComplete() && !lastAuto.customer) { lastAuto.customer = true; showStep("delivery"); }
+      else if (currentStep === "delivery" && BahcedenCart.getSub().deliveryDay && !lastAuto.delivery) { lastAuto.delivery = true; showStep("payment"); }
+      else if (!stepUnlocked(currentStep)) showStep("summary");
+      else Object.keys(stepPanels).forEach((k) => stepPanels[k].classList.toggle("step-hidden", k !== currentStep));
+    } else {
+      Object.keys(stepPanels).forEach((k) => stepPanels[k].classList.remove("step-hidden"));
+    }
+    // Özet altındaki "devam et": yalnızca mobil + giriş + sepette ürün/kutu var.
+    const contBtn = document.getElementById("summaryContinue");
+    if (contBtn) contBtn.hidden = !(isMobileSteps() && loggedIn && stepUnlocked("customer"));
+  }
+  stepsEl.addEventListener("click", (e) => {
+    const b = e.target.closest(".checkout-step");
+    if (!b || b.disabled) return;
+    showStep(b.getAttribute("data-step"));
+  });
+  // Müşteri alanları her değiştiğinde ve teslimat günü seçildiğinde kilitler güncellensin.
+  [custName, custEmail, custPhone, custAddress, custZip, custDistrict].forEach((el) => el.addEventListener("input", refreshSteps));
+  custDistrict.addEventListener("change", refreshSteps);
+  [cardName, cardNumber, cardExpiry, cardCvc].forEach((el) => el.addEventListener("input", refreshSteps));
+  window.addEventListener("resize", refreshSteps);
+
+  refreshAuthGate();
   render();
+  refreshSteps();
 })();
 </script>
 

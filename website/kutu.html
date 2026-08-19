@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title id="pagetitle">Bağdam — kutu</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo/logo-icon.svg">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -19,28 +20,28 @@
 
 <header class="nav">
   <div class="nav-inner">
+    <button class="nav-burger" type="button" aria-label="Menü" aria-expanded="false" aria-controls="navLinks">
+      <img class="nav-burger-closed" src="assets/icons/hamburger-kapali.png" alt="">
+      <img class="nav-burger-open" src="assets/icons/hamburger-acik.png" alt="">
+    </button>
     <a class="wordmark" href="index.html"><img src="assets/logo/logo-horizontal.svg" alt="Bağdam"></a>
-    <nav class="nav-links">
-      <a href="urunler.html" class="on">ürünler</a>
+    <nav class="nav-links" id="navLinks">
+      <a href="urunler.html" class="on">tüm ürünler</a>
       <a href="gunluk.html">blog</a>
       <a href="toptan.html">toptan</a>
       <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
     </nav>
     <div class="nav-icons">
       <a href="uyelik.html" class="nav-icon" aria-label="Üyelik">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-      </a>
-      <a href="sepet.html" class="nav-icon cart" aria-label="Sepet">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h14l-1.4 9.5a2 2 0 0 1-2 1.9H8.4a2 2 0 0 1-2-1.9L5 3H2"/><circle cx="9.5" cy="20.5" r="1.3"/><circle cx="17.5" cy="20.5" r="1.3"/></svg>
-        <span class="mono">(0)</span>
+        <img src="assets/icons/uye-icon.png" alt="Üyelik">
       </a>
     </div>
   </div>
-</header>
-
-<div class="promo-bar">
+  <div class="promo-bar">
   <span>Abone ol, ilk <b>2 kutunda %50 indirim</b> kazan — kod: <span class="mono">BAGDAM050</span></span>
 </div>
+</header>
+
 
 <main>
   <p class="crumb mono"><a href="urunler.html">← kutulara dön</a></p>
@@ -74,33 +75,78 @@
 
       <div class="freq-row" id="freqRow">
         <span class="pcard-pref-label mono">gönderim sıklığı</span>
-        <div class="toggle-row small" id="freqToggle"><!-- filled by JS --></div>
+        <div class="toggle-list small" id="freqToggle"><!-- filled by JS --></div>
       </div>
-
-      <div class="price-summary" id="priceSummary"><!-- filled by JS --></div>
-
-      <div class="box-editor-foot">
-        <button class="cta wide" id="confirmBtn" type="button">aboneliği başlat</button>
-      </div>
-      <p class="cancel-note" id="cancelNote" hidden>Aboneliğin aktif. <a href="#" id="cancelLink">iptal et</a></p>
 
       <div class="box-items-head">
         <h2>bu haftaki <em>içerik</em></h2>
         <span class="cutoff mono" id="cutoff"></span>
       </div>
       <div class="box-items" id="boxItems"><!-- filled by JS --></div>
+
+      <div class="box-items-head">
+        <h2>kutuna <em>ekstra</em> ekle</h2>
+        <span class="cutoff mono">SINIRSIZ EKLEME HAKKI</span>
+      </div>
+      <p class="box-editor-note" id="extrasNote">Kutunun üzerine dilediğin kadar meyve ve sebzeyi gramajını seçerek ekle — ücreti kutu fiyatının üzerine eklenir. Ekstralar yalnızca bu siparişin için geçerlidir: abonelik yenilendiğinde sonraki kutun ekstrasız gider, istersen her hafta yeniden eklersin.</p>
+      <div class="box-extras" id="boxExtras"><!-- filled by JS --></div>
+
+      <div class="freq-row" id="deliveryDayRow" hidden>
+        <span class="pcard-pref-label mono">teslimat günü</span>
+        <div class="toggle-list small" id="deliveryDayToggle"><!-- filled by JS --></div>
+        <p class="day-note mono" id="dayNote" hidden></p>
+      </div>
+
+      <div class="price-summary" id="priceSummary"><!-- filled by JS --></div>
+
+      <div class="box-editor-foot" id="boxEditorFoot"><!-- filled by JS --></div>
     </div>
   </section>
 </main>
 
-<button class="scroll-confirm" id="scrollConfirm" type="button" aria-label="Aboneliği başlat butonuna dön">
-  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-  tamamla
-</button>
-
 <footer class="site-foot">
-  <span class="wordmark small"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></span>
-  <span class="mono">© 2026 — URLA</span>
+  <div class="site-foot-top">
+    <div class="site-foot-brand">
+      <div class="site-foot-logo-row">
+        <a class="wordmark small" href="index.html" aria-label="Bağdam ana sayfa"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></a>
+      </div>
+    </div>
+    <div class="site-foot-contact-row">
+      <a class="site-foot-contact" href="tel:+905309494093">
+        <img src="assets/icons/mutlu-musteri.png" alt="">
+        <span class="site-foot-contact-text">
+          <span class="site-foot-contact-label mono">mutlu müşteri hattı</span>
+          <span class="site-foot-contact-value">+90 (530) 949 40 93</span>
+        </span>
+      </a>
+      <a class="site-foot-contact site-foot-contact-location" href="https://www.google.com/maps/search/?api=1&query=8034%20Sokak%20No%3A38%20Ku%C5%9F%C3%A7ular%20Urla%20%C4%B0zmir" target="_blank" rel="noopener">
+        <img src="assets/icons/konum.png" alt="">
+        <span class="site-foot-contact-text">
+          <span class="site-foot-contact-label mono">bağdam</span>
+          <span class="site-foot-contact-value">8034 Sokak No:38,<span class="addr-break"> </span>Kuşçular — Urla / İzmir</span>
+        </span>
+      </a>
+    </div>
+    <div class="site-foot-social">
+      <a class="site-foot-ig-link" href="#" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg>
+      </a>
+      <a class="site-foot-yt-link" href="#" aria-label="YouTube">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l6 3-6 3z" fill="currentColor" stroke="none"/></svg>
+      </a>
+    </div>
+  </div>
+  <div class="site-foot-bottom">
+    <div class="site-foot-left mono">
+      <span class="site-foot-copyright">© 2026 — BAĞDAM. TÜM HAKLARI SAKLIDIR.</span>
+      <span class="site-foot-sep">|</span>
+      <a class="policies-link" href="politikalar.html">Tüm Politikalar</a>
+    </div>
+    <a class="site-foot-credit" href="https://youmedya.com/iletisim/" target="_blank" rel="noopener">
+      <span class="mono">designed and powered by</span>
+      <span class="site-foot-credit-logo" role="img" aria-label="You Medya"></span>
+    </a>
+  </div>
 </footer>
 
 <script src="assets/products.js"></script>
@@ -127,16 +173,151 @@
   const tierPriceEl = document.getElementById("tierPrice");
   const boxItemsEl = document.getElementById("boxItems");
   const cutoffEl = document.getElementById("cutoff");
-  const confirmBtn = document.getElementById("confirmBtn");
-  const cancelNote = document.getElementById("cancelNote");
-  const cancelLink = document.getElementById("cancelLink");
+  const boxEditorFoot = document.getElementById("boxEditorFoot");
   const freqRow = document.getElementById("freqRow");
   const freqToggle = document.getElementById("freqToggle");
+  const deliveryDayRow = document.getElementById("deliveryDayRow");
+  const deliveryDayToggle = document.getElementById("deliveryDayToggle");
   const priceSummary = document.getElementById("priceSummary");
   const pairsRowEl = document.getElementById("pairsRow");
   const typeButtons = document.querySelectorAll(".type-btn");
+  const boxExtrasEl = document.getElementById("boxExtras");
+  const extrasNoteEl = document.getElementById("extrasNote");
 
   function money(n) { return n.toLocaleString("tr-TR"); }
+
+  const EXTRA_TRASH_SVG =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+
+  // Survives renderEditor() re-runs so adding an extra doesn't bounce the
+  // picker back to the first product in the list.
+  let pickedExtraId = null;
+
+  // Satın alınmış (aktif) abonelikte değişiklikler doğrudan kaydedilmez:
+  // önce bu taslağa yazılır, sayfa taslaktan render edilir ve ancak alttaki
+  // "değişiklikleri onayla" butonuyla aboneliğe işlenir. Satın alma
+  // öncesinde her şey eskisi gibi anında kaydedilir.
+  let draft = null;
+  // Çıkış yapılmışsa abonelik arayüzde yok sayılır — sayfa misafir
+  // görünümüne döner ("abone ol / sepete ekle"), giriş yapınca geri gelir.
+  function isLive() { return BahcedenCart.hasPurchasedSub(); }
+  function currentSub() {
+    if (!isLive()) return BahcedenCart.getSub();
+    if (!draft) draft = JSON.parse(JSON.stringify(BahcedenCart.getSub()));
+    return draft;
+  }
+  function hasPendingChanges() {
+    return isLive() && !!draft && JSON.stringify(draft) !== JSON.stringify(BahcedenCart.getSub());
+  }
+  // "Değişiklikleri onayla"ya basıldıktan sonra alttaki not "kaydedildi"
+  // teyidine döner; vazgeçilir ya da sayfa yeniden yüklenirse varsayılana.
+  let changesSaved = false;
+
+  // The "kutuna ekstra ekle" section: a product + amount picker on top,
+  // then one row per extra already added to this order. Unlimited adds —
+  // the same product can go in twice at different amounts.
+  function renderExtras(sub) {
+    const fresh = BahcedenCart.freshProducts();
+    if (!fresh.some((f) => f.id === pickedExtraId)) pickedExtraId = fresh.length ? fresh[0].id : null;
+    const extras = sub.extras || [];
+
+    const picked = fresh.find((f) => f.id === pickedExtraId);
+    const pickerHtml =
+      '<div class="box-extra-picker">' +
+        '<img class="box-extra-picker-img" id="extraPickerImg" src="' + (picked ? picked.img : "") + '" alt="' + (picked ? picked.name : "") + '">' +
+        '<label class="box-extra-field"><span class="pcard-pref-label mono">ürün</span>' +
+          '<select class="swap-select" id="extraProduct">' +
+            fresh.map((f) => '<option value="' + f.id + '"' + (f.id === pickedExtraId ? " selected" : "") + ">" + f.name + "</option>").join("") +
+          "</select></label>" +
+        '<label class="box-extra-field"><span class="pcard-pref-label mono">miktar</span>' +
+          '<select class="swap-select" id="extraAmount"></select></label>' +
+        '<span class="box-extra-preview mono" id="extraPreview"></span>' +
+        '<button class="qty-stepper-add" id="extraAddBtn" type="button" aria-label="Kutuya ekle">+</button>' +
+      "</div>";
+
+    const rowsHtml = extras.map((ex, i) => {
+      const p = PRODUCTS.find((x) => x.id === ex.id);
+      if (!p) return "";
+      return (
+        '<div class="box-extra-row">' +
+          '<img src="' + p.img + '" alt="' + p.name + '">' +
+          '<div class="box-extra-info">' +
+            "<h3>" + p.name + "</h3>" +
+            '<p class="pcard-meta mono">' + ex.label + "</p>" +
+          "</div>" +
+          '<span class="price mono">' + money(BahcedenCart.subExtraPrice(ex)) + " TL</span>" +
+          '<button class="qty-stepper-dec trash" data-extra-idx="' + i + '" type="button" aria-label="Ekstrayı kaldır">' + EXTRA_TRASH_SVG + "</button>" +
+        "</div>"
+      );
+    }).join("");
+
+    boxExtrasEl.innerHTML = pickerHtml + rowsHtml;
+
+    const extraProductSel = document.getElementById("extraProduct");
+    const extraAmountSel = document.getElementById("extraAmount");
+    const extraPreview = document.getElementById("extraPreview");
+
+    function pickedProduct() {
+      return PRODUCTS.find((x) => x.id === extraProductSel.value);
+    }
+    function refreshAmountOptions() {
+      const opts = BahcedenCart.subExtraOptions(pickedProduct());
+      extraAmountSel.innerHTML = opts.map((o, i) => '<option value="' + i + '">' + o.label + "</option>").join("");
+      refreshPreview();
+    }
+    function refreshPreview() {
+      const p = pickedProduct();
+      const opt = BahcedenCart.subExtraOptions(p)[parseInt(extraAmountSel.value, 10) || 0];
+      extraPreview.textContent = opt ? money(Math.round(p.price * opt.factor)) + " TL" : "";
+    }
+    const extraPickerImg = document.getElementById("extraPickerImg");
+    extraProductSel.addEventListener("change", () => {
+      pickedExtraId = extraProductSel.value;
+      const p = pickedProduct();
+      if (p) {
+        extraPickerImg.src = p.img;
+        extraPickerImg.alt = p.name;
+      }
+      refreshAmountOptions();
+    });
+    extraAmountSel.addEventListener("change", refreshPreview);
+    refreshAmountOptions();
+
+    document.getElementById("extraAddBtn").addEventListener("click", () => {
+      const p = pickedProduct();
+      const opt = BahcedenCart.subExtraOptions(p)[parseInt(extraAmountSel.value, 10) || 0];
+      if (!p || !opt) return;
+      if (isLive()) {
+        const s = currentSub();
+        s.extras = (s.extras || []).concat([{ id: p.id, factor: opt.factor, label: opt.label }]);
+      } else {
+        BahcedenCart.subAddExtra(p.id, opt.factor, opt.label);
+      }
+      renderEditor();
+    });
+    boxExtrasEl.querySelectorAll("[data-extra-idx]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-extra-idx"), 10);
+        if (isLive()) {
+          const s = currentSub();
+          s.extras = (s.extras || []).filter((_, i2) => i2 !== idx);
+        } else {
+          BahcedenCart.subRemoveExtra(idx);
+        }
+        renderEditor();
+      });
+    });
+  }
+
+  // Subscriptions need a delivery day picked unless the frequency already
+  // covers all three days; one-time orders always need a single day picked.
+  function isConfirmValid(sub) {
+    if (sub.type === "subscription") {
+      const freq = FREQ_OPTIONS.find((f) => f.id === sub.freq);
+      return !!freq && (freq.allDays || !!sub.deliveryDay);
+    }
+    return !!sub.deliveryDay;
+  }
 
   // Uses data-pair-id + a delegated listener (below) instead of
   // data-add-to-cart, so it never collides with cart.js's one-time
@@ -149,21 +330,29 @@
           '<a href="urun.html?id=' + p.id + '"><h4>' + p.name + "</h4></a>" +
           '<p class="pair-mini-price mono">' + p.price + " TL</p>" +
         "</div>" +
-        '<button class="pair-mini-add" type="button" data-pair-id="' + p.id + '" aria-label="' + p.name + ' sepete ekle">+</button>' +
+        '<div class="pair-mini-stepper" data-pair-id="' + p.id + '">' + BahcedenCart.stepperHtml(p.id) + "</div>" +
       "</article>"
     );
   }
   pairsRowEl.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-pair-id]");
-    if (!btn) return;
-    BahcedenCart.add(btn.getAttribute("data-pair-id"), null);
-    btn.textContent = "✓";
-    btn.classList.add("added");
-    setTimeout(() => { btn.textContent = "+"; btn.classList.remove("added"); }, 1200);
+    const slot = e.target.closest("[data-pair-id]");
+    if (!slot) return;
+    const id = slot.getAttribute("data-pair-id");
+    if (e.target.closest(".pref-pop")) return;
+    if (e.target.closest(".qty-stepper-add") || e.target.closest(".qty-stepper-inc")) {
+      e.stopPropagation();
+      // Tercihli ürünse (zeytinyağı) önce hızlı seçim balonu açılır.
+      if (!BahcedenCart.addFromSlot(slot, id, () => { slot.innerHTML = BahcedenCart.stepperHtml(id); })) return;
+    } else if (e.target.closest(".qty-stepper-dec")) {
+      BahcedenCart.decrementCartProduct(id);
+    } else {
+      return;
+    }
+    slot.innerHTML = BahcedenCart.stepperHtml(id);
   });
 
   function renderEditor() {
-    const sub = BahcedenCart.getSub();
+    const sub = currentSub();
     const tier = BahcedenCart.subTier();
     if (!tier) {
       window.location.href = "urunler.html";
@@ -183,8 +372,11 @@
     });
 
     const fresh = BahcedenCart.freshProducts();
-    const cutoff = BahcedenCart.nextCutoff();
-    cutoffEl.textContent = "DEĞİŞİKLİK İÇİN: " + BahcedenCart.formatCountdown(cutoff) + " SÜREN VAR";
+    // Geri sayım yalnızca satın alınmış (aktif) abonelikte anlamlı — satın
+    // alma ve gün seçimi öncesinde (ya da çıkış yapılmışsa) gösterilmez.
+    cutoffEl.textContent = isLive()
+      ? "DEĞİŞİKLİK İÇİN: " + BahcedenCart.formatCountdown(BahcedenCart.nextCutoff()) + " SÜREN VAR"
+      : "";
 
     const isSub = sub.type === "subscription";
     freqRow.classList.toggle("faded", !isSub);
@@ -193,10 +385,41 @@
     ).join("");
     freqToggle.querySelectorAll(".toggle").forEach((btn) => {
       btn.addEventListener("click", () => {
-        BahcedenCart.subSetFreq(btn.getAttribute("data-freq"));
+        if (isLive()) {
+          currentSub().freq = btn.getAttribute("data-freq");
+        } else {
+          BahcedenCart.subSetFreq(btn.getAttribute("data-freq"));
+        }
         renderEditor();
       });
     });
+
+    // Day picker: shown for both subscriptions (single-day frequencies) and
+    // one-time orders — every order needs exactly one delivery day. Kesimi
+    // geçmiş (kilitli) gün de seçilebilir; o zaman teslimatın sonraki
+    // haftaya kaldığını söyleyen not altta belirir.
+    const selectedFreq = isSub ? FREQ_OPTIONS.find((f) => f.id === sub.freq) : null;
+    const allDays = !!(selectedFreq && selectedFreq.allDays);
+    deliveryDayRow.hidden = false;
+    deliveryDayRow.classList.toggle("faded", allDays);
+    deliveryDayToggle.innerHTML = DELIVERY_DAYS.map((d) => {
+      const isActive = allDays || sub.deliveryDay === d.id;
+      return '<button class="toggle' + (isActive ? " active" : "") + '" type="button" data-day="' + d.id + '"' + (allDays ? " disabled" : "") + '>' + d.label + "</button>";
+    }).join("");
+    deliveryDayToggle.querySelectorAll(".toggle:not([disabled])").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (isLive()) {
+          currentSub().deliveryDay = btn.getAttribute("data-day");
+        } else {
+          BahcedenCart.subSetDeliveryDay(btn.getAttribute("data-day"));
+        }
+        renderEditor();
+      });
+    });
+    const dayNoteEl = document.getElementById("dayNote");
+    const dayNoteText = BahcedenCart.lockedDayNote(sub.deliveryDay);
+    dayNoteEl.hidden = !dayNoteText;
+    dayNoteEl.textContent = dayNoteText || "";
 
     boxItemsEl.innerHTML = sub.items.map((id) => {
       const p = PRODUCTS.find((x) => x.id === id);
@@ -206,9 +429,16 @@
         ? '<div class="box-item-pref" data-item="' + id + '" data-axis="' + p.pref.label + '">' +
             '<span class="pcard-pref-label mono">' + p.pref.label + "</span>" +
             '<div class="toggle-row small">' +
-              p.pref.options.map((opt) =>
-                '<button class="toggle' + (opt === chosen ? " active" : "") + '" type="button" data-value="' + opt + '">' + opt + "</button>"
-              ).join("") +
+              p.pref.options.map((opt) => {
+                // "Küçük (közleme)" → çipte "Küçük", parantez içi küçük alt not:
+                // çipler tek satırda eşit kalır, açıklama kaybolmaz.
+                const m = opt.match(/^(.*?)\s*\((.*)\)\s*$/);
+                const main = m ? m[1] : opt, note = m ? m[2] : "";
+                return '<button class="toggle' + (opt === chosen ? " active" : "") + '" type="button" data-value="' + opt + '">' +
+                  '<span class="toggle-main">' + main + "</span>" +
+                  (note ? '<span class="toggle-note">' + note + "</span>" : "") +
+                "</button>";
+              }).join("") +
             "</div>" +
           "</div>"
         : "";
@@ -221,36 +451,130 @@
           '<img src="' + p.img + '" alt="' + p.name + '">' +
           '<div class="box-item-info">' +
             "<h3>" + p.name + "</h3>" +
-            '<p class="pcard-meta mono">' + p.location + ", İzmir" + (p.season ? " — " + p.season : "") + "</p>" +
-            prefHtml +
+            '<p class="pcard-meta mono">' + p.meta + "</p>" +
+            // Kutudaki miktar sabittir — gramaj burada değiştirilemez,
+            // fazlasını isteyen aşağıdaki ekstra alanından ekler.
+            (p.boxAmount ? '<p class="box-item-amount mono">kutuda: ' + p.boxAmount + "</p>" : "") +
           "</div>" +
           '<select class="swap-select" data-slot="' + id + '">' + swapOptions + "</select>" +
+          // Tercih çipleri kartın doğrudan çocuğu: masaüstünde bilgi sütununun
+          // altına (grid-column), mobilde tam genişlik yeni satıra oturur.
+          prefHtml +
         "</div>"
       );
     }).join("");
 
+    // Öne çıkan 4'ü başa; kalan tekli ürünler arkasına (mobilde yana
+    // kaydırınca görünür, masaüstünde dikey liste uzar).
     const pairIds = ["ekmek", "zeytinyagi", "beyazpeynir", "tereyagi"];
-    pairsRowEl.innerHTML = pairIds
-      .map((id) => PRODUCTS.find((p) => p.id === id))
-      .filter(Boolean)
-      .map(pairCardHtml)
+    const pairList = pairIds.map((id) => PRODUCTS.find((p) => p.id === id)).filter(Boolean)
+      .concat(PRODUCTS.filter((p) => !p.fresh && pairIds.indexOf(p.id) === -1));
+    // İlk 4 her zaman; kalanlar .pair-mini-more — masaüstünde gizli, mobilde
+    // kaydırmalı şeritte görünür.
+    pairsRowEl.innerHTML = pairList
+      .map((p, i) => pairCardHtml(p).replace('class="pair-mini"', 'class="pair-mini' + (i >= 4 ? " pair-mini-more" : "") + '"'))
       .join("");
 
+    extrasNoteEl.textContent =
+      "Kutundaki " + tier.count + " ürünün üzerine dilediğin kadar meyve ve sebzeyi gramajını seçerek ekle — ücreti kutu fiyatının üzerine eklenir. Ekstralar yalnızca bu siparişin için geçerlidir: " +
+      (isSub ? "abonelik yenilendiğinde sonraki kutun ekstrasız gider, istersen her hafta yeniden eklersin." : "bir sonraki siparişin ekstrasız başlar, istersen yeniden eklersin.");
+    renderExtras(sub);
+
+    // Taslak üzerinden çalışırken toplam da taslaktan hesaplanır —
+    // subExtrasTotal() kayıtlı hali okur, onaylanmamış ekleri görmez.
+    const extras = sub.extras || [];
+    const extrasTotal = extras.reduce((sum, ex) => sum + BahcedenCart.subExtraPrice(ex), 0);
+    const extrasRows = extras.map((ex) => {
+      const p = PRODUCTS.find((x) => x.id === ex.id);
+      if (!p) return "";
+      return '<div class="ps-row"><span>+ ' + p.name + " (" + ex.label + ")</span><span class=\"mono\">" + money(BahcedenCart.subExtraPrice(ex)) + " TL</span></div>";
+    }).join("");
+
     const deliveryFee = BahcedenCart.subDeliveryFee();
-    const isFirst = sub.type === "subscription"; // prototip: her zaman "ilk 2 kutu" fiyatını gösterir
+    // "İlk 2 kutu" indirimi yalnızca satın alma öncesi gösterilir; aktif
+    // abonelikte haftalık çekim tam fiyattan hesaplanır.
+    const isFirst = sub.type === "subscription" && !isLive();
     const firstPrice = Math.round(tier.price / 2);
     priceSummary.innerHTML =
       '<div class="ps-row"><span>' + tier.label + "</span><span class=\"mono\">" + money(isFirst ? firstPrice : tier.price) + " TL</span></div>" +
       (isFirst ? '<div class="ps-row ps-note"><span>ilk 2 kutuda %50 indirim uygulandı</span><span class="mono">-' + money(tier.price - firstPrice) + " TL</span></div>" : "") +
+      extrasRows +
+      (extras.length ? '<div class="ps-row ps-note"><span>ekstralar yalnızca bu siparişe eklenir</span><span class="mono">+' + money(extrasTotal) + " TL</span></div>" : "") +
       '<div class="ps-row"><span>Kargo</span><span class="mono">' + (deliveryFee > 0 ? money(deliveryFee) + " TL" : "Dahil") + "</span></div>" +
-      '<div class="ps-row ps-total"><span>Toplam</span><span class="mono">' + money((isFirst ? firstPrice : tier.price) + deliveryFee) + " TL</span></div>";
+      '<div class="ps-row ps-total"><span>' + (isLive() ? "Bu haftaki ödeme" : "Toplam") + '</span><span class="mono">' + money((isFirst ? firstPrice : tier.price) + extrasTotal + deliveryFee) + " TL</span></div>" +
+      (isLive() ? '<div class="ps-row ps-note"><span>ödemen teslimat günü çekilir</span><span></span></div>' : "");
 
-    cancelNote.hidden = !sub.active;
+    // Satın alınmış (ödemesi yapılmış) abonelikte bu sayfa düzenleme
+    // alanıdır — ama hiçbir değişiklik onaysız işlenmez: taslakta birikir,
+    // "değişiklikleri onayla"ya basılınca aboneliğe kaydedilir. Çıkış
+    // yapılmışsa buraya girilmez: misafir "abone ol / sepete ekle" görür.
+    if (isLive()) {
+      if (hasPendingChanges()) {
+        boxEditorFoot.innerHTML =
+          '<button class="cta wide" id="applyChangesBtn" type="button">değişiklikleri onayla</button>' +
+          '<button class="btn" id="discardChangesBtn" type="button">vazgeç</button>';
+        document.getElementById("applyChangesBtn").addEventListener("click", () => {
+          BahcedenCart.setSub(draft);
+          // Onaylanan ekstralar bu haftanın siparişine ait — kesim damgası
+          // burada vurulur ki hafta dönünce otomatik temizlensinler.
+          const saved = BahcedenCart.getSub();
+          if ((saved.extras || []).length) {
+            saved.extrasCutoff = BahcedenCart.nextCutoff().getTime();
+            BahcedenCart.setSub(saved);
+          }
+          draft = null;
+          changesSaved = true;
+          renderEditor();
+        });
+        document.getElementById("discardChangesBtn").addEventListener("click", () => {
+          draft = null;
+          changesSaved = false;
+          renderEditor();
+        });
+      } else {
+        // Değişiklik yokken sessiz kalır — yalnızca onay sonrasında
+        // "kaydedildi" teyidi gösterilir.
+        boxEditorFoot.innerHTML =
+          (changesSaved ? '<p class="box-live-note mono">Aboneliğin aktif — değişikliklerin kaydedildi.</p>' : "") +
+          '<a class="btn" href="uyelik.html">aboneliğine dön</a>';
+      }
+    // Once added (subscription or one-time), stay on the page — the button
+    // just relabels itself "sepette" with a trash icon beside it to remove.
+    } else if (sub.active) {
+      boxEditorFoot.innerHTML =
+        '<button class="cta wide sepette-btn" type="button" disabled>sepette</button>' +
+        '<button class="cart-remove-icon" id="boxRemove" type="button" aria-label="Sepetten kaldır">' +
+          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
+        "</button>";
+      document.getElementById("boxRemove").addEventListener("click", () => {
+        // Just un-commits it from the cart (active:false) — subCancel() would
+        // also wipe tierId/items and bounce this page back to urunler.html.
+        const s = BahcedenCart.getSub();
+        s.active = false;
+        BahcedenCart.setSub(s);
+        renderEditor();
+      });
+    } else {
+      boxEditorFoot.innerHTML = '<button class="cta wide" id="confirmBtn" type="button">' + (isSub ? "aboneliği başlat" : "sepete ekle") + "</button>";
+      const confirmBtn = document.getElementById("confirmBtn");
+      confirmBtn.disabled = !isConfirmValid(sub);
+      confirmBtn.title = confirmBtn.disabled ? "Devam etmek için teslimat gününü seç." : "";
+      confirmBtn.addEventListener("click", () => {
+        const s = BahcedenCart.getSub();
+        s.active = true;
+        BahcedenCart.setSub(s);
+        renderEditor();
+      });
+    }
   }
 
   typeButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      BahcedenCart.subSetType(btn.getAttribute("data-type"));
+      if (isLive()) {
+        currentSub().type = btn.getAttribute("data-type");
+      } else {
+        BahcedenCart.subSetType(btn.getAttribute("data-type"));
+      }
       renderEditor();
     });
   });
@@ -259,51 +583,58 @@
     const btn = e.target.closest(".toggle");
     if (!btn) return;
     const wrap = btn.closest(".box-item-pref");
-    BahcedenCart.subSetItemPref(wrap.getAttribute("data-item"), btn.getAttribute("data-value"), wrap.getAttribute("data-axis"));
+    if (isLive()) {
+      const s = currentSub();
+      if (!s.itemPrefs) s.itemPrefs = {};
+      s.itemPrefs[wrap.getAttribute("data-item")] = btn.getAttribute("data-value");
+      // Damak zevki öğrenimi global — onay beklemeden kaydedilebilir.
+      BahcedenCart.recordPref(wrap.getAttribute("data-axis"), btn.getAttribute("data-value"));
+    } else {
+      BahcedenCart.subSetItemPref(wrap.getAttribute("data-item"), btn.getAttribute("data-value"), wrap.getAttribute("data-axis"));
+    }
     renderEditor();
   });
 
   boxItemsEl.addEventListener("change", (e) => {
     const sel = e.target.closest(".swap-select");
     if (!sel) return;
-    BahcedenCart.subSwapItem(sel.getAttribute("data-slot"), sel.value);
+    if (isLive()) {
+      const s = currentSub();
+      const idx = s.items.indexOf(sel.getAttribute("data-slot"));
+      if (idx !== -1 && s.items.indexOf(sel.value) === -1) s.items[idx] = sel.value;
+    } else {
+      BahcedenCart.subSwapItem(sel.getAttribute("data-slot"), sel.value);
+    }
     renderEditor();
   });
 
-  confirmBtn.addEventListener("click", () => {
-    const sub = BahcedenCart.getSub();
-    sub.active = true;
-    BahcedenCart.setSub(sub);
-    window.location.href = "sepet.html";
-  });
-
-  cancelLink.addEventListener("click", (e) => {
-    e.preventDefault();
-    BahcedenCart.subCancel();
-    window.location.href = "urunler.html";
+  // ---- Küçük meyve/sebze fotoğrafları: tıklayınca hafifçe büyüyerek açılan
+  // önizleme. Tek bir overlay yeniden kullanılır; içerik ve ekstra listeleri
+  // her renderEditor()'da yeniden kurulduğu için dinleme kalıcı kapsayıcıda.
+  const lightbox = document.createElement("div");
+  lightbox.className = "img-lightbox";
+  lightbox.innerHTML = '<img src="" alt="">';
+  document.body.appendChild(lightbox);
+  const lightboxImg = lightbox.querySelector("img");
+  function closeLightbox() { lightbox.classList.remove("open"); }
+  lightbox.addEventListener("click", closeLightbox);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLightbox(); });
+  [boxItemsEl, boxExtrasEl].forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const img = e.target.closest("img");
+      if (!img || e.target.closest("button")) return;
+      lightboxImg.src = img.src;
+      lightboxImg.alt = img.alt;
+      lightbox.classList.add("open");
+    });
   });
 
   renderEditor();
   setInterval(() => {
-    cutoffEl.textContent = "DEĞİŞİKLİK İÇİN: " + BahcedenCart.formatCountdown(BahcedenCart.nextCutoff()) + " SÜREN VAR";
+    cutoffEl.textContent = BahcedenCart.hasPurchasedSub()
+      ? "DEĞİŞİKLİK İÇİN: " + BahcedenCart.formatCountdown(BahcedenCart.nextCutoff()) + " SÜREN VAR"
+      : "";
   }, 60000);
-
-  // Shows the floating "tamamla" shortcut only once the user has scrolled
-  // past the real confirm button (it's above the viewport) — not while it's
-  // still visible, and not before it's even been reached on page load.
-  const scrollConfirmBtn = document.getElementById("scrollConfirm");
-  const confirmObserver = new IntersectionObserver(
-    (entries) => {
-      const entry = entries[0];
-      const scrolledPast = !entry.isIntersecting && entry.boundingClientRect.top < 0;
-      scrollConfirmBtn.classList.toggle("visible", scrolledPast);
-    },
-    { threshold: 0 }
-  );
-  confirmObserver.observe(confirmBtn);
-  scrollConfirmBtn.addEventListener("click", () => {
-    confirmBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-  });
 })();
 </script>
 

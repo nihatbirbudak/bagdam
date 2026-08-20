@@ -9,7 +9,7 @@ export type AdminNavLeaf = {
   label: string;
   to: string;
   phase?: AdminPhase;
-  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: ekranlar 1–8 bağlı). */
+  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: 1–8, F5: 9–15, F6: 16 + e-posta günlüğü bağlı). */
   comingSoon?: boolean;
   /** Yer tutucu sayfada gösterilen kısa kapsam notu (BACKEND-PLANI §4). */
   hint?: string;
@@ -89,7 +89,13 @@ export const adminNavItems: AdminNavItem[] = [
   {
     label: 'Satış',
     children: [
-      { label: 'Müşteriler', to: '/musteriler', phase: 'F6', comingSoon: true, hint: 'Kullanıcı, adres, sipariş, abonelik, kart, rızalar; anonimleştir.' },
+      {
+        label: 'Müşteriler',
+        to: '/musteriler',
+        phase: 'F6',
+        comingSoon: false,
+        hint: 'Liste (arama, rol, son giriş, e-posta doğrulama), detay (profil, adres, onaylar, audit özeti; siparişler F8), düzenle, KVKK anonimleştir.',
+      },
       { label: 'Siparişler', to: '/siparisler', phase: 'F8', comingSoon: true, hint: 'Durum geçişleri, iade, fatura no/PDF, kurumsal fatura alanları.' },
       { label: 'Abonelikler', to: '/abonelikler', phase: 'F9', comingSoon: true, hint: 'Abonelik, cycle, cycle içerikleri, olaylar, iptaller; tek seferlik kutular da burada.' },
       { label: 'Ödeme Problemleri', to: '/odeme-problemleri', phase: 'F9', comingSoon: true, hint: "UNPAID / AWAITING_PAYMENT cycle'lar: link gönder, yeniden çek." },
@@ -116,6 +122,14 @@ export const adminNavItems: AdminNavItem[] = [
     label: 'Sistem',
     children: [
       { label: 'Sistem Durumu', to: '/sistem', phase: 'F10', comingSoon: true, hint: 'Audit / system / cron / mail / webhook günlükleri; sağlık.' },
+      { divider: 'Günlükler' },
+      {
+        label: 'E-posta Günlüğü',
+        to: '/sistem/e-posta-gunlugu',
+        phase: 'F6',
+        comingSoon: false,
+        hint: 'MailLog: alıcı, konu, şablon, durum (SENT / FAILED / SKIPPED), hata; DISABLE_MAIL önizleme dosyası yolu yalnız dev.',
+      },
     ],
   },
 ];

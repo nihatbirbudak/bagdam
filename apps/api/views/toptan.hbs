@@ -81,14 +81,19 @@
       return;
     }
     button.disabled = true;
-    fetch("/api/v1/wholesale-leads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ email: email })
-    })
-      .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
+    // F6: oturumlu müşteride CsrfGuard access çerezini görünce X-CSRF-Token ister → BahcedenCart.api() (çerez + CSRF
+    // başlığı; anonimde de çalışır). cart.js yüklenmemişse düz fetch yedeği (anonim — CSRF gerekmez).
+    // (cart.js `const BahcedenCart` — window özelliği değil, sözcüksel global: typeof ile yokla)
+    var send = (typeof BahcedenCart !== "undefined" && BahcedenCart && typeof BahcedenCart.api === "function")
+      ? BahcedenCart.api("/wholesale-leads", { method: "POST", body: { email: email } })
+      : fetch("/api/v1/wholesale-leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ email: email })
+        }).then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); });
+    send
+      .then(function () {
         form.hidden = true;
         showMsg(texts.success, false);
       })

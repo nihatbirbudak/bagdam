@@ -97,4 +97,76 @@ export class AuthRepository {
       .update({ where: { id }, data: { passwordHash, refreshTokenHash } })
       .then(() => undefined);
   }
+
+  // ── F6: kayıt · e-posta doğrulama · parola sıfırlama ────────────────────────
+
+  /**
+   * Müşteri kaydı + onay satırları TEK işlemde (iç içe create): kullanıcı var ama KVKK onayı yok durumu oluşmaz.
+   * `consents` Consent.user ilişkisi üzerinden (userId otomatik); documentId önceden çözülmüş (ContentService).
+   */
+  createCustomer(data: CustomerCreateInput, consents: CustomerConsentInput[]): Promise<User> {
+    return this.prisma.user.create({
+      data: {
+        email: data.email,
+        passwordHash: data.passwordHash,
+        name: data.name,
+        phone: data.phone,
+        role: 'CUSTOMER',
+        marketingOptIn: data.marketingOptIn,
+        consents: { create: consents },
+      },
+    });
+  }
+
+  /** Doğrulama: ilk kez ise emailVerifiedAt yazılır; zaten doğruysa dokunulmaz (idempotent). */
+  markEmailVerified(id: string, at: Date): Promise<boolean> {
+    return this.prisma.user
+      .updateMany({ where: { id, emailVerifiedAt: null, deletedAt: null }, data: { emailVerifiedAt: at } })
+      .then((r) => r.count === 1);
+  }
+
+  /** Parola sıfırlama: token'ın sha256 özeti + son kullanma; önceki token geçersizleşir. */
+  setPasswordResetToken(id: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    return this.prisma.user
+      .update({ where: { id }, data: { passwordResetToken: tokenHash, passwordResetExpires: expiresAt } })
+      .then(() => undefined);
+  }
+
+  /** Özet ile kullanıcı (süre kontrolü serviste — geçersiz/süresi dolmuş ayrımı tek mesajla döner). */
+  findByPasswordResetTokenHash(tokenHash: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { passwordResetToken: tokenHash } });
+  }
+
+  /**
+   * Sıfırlama tamamlandı: yeni parola, token temizlenir, refresh hash = yeni oturumunki (diğer oturumlar düşer),
+   * kilit/sayaç sıfır (parolasını sıfırlayan kullanıcı kilitli kalmasın). Karşılaştır-ve-yaz: token hâlâ aynıysa
+   * (eşzamanlı ikinci deneme yapılmamışsa) — count 0 → çağıran RESET_TOKEN_INVALID verir.
+   */
+  completePasswordReset(id: string, tokenHash: string, passwordHash: string, refreshTokenHash: string, now: Date): Promise<boolean> {
+    return this.prisma.user
+      .updateMany({
+        where: { id, passwordResetToken: tokenHash },
+        data: {
+          passwordHash,
+          passwordResetToken: null,
+          passwordResetExpires: null,
+          refreshTokenHash,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          lastLoginAt: now,
+        },
+      })
+      .then((r) => r.count === 1);
+  }
 }
+
+export interface CustomerCreateInput {
+  email: string;
+  passwordHash: string;
+  name: string | null;
+  phone: string | null;
+  marketingOptIn: boolean;
+}
+
+/** Kayıt onayı — Prisma iç içe create girdisi (userId ilişkiden gelir; documentId skaler). */
+export type CustomerConsentInput = Prisma.ConsentUncheckedCreateWithoutUserInput;

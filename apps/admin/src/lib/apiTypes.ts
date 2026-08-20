@@ -362,3 +362,149 @@ export interface AdminDeliveryDatePatch {
   capacity?: number;
   status?: DeliveryDateStatusValue;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * F6 sözleşmesi — müşteriler (ekran 16), e-posta günlüğü (MailLog), e-posta test gönderimi.
+ * Kaynak: görev sözleşmesi (A/B/C). Enum/etiketler `@bagdam/shared` (USER_ROLE_*, CONSENT_KIND_*, IYS_STATUS_*,
+ * MAIL_STATUS_*). Sunucu (A) alan adı/şekil farkı gösterirse `features/musteriler/customers.ts` ve
+ * `features/sistem/mailLogs.ts` normalize eder; bu dosyadaki şekiller panelin gördüğü hâldir.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+export type ConsentKindValue =
+  | 'PREINFO_ACK'
+  | 'CONTRACT_ACK'
+  | 'SUBSCRIPTION_CONTRACT_ACK'
+  | 'KVKK_ACK'
+  | 'MARKETING_EMAIL'
+  | 'MARKETING_SMS'
+  | 'COOKIE_ANALYTICS'
+  | 'COOKIE_MARKETING';
+
+export type IysStatusValue = 'NOT_APPLICABLE' | 'PENDING' | 'SYNCED' | 'FAILED';
+
+export type MailStatusValue = 'QUEUED' | 'SENT' | 'FAILED' | 'SKIPPED';
+
+/* ── Müşteriler (User, ekran 16) ──────────────────────────────────────────── */
+
+/** `GET /admin/customers?q&role&page&limit` satırı. Parola/refresh/reset alanları ASLA gelmez. */
+export interface AdminCustomerListItem {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  role: UserRole | string;
+  isActive: boolean;
+  emailVerifiedAt: string | null;
+  lastLoginAt: string | null;
+  anonymizedAt: string | null;
+  createdAt: string;
+  /** F8'de dolar; şimdilik 0 / null gelebilir. */
+  orderCount?: number;
+  lastOrderAt?: string | null;
+  subscriptionStatus?: string | null;
+}
+
+export interface AdminCustomerListQuery {
+  q?: string;
+  role?: UserRole | string | '';
+  page?: number;
+  limit?: number;
+}
+
+/** Müşterinin tek adresi (MVP; `Address` + bölge adı). */
+export interface AdminCustomerAddress {
+  id: string;
+  fullName: string;
+  phone: string;
+  line: string;
+  zoneId: string;
+  zoneName?: string | null;
+  zoneSlug?: string | null;
+  zip: string | null;
+  isDefault?: boolean;
+  updatedAt?: string | null;
+}
+
+/** Consent satırı (KVKK / pazarlama / sözleşme onayları). */
+export interface AdminCustomerConsent {
+  id: string;
+  kind: ConsentKindValue | string;
+  granted: boolean;
+  documentId: string | null;
+  /** Onaylanan belgenin slug/başlık/sürümü (mapper verirse). */
+  documentSlug?: string | null;
+  documentTitle?: string | null;
+  documentVersion?: number | null;
+  source?: string | null;
+  iysStatus?: IysStatusValue | string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+}
+
+/** Müşteriye ait son audit satırları özeti (`AuditLog` — actor ya da entity bu kullanıcı). */
+export interface AdminCustomerAuditEntry {
+  id: string;
+  action: string;
+  module: string;
+  summary: string | null;
+  actorEmail?: string | null;
+  createdAt: string;
+}
+
+/** `GET /admin/customers/:id` — profil + adres + onaylar + audit özeti (+ F8: siparişler boş). */
+export interface AdminCustomerDetail extends AdminCustomerListItem {
+  marketingOptIn?: boolean;
+  updatedAt?: string | null;
+  address: AdminCustomerAddress | null;
+  consents: AdminCustomerConsent[];
+  audit: AdminCustomerAuditEntry[];
+  /** F8'de dolar. */
+  orders: { items: unknown[]; total: number };
+}
+
+/** `PATCH /admin/customers/:id` gövdesi (kısmi). */
+export interface AdminCustomerPatch {
+  isActive?: boolean;
+  name?: string | null;
+  phone?: string | null;
+}
+
+/* ── E-posta günlüğü (MailLog, Sistem) ────────────────────────────────────── */
+
+/** `GET /admin/mail-logs?page&limit&status&to` satırı (MailLog tablosu birebir). */
+export interface AdminMailLog {
+  id: string;
+  to: string;
+  subject: string;
+  templateSlug: string;
+  entityId: string | null;
+  status: MailStatusValue | string;
+  /** Hata metni; DISABLE_MAIL'de `preview:<dosya>` (render edilmiş HTML yolu, yalnız dev). */
+  error: string | null;
+  messageId: string | null;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+export interface AdminMailLogQuery {
+  status?: MailStatusValue | '';
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** `POST /admin/settings/mail/test {to}` yanıtı — MailService.send sonucu (MailLog satırı ya da özet). */
+export interface AdminMailSendResult {
+  id?: string;
+  mailLogId?: string;
+  status?: MailStatusValue | string;
+  to?: string;
+  subject?: string;
+  error?: string | null;
+  messageId?: string | null;
+  preview?: string | null;
+  /** A sözleşmesi (shared MailTestResult): DISABLE_MAIL'de yazılan önizleme dosyası. */
+  previewPath?: string | null;
+  logId?: string;
+  message?: string;
+}

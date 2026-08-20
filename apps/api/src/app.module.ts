@@ -14,8 +14,11 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { ContentModule } from './modules/content/content.module';
+import { CustomersModule } from './modules/customers/customers.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
+import { MailModule } from './modules/mail/mail.module';
+import { MeModule } from './modules/me/me.module';
 import { MediaModule } from './modules/media/media.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { WholesaleModule } from './modules/wholesale/wholesale.module';
@@ -49,8 +52,11 @@ new Logger('AppModule').log(
     ]),
     PrismaModule, // @Global — PrismaService tüm repository'lerde (F2)
     HealthModule,
-    AuthModule, // F4: /api/v1/auth/* (csrf, login, refresh, logout, me) + JwtAuthGuard'ın AuthService'i
+    AuthModule, // F4: /api/v1/auth/* (csrf, login, refresh, logout, me) + JwtAuthGuard'ın AuthService'i; F6: register/verify/forgot/reset (MailModule Notifier)
     AuditModule, // F4: AuditService (interceptor) + GET /api/v1/admin/audit-logs
+    MailModule, // F6: MailService (SiteContent mail.* şablonları → MailLog → SMTP/DISABLE_MAIL önizleme) + NOTIFIER + /admin/mail-logs + /admin/settings/mail/test
+    MeModule, // F6: /api/v1/me/* (adres upsert, onaylar, F8 yer tutucu siparişler/kartlar)
+    CustomersModule, // F6: /api/v1/admin/customers (ekran 16: liste/detay/PATCH/anonimleştir)
     CatalogModule, // F3: GET /api/v1/bootstrap + public katalog uçları; WebModule aynı servisi kullanır
     MediaModule, // F4: POST/GET/PATCH/DELETE /api/v1/admin/media (ADMIN/STAFF, @Audited('media')); /uploads statik main.ts'te
     ContentModule, // F5: site-content/posts/legal/consents (+ /admin/*) + sitemap.xml/robots.txt; WebModule ContentService'i kullanır

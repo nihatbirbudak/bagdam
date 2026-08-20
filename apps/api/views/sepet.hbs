@@ -61,12 +61,22 @@
           <label>Parola<input type="password" id="loginPassword" placeholder="••••••••"></label>
           <p class="checkout-auth-msg mono" id="loginMsg" hidden></p>
           <button class="cta wide" type="button" id="loginSubmit">giriş yap</button>
+          <!-- F6 — ADR-0003 istisna 4: parolamı unuttum (POST /auth/forgot) -->
+          <p class="cancel-note" id="forgotNote"><a href="#" id="forgotLink">parolamı unuttum</a></p>
         </div>
         <div class="checkout-form" id="authFormSignup" hidden>
           <label>E-posta<input type="email" id="signupEmail" placeholder="ornek@eposta.com"></label>
           <label>E-posta (Tekrar)<input type="email" id="signupEmailConfirm" placeholder="ornek@eposta.com"></label>
           <label>Parola<input type="password" id="signupPassword" placeholder="••••••••"></label>
           <label>Parola (Tekrar)<input type="password" id="signupPasswordConfirm" placeholder="••••••••"></label>
+          <!-- F6 — ADR-0003 istisna 2: KVKK aydınlatma onayı (zorunlu) + pazarlama izni (isteğe bağlı). Yalnız bu blok; styles.css'e dokunulmaz. -->
+          <style>
+            .checkout-form .consent-row{ flex-direction:row; align-items:flex-start; gap:10px; text-transform:none; letter-spacing:0; font-size:12px; line-height:1.45; color:var(--ink-soft); cursor:pointer; }
+            .checkout-form .consent-row input{ appearance:auto; -webkit-appearance:checkbox; width:15px; height:15px; padding:0; margin:2px 0 0; flex:none; accent-color:var(--olive-deep); }
+            .checkout-form .consent-row a{ color:var(--fig-deep); text-decoration:underline; text-underline-offset:3px; }
+          </style>
+          <label class="consent-row"><input type="checkbox" id="signupKvkk"><span><a href="politikalar.html#kvkk" target="_blank" rel="noopener">KVKK Aydınlatma Metni</a>'ni okudum; kişisel verilerimin bu kapsamda işleneceğini biliyorum. <span class="mono">(zorunlu)</span></span></label>
+          <label class="consent-row"><input type="checkbox" id="signupMarketing"><span>Kampanya ve yeniliklerden e-posta ile haberdar olmak istiyorum (<a href="politikalar.html#ticari-ileti-izni" target="_blank" rel="noopener">ticari elektronik ileti izni</a>, isteğe bağlı).</span></label>
           <p class="checkout-auth-msg mono" id="signupMsg" hidden></p>
           <button class="cta wide" type="button" id="signupSubmit">üye ol</button>
         </div>
@@ -169,8 +179,10 @@
   // (wireAuthGate kurulurken bir kez hemen çağrılır — o anda form alanları
   // henüz tanımlı değil; ilk çağrı atlanır, formlar aşağıda elle dolar.)
   let formsReady = false;
-  const refreshAuthGate = BahcedenCart.wireAuthGate("checkoutSections", () => {
+  const refreshAuthGate = BahcedenCart.wireAuthGate("checkoutSections", (loggedIn) => {
     if (!formsReady) return;
+    // F6 auth: giriş sayfa yenilemesiyle gelir; buraya çıkış / oturum düşmesi (ve ileride anlık giriş) düşer.
+    if (loggedIn) { loadProfileIntoForms(); return; }
     fillFormsFromStore();
     render();
   });
@@ -184,9 +196,11 @@
   const custZip = document.getElementById("custZip");
 
   function fillFormsFromStore() {
+    // F6 auth: adres sunucu önbelleğinden (BahcedenCart.loadAddress → getAddress), e-posta oturumdan (bahceden_address kalktı).
     const a = BahcedenCart.getAddress() || {};
+    const user = BahcedenCart.me();
     custName.value = a.name || "";
-    custEmail.value = a.email || "";
+    custEmail.value = (user && user.email) || "";
     custPhone.value = a.phone || "";
     custAddress.value = a.line || "";
     custDistrict.value = a.district || "";
@@ -197,15 +211,28 @@
     cardExpiry.value = c.expiry || "";
     cardCvc.value = c.cvc || "";
   }
+  // F6 auth: bölgeler + adres sunucudan; hata olursa boş form (elle doldurulur, sepet akışı kesilmez).
+  function loadProfileIntoForms() {
+    BahcedenCart.loadZones()
+      .then(() => BahcedenCart.loadAddress())
+      .catch(() => null)
+      .then(() => { fillFormsFromStore(); render(); });
+  }
+  // F6 auth: adres PUT /me/address ile sunucuya (tek adres) — yalnız oturumlu ve zorunlu alanlar tamamken;
+  // alan değişimlerinde (change) kısa gecikmeyle, her tuşta değil.
+  let saveAddressTimer = null;
   function saveCustomerForm() {
-    BahcedenCart.setAddress({
-      name: custName.value.trim(),
-      email: custEmail.value.trim(),
-      phone: custPhone.value.trim(),
-      line: custAddress.value.trim(),
-      district: custDistrict.value,
-      zip: custZip.value.trim(),
-    });
+    if (!BahcedenCart.isLoggedIn() || !customerComplete()) return;
+    clearTimeout(saveAddressTimer);
+    saveAddressTimer = setTimeout(() => {
+      BahcedenCart.setAddress({
+        name: custName.value.trim(),
+        phone: custPhone.value.trim(),
+        line: custAddress.value.trim(),
+        district: custDistrict.value,
+        zip: custZip.value.trim(),
+      }).catch(() => { /* sepet akışını kesmez; üyelik sayfasından yeniden kaydedilebilir */ });
+    }, 400);
   }
   // Delivery and Payment stay collapsed to just their title until every
   // required customer field is filled — same "one step unlocks the next"
@@ -312,7 +339,8 @@
   });
 
   [custName, custEmail, custPhone, custAddress, custZip].forEach((el) => {
-    el.addEventListener("input", () => { saveCustomerForm(); refreshSections(); });
+    el.addEventListener("input", refreshSections);
+    el.addEventListener("change", saveCustomerForm); // F6 auth: odak çıkınca sunucuya
   });
   custDistrict.addEventListener("change", () => { saveCustomerForm(); refreshSections(); });
   refreshSections();
@@ -653,6 +681,7 @@
   refreshAuthGate();
   render();
   refreshSteps();
+  if (BahcedenCart.isLoggedIn()) loadProfileIntoForms(); // F6 auth: adres/e-posta sunucudan
 })();
 </script>
 

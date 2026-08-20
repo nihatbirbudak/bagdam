@@ -7,6 +7,11 @@
 // Kullanım (repo kökünden):
 //   node tools/visual-parity/run.mjs [--old=http://127.0.0.1:8080] [--new=http://127.0.0.1:4023]
 //        [--threshold=0.1] [--max-diff-pct=0.1] [--only=kutu,urun] [--skip-visual] [--skip-smoke] [--smoke-product=ekmek]
+//        [--mask=<css seçici listesi>]
+// --mask (F6): ADR-0003 izinli tasarım istisnası blokları (örn. "#forgotNote,#authInfo") ekran görüntüsünden
+//   ÖNCE iki tarafta da display:none ile akıştan çıkarılır (eski sitede yoklarsa etkisiz) → maskelenen alan
+//   dışında 0 px beklenir. (Boyama yerine akıştan çıkarma: istisna bloğu yükseklik kattığı için altındaki
+//   içerik kayar; boyama bu kaymayı gizleyemezdi.) Maskesiz koşu ham farkı verir; ikisi de raporlanır.
 // Bağımlılıklar kökte kurulu: @playwright/test (Chromium), pixelmatch, pngjs. Çıktılar: out/ (gitignore), report.md.
 // Çıkış kodu: görsel eşik aşımı ya da duman testi farkı varsa 1.
 import { chromium } from '@playwright/test';
@@ -36,6 +41,7 @@ const SKIP_VISUAL = Boolean(args['skip-visual']);
 const SKIP_SMOKE = Boolean(args['skip-smoke']);
 // incir fresh → ürün sayfasında "kutuda dene" CTA'sı var, sepete ekle düğmesi yok; ekleme için pantry ürünü.
 const SMOKE_ADD_PRODUCT = String(args['smoke-product'] || 'ekmek');
+const MASK_SELECTOR = typeof args.mask === 'string' && args.mask.trim() ? args.mask.trim() : null;
 
 // ---- sayfalar / viewport'lar -----------------------------------------------------------------
 // kutu.html abone tier'ı yoksa urunler.html'e yönlendirir → ?tier=sezon ile açılır (iki sitede de aynı).
@@ -93,6 +99,8 @@ async function newPage(browser, viewport) {
 async function settle(page, url) {
   await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
   await page.addStyleTag({ content: NO_MOTION_CSS });
+  // --mask: istisna blokları akıştan çıkar (iki tarafta da; eski sitede seçici eşleşmezse etkisiz).
+  if (MASK_SELECTOR) await page.addStyleTag({ content: MASK_SELECTOR + '{display:none !important}' });
   await page.evaluate(() => document.fonts.ready);
   // Lazy görseller / IntersectionObserver açığa çıkarma: adım adım aşağı, sonra en üste.
   await page.evaluate(async () => {
@@ -303,7 +311,7 @@ await browser.close();
 // ---- rapor ----------------------------------------------------------------------------------
 const smokeFail = smokeChecks.filter((c) => !c.ok).length;
 const lines = [];
-lines.push('# Görsel parite raporu — F3 (eski statik site vs Nest render)');
+lines.push('# Görsel parite raporu — eski statik site vs Nest render (F3 temel; F5 CMS; F6 auth: --mask ile ADR-0003 istisna blokları)');
 lines.push('');
 lines.push(`- Tarih: ${startedAt.toISOString()} · Sabit sayfa saati (Date.now): ${new Date(FIXED_NOW).toISOString()}`);
 lines.push(`- Eski: \`${OLD_BASE}\` · Yeni: \`${NEW_BASE}\``);
@@ -313,6 +321,7 @@ lines.push(
 );
 lines.push(`- Kabul: fark piksel oranı ≤ %${MAX_DIFF_PCT} (tam sayfa; boyut farkında küçük görüntü beyaz zeminle büyütülür)`);
 lines.push('- Çıktılar: `tools/visual-parity/out/<sayfa>--<viewport>--{old,new,diff}.png` (gitignore)');
+if (MASK_SELECTOR) lines.push('- Maske (--mask): `' + MASK_SELECTOR + '` — bu seçicilerle eşleşen öğeler iki tarafta da ekran görüntüsünden önce akıştan çıkarıldı (display:none); fark yalnız maske DIŞI alanı ölçer.');
 lines.push('');
 if (!SKIP_VISUAL) {
   lines.push(`## Görsel karşılaştırma — ${visualRows.length} çift, ${visualRows.length - visualFail} OK / ${visualFail} FAIL`);

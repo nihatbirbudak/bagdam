@@ -1,7 +1,8 @@
 import { Controller, Get, HttpStatus, Inject, Logger, NotFoundException, Param, Req, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { BootstrapPayload } from '@bagdam/shared';
+import type { BootstrapMe, BootstrapPayload } from '@bagdam/shared';
 import type { Request, Response } from 'express';
+import type { SessionUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { SkipTimeout } from '../common/decorators/skip-timeout.decorator';
 import { APP_VERSION } from '../config/app-info';
@@ -47,7 +48,13 @@ const UNAVAILABLE_HTML =
   '<h1 style="font-size:1.25rem">Şu an sayfayı hazırlayamıyoruz</h1>' +
   '<p>Kısa bir kesinti var; lütfen birkaç saniye sonra yeniden deneyin.</p></body></html>';
 
-type RequestWithCookies = Request & { cookies?: Record<string, unknown>; requestId?: string };
+/** JwtAuthGuard @Public uçta geçerli çerez varsa `req.user`'ı doldurur (F6: bootstrap `me` buradan). */
+type RequestWithCookies = Request & { cookies?: Record<string, unknown>; requestId?: string; user?: SessionUser };
+
+/** `__BAGDAM__.me` — oturum varsa {loggedIn:true,id,email,name}; yoksa null (cart.js `isLoggedIn()`). */
+function toBootstrapMe(user: SessionUser | undefined): BootstrapMe | null {
+  return user ? { loggedIn: true, id: user.id, email: user.email, name: user.name } : null;
+}
 
 /** toptan.hbs form script'ine gömülen metinler (SiteContent toptan.form; JS-string olarak JSON ile). */
 interface ToptanTexts {
@@ -175,10 +182,10 @@ export class WebController {
     });
   }
 
-  /** Anonim bootstrap (me/sub null — F6/F9'da çerezden dolar). Hata → null (çağıran 503 verir). */
+  /** Bootstrap: `me` oturumdan (JwtAuthGuard req.user — F6), `sub` F9'a kadar null. Hata → null (çağıran 503 verir). */
   private async loadBootstrap(req: RequestWithCookies, view: string): Promise<BootstrapPayload | null> {
     try {
-      return await this.catalog.getBootstrap({ me: null, sub: null });
+      return await this.catalog.getBootstrap({ me: toBootstrapMe(req.user), sub: null });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(

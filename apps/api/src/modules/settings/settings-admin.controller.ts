@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Param, Post, Put, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put, Req } from '@nestjs/common';
 import { findSettingGroup, type AdminSettingGroup } from '@bagdam/shared';
 import { Audited, setAuditValues } from '../../common/decorators/audit.decorator';
 import type { AuthenticatedRequest } from '../../common/decorators/current-user.decorator';
@@ -13,7 +13,8 @@ import { SettingsService } from './settings.service';
  *  - GET  /admin/settings            → tüm gruplar (registry şeması + değer; sırlar maskeli)
  *  - GET  /admin/settings/:group     → tek grup
  *  - PUT  /admin/settings/:group     → {field: value, …} kısmi güncelleme; secret boş/maske → değişmez
- *  - POST /admin/settings/mail/test  → 501 {message:'F6'} (MailModule F6'da)
+ *  - POST /admin/settings/mail/test  → F6: MailModule'deki MailAdminController sunar (MailService.sendTest; DISABLE_MAIL'de
+ *    SKIPPED + önizleme) — SettingsModule ↔ MailModule döngüsü olmasın diye rota oraya taşındı (F5'teki 501 kalktı).
  * Gövde şeması dinamik olduğundan DTO sınıfı yok: ValidationPipe düz `Object`i atlar, doğrulama SettingsService'te (registry).
  * Audit: newValues secret alanlar `[redacted]` olarak yazılır (interceptor'ın gövde kopyası yerine).
  */
@@ -26,12 +27,6 @@ export class SettingsAdminController {
   @Get()
   list(): Promise<AdminSettingGroup[]> {
     return this.settings.listGroups();
-  }
-
-  /** MailModule (F6) gelene kadar 501. Statik rota, `:group` rotalarından önce tanımlı. */
-  @Post('mail/test')
-  testMail(): never {
-    throw new HttpException({ message: 'F6', error: 'NOT_IMPLEMENTED' }, HttpStatus.NOT_IMPLEMENTED);
   }
 
   @Get(':group')

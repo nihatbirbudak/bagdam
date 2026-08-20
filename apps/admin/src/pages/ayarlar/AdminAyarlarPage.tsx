@@ -1,6 +1,8 @@
 import { Send, Settings } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { TextInput } from '../../components/ui/FormField';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { SettingsGroupForm } from '../../features/ayarlar/SettingsGroupForm';
 import { settingsApi } from '../../features/ayarlar/api';
 import { SETTINGS_GROUP_LABELS } from '../../features/ayarlar/settingsForm';
@@ -8,6 +10,7 @@ import { AdminEmptyState } from '../../features/components/AdminEmptyState';
 import { AdminPageHeader } from '../../features/components/AdminPageHeader';
 import { AdminTabPanel } from '../../features/components/AdminTabPanel';
 import { ErrorBlock, InlineNotice, LoadingBlock } from '../../features/components/StateBlocks';
+import { describeMailSendResult } from '../../features/sistem/mailLogs';
 import { ApiError, errorMessage } from '../../lib/api';
 import type { AdminSettingGroup } from '../../lib/apiTypes';
 import { btn } from '../../lib/buttonStyles';
@@ -105,17 +108,33 @@ export function AdminAyarlarGenelPage() {
   );
 }
 
-/** Test e-postası düğmesi: F5'te API 501 `{message:'F6'}` döner → bilgi mesajı. */
-function MailTestButton() {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Test e-postası: alıcı + gönder → `POST /admin/settings/mail/test {to}` (F6 MailModule). Yanıt durumuna göre mesaj:
+ * SENT başarı · SKIPPED (DISABLE_MAIL) bilgi + önizleme dosyası yolu · FAILED hata. API 501 dönerse (MailModule bağlı değil) bilgi.
+ * SettingsGroupForm'un `<form>`u içinde render edilir → iç içe form yok; Enter tuşu gönderimi tetikler.
+ */
+export function MailTestForm({ defaultTo = '' }: { defaultTo?: string }) {
+  const [to, setTo] = useState(defaultTo);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputId = useId();
+
   async function run() {
+    const addr = to.trim();
+    if (!EMAIL_RE.test(addr)) {
+      setError('Geçerli bir e-posta girin');
+      return;
+    }
+    setError(null);
     setBusy(true);
     try {
-      const res = await settingsApi.testMail();
-      toast.success(res?.message ? `Test gönderildi: ${res.message}` : 'Test e-postası gönderildi');
+      const d = describeMailSendResult(await settingsApi.testMail({ to: addr }));
+      toast[d.tone](d.message);
     } catch (e) {
       if (e instanceof ApiError && (e.status === 501 || /F6/.test(e.message))) {
-        toast.info('E-posta gönderimi F6 fazında (MailModule) açılacak; ayarlar şimdiden kaydedilebilir.');
+        toast.info('E-posta gönderimi (MailModule) henüz bağlı değil; ayarlar şimdiden kaydedilebilir.');
       } else {
         toast.error(errorMessage(e, 'Test gönderilemedi'));
       }
@@ -123,22 +142,58 @@ function MailTestButton() {
       setBusy(false);
     }
   }
+
   return (
-    <button type="button" onClick={() => void run()} disabled={busy} className={btn.secondary}>
-      <Send className="h-4 w-4" aria-hidden />
-      {busy ? 'Gönderiliyor…' : 'Test e-postası gönder'}
-    </button>
+    <div className="flex flex-wrap items-center gap-2">
+      <label htmlFor={inputId} className="sr-only">Test alıcısı</label>
+      <TextInput
+        id={inputId}
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        placeholder="test@ornek.com"
+        value={to}
+        invalid={!!error}
+        disabled={busy}
+        className="w-56 py-1.5 text-xs"
+        onChange={(e) => {
+          setTo(e.target.value);
+          if (error) setError(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            void run();
+          }
+        }}
+      />
+      <button type="button" onClick={() => void run()} disabled={busy} className={btn.secondary}>
+        <Send className="h-4 w-4" aria-hidden />
+        {busy ? 'Gönderiliyor…' : 'Test e-postası gönder'}
+      </button>
+      {error && (
+        <span role="alert" className="text-xs text-accent-dark">
+          {error}
+        </span>
+      )}
+    </div>
   );
 }
 
-/** Ekran 15 — E-posta / SMS: sağlayıcı ayarları (parolalar şifreli, maskeli), test gönderimi (F6'da açılır). */
+/** Varsayılan alıcı: oturumdaki yönetici. */
+function MailTestFooter() {
+  const { user } = useAdminAuth();
+  return <MailTestForm defaultTo={user?.email ?? ''} />;
+}
+
+/** Ekran 15 — E-posta / SMS: sağlayıcı ayarları (parolalar şifreli, maskeli), test gönderimi (F6 MailModule; DISABLE_MAIL'de önizleme). */
 export function AdminEpostaPage() {
   return (
     <SettingsGroupsView
       title="E-posta / SMS"
       description="SMTP / Resend / SES ve Netgsm ayarları. Gizli alanlar sunucuda AES-256-GCM ile şifrelenir, panelde maskeli görünür; yalnız “Değiştir” ile yeni değer gönderilir. .env SMTP değerleri yedek kaynaktır (ADR-0014)."
       groups={['mail', 'sms']}
-      footerExtra={(g) => (g.group === 'mail' ? <MailTestButton /> : null)}
+      footerExtra={(g) => (g.group === 'mail' ? <MailTestFooter /> : null)}
     />
   );
 }

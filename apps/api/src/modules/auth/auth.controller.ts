@@ -6,11 +6,13 @@ import {
   HttpStatus,
   Patch,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import type { OkResponse } from '@bagdam/shared';
 import type { Response } from 'express';
 import { Audited, setAuditValues } from '../../common/decorators/audit.decorator';
 import { AuthenticatedRequest, CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -26,13 +28,19 @@ import {
   REFRESH_COOKIE,
   refreshCookieOptions,
 } from '../../config/cookie.config';
+import { AuditService } from '../audit/audit.service';
+import { webUrl } from '../mail/mail.constants';
 import { AuthMeDto, AuthUserDto } from './auth.mapper';
 import { AuthService } from './auth.service';
 import type { IssuedTokens } from './auth.types';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { VerifyQueryDto } from './dto/verify-query.dto';
 
 /** Login/refresh gövdesi — token'lar çerezde, gövdede yalnız kullanıcı (ADR-0009; Bearer yalnız testlerde). */
 export interface AuthSessionResponse {
@@ -43,15 +51,102 @@ export interface CsrfResponse {
   csrfToken: string;
 }
 
+/** E-posta doğrulama sonucu yönlendirmesi: `?dogrulandi=1` başarı · `?dogrulandi=0` geçersiz/süresi dolmuş (B: bilgi metni). */
+export const VERIFY_REDIRECT_PATH = '/uyelik.html?dogrulandi=';
+
 /**
- * AuthController — önek /api/v1/auth (BACKEND-PLANI §3 auth satırı, F4 kapsamı: admin girişi; F6'da register/forgot/reset).
- * - csrf/login/refresh: @Public + @SkipCsrf (çerezi kendisi üretir ya da çerezle kimlik taşımaz)
+ * AuthController — önek /api/v1/auth (BACKEND-PLANI §3 auth satırı; F4: admin girişi · F6: register/verify/forgot/reset).
+ * - csrf/login/refresh/register/forgot/reset: @Public + @SkipCsrf (çerezi kendisi üretir ya da çerezle kimlik taşımaz)
+ * - verify: @Public GET → 302 /uyelik.html?dogrulandi=1|0
  * - logout: @Public (access süresi dolmuşsa da çıkış yapılabilir) ama CSRF'e tabi
  * - me / me(PATCH) / me/password: oturum zorunlu (JwtAuthGuard); mutasyonlar CSRF'li ve audit'li
+ * Audit: register/reset satırları AuditService ile açıkça yazılır (interceptor fiil haritası register→CREATE verirdi;
+ * sözleşme `auth:REGISTER`); e-posta/parola gövdeye girmez.
  */
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly audit: AuditService,
+  ) {}
+
+  // ── F6: kayıt · doğrulama · parola unuttum/sıfırla ───────────────────────────
+
+  /** 201 {user} + çerezler (anında giriş); KVKK yoksa 400 KVKK_REQUIRED; e-posta varsa 409 EMAIL_TAKEN; 5 istek/dk/IP. */
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(HttpStatus.CREATED)
+  @Post('register')
+  async register(
+    @Body() dto: RegisterDto,
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthSessionResponse> {
+    const { user, tokens, consentKinds } = await this.auth.register(dto, requestMeta(req));
+    this.setAuthCookies(res, tokens);
+    res.cookie(CSRF_COOKIE, this.auth.createCsrfToken(), csrfCookieOptions());
+    req.user = { id: user.id, email: user.email, name: user.name, role: user.role };
+    req.authMethod = 'cookie';
+    await this.audit.record({
+      actorId: user.id,
+      actorEmail: user.email,
+      action: 'REGISTER',
+      module: 'auth',
+      entityId: user.id,
+      summary: `auth: REGISTER #${user.id}`,
+      newValues: { email: '[redacted]', consents: consentKinds, hasName: Boolean(user.name) },
+      requestId: req.requestId ?? null,
+      ipAddress: req.ip ?? req.socket?.remoteAddress ?? null,
+    });
+    return { user };
+  }
+
+  /** E-postadaki bağlantı: token geçerliyse emailVerifiedAt=now → 302 /uyelik.html?dogrulandi=1; değilse ?dogrulandi=0. */
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Get('verify')
+  async verify(@Query() query: VerifyQueryDto, @Res() res: Response): Promise<void> {
+    const ok = await this.auth.verifyEmail(query.token);
+    res.setHeader('Cache-Control', 'no-store');
+    res.redirect(HttpStatus.FOUND, `${webUrl()}${VERIFY_REDIRECT_PATH}${ok ? '1' : '0'}`);
+  }
+
+  /** Her zaman 200 {ok:true} (kullanıcı yoksa da — e-posta keşfi yok); 3 istek/dk/IP. */
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot')
+  async forgot(@Body() dto: ForgotPasswordDto): Promise<OkResponse> {
+    await this.auth.forgotPassword(dto.email);
+    return { ok: true };
+  }
+
+  /** 200 {ok:true} + çerezlerle giriş; geçersiz/süresi dolmuş → 400 RESET_TOKEN_INVALID; diğer oturumlar düşer. */
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('reset')
+  async reset(@Body() dto: ResetPasswordDto, @Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response): Promise<OkResponse> {
+    const { user, tokens } = await this.auth.resetPassword(dto.token, dto.password);
+    this.setAuthCookies(res, tokens);
+    res.cookie(CSRF_COOKIE, this.auth.createCsrfToken(), csrfCookieOptions());
+    req.user = { id: user.id, email: user.email, name: user.name, role: user.role };
+    req.authMethod = 'cookie';
+    await this.audit.record({
+      actorId: user.id,
+      actorEmail: user.email,
+      action: 'PASSWORD_RESET',
+      module: 'auth',
+      entityId: user.id,
+      summary: `auth: PASSWORD_RESET #${user.id}`,
+      requestId: req.requestId ?? null,
+      ipAddress: req.ip ?? req.socket?.remoteAddress ?? null,
+    });
+    return { ok: true };
+  }
 
   /** Double-submit CSRF: çerez `csrf_token` (httpOnly:false) + gövdede aynı değer. */
   @Public()
@@ -157,4 +252,13 @@ export class AuthController {
     res.clearCookie(ACCESS_COOKIE, clearAccessCookieOptions());
     res.clearCookie(REFRESH_COOKIE, clearRefreshCookieOptions());
   }
+}
+
+/** Onay satırları için ip (trust proxy) + user-agent. */
+function requestMeta(req: AuthenticatedRequest): { ip: string | null; userAgent: string | null } {
+  const rawUa = req.headers['user-agent'];
+  return {
+    ip: req.ip ?? req.socket?.remoteAddress ?? null,
+    userAgent: Array.isArray(rawUa) ? (rawUa[0] ?? null) : (rawUa ?? null),
+  };
 }

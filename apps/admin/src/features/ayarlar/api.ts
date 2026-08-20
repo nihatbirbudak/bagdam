@@ -8,6 +8,7 @@ import type {
   AdminDeliveryDatePatch,
   AdminDeliveryZone,
   AdminDeliveryZoneInput,
+  AdminMailSendResult,
   AdminSettingGroup,
   AdminSettingGroupUpdate,
 } from '../../lib/apiTypes';
@@ -21,8 +22,8 @@ export const settingsApi = {
     normalizeSettingsGroup(await api.get<unknown>(`/admin/settings/${encodeURIComponent(group)}`), group),
   /** `{field:value}`; secret boş/maske → değişmez. */
   update: (group: string, body: AdminSettingGroupUpdate) => api.put<unknown>(`/admin/settings/${encodeURIComponent(group)}`, body),
-  /** F5'te 501 `{message:'F6'}` (MailModule yok). */
-  testMail: (body: { to?: string } = {}) => api.post<{ message?: string }>('/admin/settings/mail/test', body),
+  /** F6: `{to}` → MailService.send test şablonu (MailLog satırı / özet döner); DISABLE_MAIL'de SKIPPED + `preview:<dosya>`. */
+  testMail: (body: { to: string }) => api.post<AdminMailSendResult>('/admin/settings/mail/test', body),
 };
 
 export const deliveryAdminApi = {

@@ -17,6 +17,18 @@ export interface JwtPayload {
   exp?: number;
 }
 
+/**
+ * E-posta doğrulama token'ı (F6): `{sub, typ:'verify', jti}` — access sırrı ile 24 saat; yalnız GET /auth/verify kabul eder
+ * (typ farklı → access/refresh yerine kullanılamaz). Ayrı DB alanı yok; doğrulama zorunlu değil.
+ */
+export interface VerifyTokenPayload {
+  sub: string;
+  typ: 'verify';
+  jti: string;
+  iat?: number;
+  exp?: number;
+}
+
 /** Login/refresh sonucu — controller çerezleri yazar, gövdede yalnız `user` döner. */
 export interface IssuedTokens {
   accessToken: string;

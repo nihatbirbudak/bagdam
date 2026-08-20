@@ -21,7 +21,7 @@ export interface SiteContentRegistryEntry {
   schema: ContentSchema;
 }
 
-export const SITE_CONTENT_PAGES = ['global', 'index', 'urunler', 'kutu', 'nasil-seciyoruz', 'toptan', 'gunluk'] as const;
+export const SITE_CONTENT_PAGES = ['global', 'index', 'urunler', 'kutu', 'nasil-seciyoruz', 'toptan', 'gunluk', 'mail'] as const;
 export type SiteContentPage = (typeof SITE_CONTENT_PAGES)[number];
 
 /** Alan tipleri — HTML olarak ham basılanlar (escape YOK). */
@@ -376,7 +376,37 @@ export const SITE_CONTENT_REGISTRY: readonly SiteContentRegistryEntry[] = [
       fields: [richtext('title', 'Başlık (HTML)', { required: true }), text('ctaText', 'Buton metni'), url('ctaHref', 'Buton bağlantısı', { help: CTA_HELP })],
     },
   },
+
+  // ── E-posta şablonları (F6 MailModule — ADR-0014: şablonlar DB'de; Handlebars) ─────────────────
+  // Anahtar `mail.<slug>` = MailService.send({templateSlug}) → {subject, html}. Değişkenler her şablonda:
+  // `brand` {name, webUrl, contactEmail, contactPhone, footerPhone, footerAddress, instagramUrl}; şablona özel: user, verifyUrl, resetUrl, lead …
+  ...mailTemplateEntry('welcome', 'E-posta — hoş geldin', 'Değişkenler: {{user.name}} {{user.email}} {{brand.*}} {{{brand.webUrl}}}'),
+  ...mailTemplateEntry('verify', 'E-posta — e-posta doğrulama', 'Değişkenler: {{{verifyUrl}}} (24 saat geçerli; bağlantılar üç süslü parantez) {{user.*}} {{brand.*}}'),
+  ...mailTemplateEntry('reset', 'E-posta — parola sıfırlama', 'Değişkenler: {{{resetUrl}}} {{expiresMinutes}} {{user.*}} {{brand.*}}'),
+  ...mailTemplateEntry('password-changed', 'E-posta — parola değişti', 'Değişkenler: {{user.*}} {{brand.*}} {{changedAt}}'),
+  ...mailTemplateEntry('wholesale-lead', 'E-posta — yeni toptan talebi (yöneticiye)', 'Değişkenler: {{lead.email}} {{lead.businessName}} {{lead.phone}} {{lead.note}} {{lead.createdAt}} {{{adminUrl}}}'),
+  ...mailTemplateEntry('test', 'E-posta — test gönderimi (Ayarlar › E-posta)', 'Değişkenler: {{sentAt}} {{brand.*}}'),
 ];
+
+/**
+ * `mail.<slug>` girdisi — subject (metin, Handlebars) + html (richtext, Handlebars). `{{var}}` HTML-kaçışlı (metin),
+ * `{{{var}}}` ham — bağlantılar (verifyUrl/resetUrl/brand.webUrl/adminUrl) üç süslü parantezle yazılır (= işareti kaçışlanmasın).
+ */
+function mailTemplateEntry(slug: string, label: string, help: string): SiteContentRegistryEntry[] {
+  return [
+    {
+      key: `mail.${slug}`,
+      label,
+      page: 'mail',
+      schema: {
+        fields: [
+          text('subject', 'Konu (Handlebars)', { required: true, help }),
+          richtext('html', 'Gövde (HTML + Handlebars)', { required: true, help: 'Tam HTML belge gerekmez; MailService metin gövdesini olduğu gibi gönderir.' }),
+        ],
+      },
+    },
+  ];
+}
 
 const BY_KEY: ReadonlyMap<string, SiteContentRegistryEntry> = new Map(SITE_CONTENT_REGISTRY.map((e) => [e.key, e]));
 

@@ -1,7 +1,7 @@
 // F5 — Settings admin uçları HTTP seviyesinde (gerçek Nest uygulaması, rastgele port, Node fetch, gerçek DB bagdam_dev).
 // Guard'lar test modülünde YOK (JwtAuth/Roles/Csrf AppModule'de); AuditLogInterceptor DAHİL (sır redaksiyonu doğrulanır).
 // Kapsam: GET maskeleme · PUT secret şifreli saklanır (DB'de düz metin yok) + maske/boş gönderilince değişmez ·
-// commerce PUT → getCommerce yeni değer + bootstrap cache invalidate · doğrulama 400/404 · mail/test 501.
+// commerce PUT → getCommerce yeni değer + bootstrap cache invalidate · doğrulama 400/404 · mail/test rotası F6'da MailModule'e taşındı (burada 404).
 // Test verisi: mail/commerce gruplarının satırları başta kaydedilir, sonda geri yüklenir.
 import '../helpers/env';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
@@ -151,10 +151,10 @@ describe('Settings admin HTTP — /api/v1/admin/settings (registry · maske · �
     expect(bad.status).toBe(400);
   });
 
-  it('POST /admin/settings/mail/test → 501 {message:"F6"}', async () => {
-    const res = await api('POST', '/admin/settings/mail/test', {});
-    expect(res.status).toBe(501);
-    expect((res.body as ErrorBody).message).toBe('F6');
+  it('POST /admin/settings/mail/test → F6: rota MailModule (MailAdminController) sunar; SettingsModule tek başına 404', async () => {
+    // Gerçek davranış (DISABLE_MAIL SKIPPED + önizleme) __tests__/mail/mail.http.spec.ts'te doğrulanır.
+    const res = await api('POST', '/admin/settings/mail/test', { to: 'test@bagdam.test' });
+    expect(res.status).toBe(404);
   });
 
   // ── PUT: secret ─────────────────────────────────────────────────────────────

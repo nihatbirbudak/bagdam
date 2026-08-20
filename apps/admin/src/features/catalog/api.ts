@@ -162,6 +162,7 @@ export function normalizeBoxWeek(raw: unknown, week: string): AdminBoxWeek | nul
 /* ── Audit ─────────────────────────────────────────────────────────────── */
 
 export const auditApi = {
-  list: (params: { page?: number; limit?: number; module?: string }) =>
+  /** `?page&limit&module&action&actorId&entityId&search` (AuditQueryDto) — yalnız ADMIN. */
+  list: (params: { page?: number; limit?: number; module?: string; action?: string; actorId?: string; entityId?: string; search?: string }) =>
     api.get<Paginated<AdminAuditLog>>(`/admin/audit-logs${buildQuery(params)}`),
 };

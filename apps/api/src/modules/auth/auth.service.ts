@@ -1,6 +1,16 @@
-import { HttpException, HttpStatus, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { User } from '@prisma/client';
+import { IysStatus, Prisma, type User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import {
@@ -10,10 +20,15 @@ import {
   REFRESH_TOKEN_TTL_SECONDS,
   TokenType,
 } from '../../config/jwt.config';
+import { DEFAULT_CONSENT_SOURCE } from '../content/content.constants';
+import { ContentService } from '../content/content.service';
+import { RESET_LINK_MINUTES, webUrl } from '../mail/mail.constants';
+import { NOTIFIER, type Notifier } from '../mail/notifier.interface';
 import { AuthMeDto, AuthUserDto, toAuthMe, toAuthUser, toSessionUser } from './auth.mapper';
-import { AuthRepository } from './auth.repository';
-import type { IssuedTokens, JwtPayload, SessionResolution } from './auth.types';
+import { AuthRepository, type CustomerConsentInput } from './auth.repository';
+import type { IssuedTokens, JwtPayload, SessionResolution, VerifyTokenPayload } from './auth.types';
 import type { ChangePasswordDto } from './dto/change-password.dto';
+import type { RegisterDto } from './dto/register.dto';
 import type { UpdateMeDto } from './dto/update-me.dto';
 
 /** Parola bcrypt maliyeti — database/seeds/seed.ts ile aynı (12). */
@@ -26,14 +41,37 @@ export const LOCK_DURATION_MS = 30 * 60 * 1000;
 /** Sözleşme metni — admin/cart.js bu mesajı gösterir. */
 export const INVALID_CREDENTIALS_MESSAGE = 'E-posta veya parola hatalı';
 
+/** F6 — e-posta doğrulama JWT ömrü (24 saat) ve parola sıfırlama bağlantısı ömrü (60 dk). */
+export const VERIFY_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+export const RESET_TOKEN_TTL_MS = RESET_LINK_MINUTES * 60 * 1000;
+/** Kayıtta documentSlug verilmezse türün varsayılan yasal belgesi (yayındaki sürüm; yoksa bağlanmaz). */
+export const DEFAULT_CONSENT_DOCUMENT_SLUGS: Readonly<Record<'KVKK_ACK' | 'MARKETING_EMAIL' | 'MARKETING_SMS', string>> = {
+  KVKK_ACK: 'kvkk',
+  MARKETING_EMAIL: 'ticari-ileti-izni',
+  MARKETING_SMS: 'ticari-ileti-izni',
+};
+
 export interface LoginResult {
   user: AuthUserDto;
   tokens: IssuedTokens;
 }
 
+/** İstek bağlamı (onay satırları ip/ua) — controller istekten çıkarır. */
+export interface RequestMeta {
+  ip?: string | null;
+  userAgent?: string | null;
+}
+
+export interface RegisterResult extends LoginResult {
+  /** Kaydedilen onay türleri (audit özeti için; e-posta/telefon buraya girmez). */
+  consentKinds: string[];
+}
+
 /**
  * AuthService — kimlik kuralları (ADR-0009): e-posta+parola (bcrypt), access 15 dk + refresh 30 gün rotasyonlu,
  * refresh hash'i DB'de, 5 hata → 30 dk kilit. Çerez/başlık işleri controller'da; Prisma AuthRepository'de.
+ * F6: kayıt (KVKK zorunlu + Consent satırları tek işlemde + anında giriş + hoş geldin/doğrulama e-postası), e-posta
+ * doğrulama (JWT typ:'verify' 24 s), parola unuttum/sıfırla (sha256 token 60 dk; diğer oturumlar düşer; e-posta).
  */
 @Injectable()
 export class AuthService {
@@ -45,8 +83,180 @@ export class AuthService {
   constructor(
     private readonly repo: AuthRepository,
     private readonly jwt: JwtService,
+    private readonly content: ContentService,
+    @Inject(NOTIFIER) private readonly notifier: Notifier,
   ) {
     this.secrets = loadJwtSecrets();
+  }
+
+  // ── F6: Kayıt ────────────────────────────────────────────────────────────────
+
+  /**
+   * Kayıt: KVKK_ACK granted zorunlu (400 KVKK_REQUIRED) · e-posta tekil (409 EMAIL_TAKEN; yarışta P2002 de 409) ·
+   * Consent satırları (documentId = slug'ın yayındaki LegalDocument'i; MARKETING_* → iysStatus PENDING) kullanıcıyla aynı
+   * işlemde · anında giriş (token çifti + lastLoginAt) · hoş geldin + doğrulama e-postası (Notifier; hata kaydı bozmaz).
+   */
+  async register(dto: RegisterDto, meta: RequestMeta = {}): Promise<RegisterResult> {
+    const email = dto.email.trim().toLowerCase();
+    const kvkk = dto.consents.find((c) => c.kind === 'KVKK_ACK' && c.granted === true);
+    if (!kvkk) {
+      throw new BadRequestException({ message: 'KVKK aydınlatma metnini onaylamanız gerekir', error: 'KVKK_REQUIRED' });
+    }
+    const existing = await this.repo.findByEmail(email);
+    if (existing) {
+      throw new ConflictException({ message: 'Bu e-posta zaten kayıtlı', error: 'EMAIL_TAKEN' });
+    }
+
+    const consents = await this.buildRegisterConsents(dto, meta);
+    const marketingOptIn = dto.consents.some((c) => c.kind === 'MARKETING_EMAIL' && c.granted);
+    const passwordHash = await bcrypt.hash(dto.password, PASSWORD_BCRYPT_ROUNDS);
+
+    let user: User;
+    try {
+      user = await this.repo.createCustomer(
+        { email, passwordHash, name: dto.name?.trim() || null, phone: dto.phone?.trim() || null, marketingOptIn },
+        consents,
+      );
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException({ message: 'Bu e-posta zaten kayıtlı', error: 'EMAIL_TAKEN' });
+      }
+      throw err;
+    }
+
+    const now = new Date();
+    const tokens = await this.issueTokens(user);
+    await this.repo.recordLoginSuccess(user.id, await this.hashRefreshToken(tokens.refreshToken), now);
+    this.logger.log(`Yeni müşteri kaydı (uid:${user.id})`);
+
+    // E-postalar: hoş geldin + doğrulama bağlantısı (Notifier asla fırlatmaz; DISABLE_MAIL'de MailLog SKIPPED + önizleme)
+    const notifierUser = { id: user.id, email: user.email, name: user.name };
+    await this.notifier.notify('customer.welcome', { user: notifierUser });
+    await this.notifier.notify('customer.verify', { user: notifierUser, verifyUrl: await this.buildVerifyUrl(user) });
+
+    return { user: toAuthUser(user), tokens, consentKinds: consents.map((c) => c.kind) };
+  }
+
+  // ── F6: E-posta doğrulama ───────────────────────────────────────────────────
+
+  /** Doğrulama bağlantısı: `${WEB_URL}/api/v1/auth/verify?token=<jwt typ:verify 24 s>` (WEB_URL yoksa göreli). */
+  async buildVerifyUrl(user: Pick<User, 'id'>): Promise<string> {
+    const token = await this.jwt.signAsync(
+      { sub: user.id, typ: 'verify', jti: randomUUID() } satisfies VerifyTokenPayload,
+      { secret: this.secrets.access, expiresIn: VERIFY_TOKEN_TTL_SECONDS },
+    );
+    return `${webUrl()}/api/v1/auth/verify?token=${encodeURIComponent(token)}`;
+  }
+
+  /** Token geçerli ve kullanıcı aktifse emailVerifiedAt=now (ilk kez) → true; geçersiz/süresi dolmuş/kullanıcı yok → false. */
+  async verifyEmail(token: string): Promise<boolean> {
+    let payload: VerifyTokenPayload;
+    try {
+      payload = await this.jwt.verifyAsync<VerifyTokenPayload>(token, { secret: this.secrets.access });
+    } catch {
+      return false;
+    }
+    if (!payload || typeof payload.sub !== 'string' || payload.typ !== 'verify') return false;
+    const user = await this.repo.findById(payload.sub);
+    if (!user || user.deletedAt || !user.isActive) return false;
+    if (user.emailVerifiedAt) return true; // idempotent: tekrar tıklama da başarı sayfasına gider
+    const marked = await this.repo.markEmailVerified(user.id, new Date());
+    if (marked) this.logger.log(`E-posta doğrulandı (uid:${user.id})`);
+    return true;
+  }
+
+  // ── F6: Parola unuttum / sıfırla ────────────────────────────────────────────
+
+  /**
+   * Her zaman sessiz başarı (e-posta keşfi yok). Kullanıcı varsa ve aktifse: ham token (32 bayt hex) e-postaya,
+   * sha256 özeti DB'ye (+60 dk). Bağlantı: `${WEB_URL}/uyelik.html?sifirla=<token>`.
+   */
+  async forgotPassword(rawEmail: string): Promise<void> {
+    const email = rawEmail.trim().toLowerCase();
+    const user = await this.repo.findByEmail(email);
+    if (!user || user.deletedAt || !user.isActive || user.anonymizedAt) {
+      // Sessiz başarı: yanıt ve durum kodu kullanıcı var/yok ayrımı yapmaz (e-posta keşfi yok); e-posta log'a yazılmaz (ADR-0015)
+      this.logger.log('Parola sıfırlama: bilinmeyen/pasif e-posta (sessiz)');
+      return;
+    }
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await this.repo.setPasswordResetToken(user.id, this.sha256(token), expiresAt);
+    const resetUrl = `${webUrl()}/uyelik.html?sifirla=${token}`;
+    await this.notifier.notify('customer.reset', {
+      user: { id: user.id, email: user.email, name: user.name },
+      resetUrl,
+      expiresMinutes: RESET_LINK_MINUTES,
+    });
+    this.logger.log(`Parola sıfırlama bağlantısı üretildi (uid:${user.id})`);
+  }
+
+  /**
+   * Token (sha256 eşleşmesi + süre) geçerliyse: yeni parola, token temizlenir, refresh hash yeni oturuma (diğer
+   * oturumlar düşer), kilit sıfır; "parolan değişti" e-postası. Geçersiz/süresi dolmuş → 400 RESET_TOKEN_INVALID.
+   * Döner: yeni token çifti (controller çerezleri yazar — anında giriş) + kullanıcı.
+   */
+  async resetPassword(token: string, password: string): Promise<LoginResult> {
+    const tokenHash = this.sha256(token);
+    const now = new Date();
+    const user = await this.repo.findByPasswordResetTokenHash(tokenHash);
+    if (!user || user.deletedAt || !user.isActive || !user.passwordResetExpires || user.passwordResetExpires.getTime() <= now.getTime()) {
+      throw new BadRequestException({ message: 'Sıfırlama bağlantısı geçersiz ya da süresi dolmuş', error: 'RESET_TOKEN_INVALID' });
+    }
+    const passwordHash = await bcrypt.hash(password, PASSWORD_BCRYPT_ROUNDS);
+    const tokens = await this.issueTokens(user);
+    const done = await this.repo.completePasswordReset(user.id, tokenHash, passwordHash, await this.hashRefreshToken(tokens.refreshToken), now);
+    if (!done) {
+      throw new BadRequestException({ message: 'Sıfırlama bağlantısı geçersiz ya da süresi dolmuş', error: 'RESET_TOKEN_INVALID' });
+    }
+    this.logger.log(`Parola sıfırlandı (uid:${user.id})`);
+    await this.notifier.notify('customer.password-changed', { user: { id: user.id, email: user.email, name: user.name }, changedAt: now });
+    return { user: toAuthUser(user), tokens };
+  }
+
+  /** Kayıt onayları → Consent create girdileri (documentId: verilen ya da varsayılan slug'ın yayındaki sürümü). */
+  private async buildRegisterConsents(dto: RegisterDto, meta: RequestMeta): Promise<CustomerConsentInput[]> {
+    const out: CustomerConsentInput[] = [];
+    const seen = new Set<string>();
+    for (const c of dto.consents) {
+      if (seen.has(c.kind)) continue; // aynı tür iki kez gelirse ilki geçerli
+      seen.add(c.kind);
+      const documentId = await this.resolveConsentDocument(c.kind, c.documentSlug);
+      out.push({
+        kind: c.kind,
+        granted: c.granted,
+        documentId,
+        source: DEFAULT_CONSENT_SOURCE,
+        ipAddress: meta.ip ? meta.ip.slice(0, 64) : null,
+        userAgent: meta.userAgent ? meta.userAgent.slice(0, 255) : null,
+        iysStatus: c.kind === 'MARKETING_EMAIL' || c.kind === 'MARKETING_SMS' ? IysStatus.PENDING : IysStatus.NOT_APPLICABLE,
+      });
+    }
+    return out;
+  }
+
+  /** Açık slug bulunamazsa 400 (istemci yanlış belge gönderdi); varsayılan slug yoksa sessizce bağlanmaz. */
+  private async resolveConsentDocument(kind: keyof typeof DEFAULT_CONSENT_DOCUMENT_SLUGS, slug: string | undefined): Promise<string | null> {
+    if (slug) {
+      try {
+        return (await this.content.getLegalBySlug(slug)).id;
+      } catch (err) {
+        if (err instanceof NotFoundException) {
+          throw new BadRequestException({ message: `Onay verilecek yasal metin bulunamadı: ${slug}`, error: 'CONSENT_DOCUMENT_NOT_FOUND' });
+        }
+        throw err;
+      }
+    }
+    try {
+      return (await this.content.getLegalBySlug(DEFAULT_CONSENT_DOCUMENT_SLUGS[kind])).id;
+    } catch (err) {
+      if (err instanceof NotFoundException) return null;
+      throw err;
+    }
+  }
+
+  private sha256(value: string): string {
+    return createHash('sha256').update(value, 'utf8').digest('hex');
   }
 
   // ── Login / refresh / logout ─────────────────────────────────────────────

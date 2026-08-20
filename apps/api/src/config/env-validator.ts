@@ -78,7 +78,26 @@ export function validateEnv(): void {
     errors.push(`  [HATA] SITE_MODE: geçersiz değer "${siteMode}" — izinli: ${SITE_MODES.join(' | ')}`);
   }
 
+  // E-posta (F6, ADR-0014): DISABLE_MAIL yalnız "true"/"false"; SMTP_PORT sayısal; WEB_URL e-posta bağlantılarının kökü
+  // (doğrulama/parola sıfırlama linkleri). SMTP_* boş bırakılabilir: Setting mail.* (panel) önceliklidir, .env yedektir.
+  const disableMail = process.env.DISABLE_MAIL?.trim().toLowerCase();
+  if (disableMail && disableMail !== 'true' && disableMail !== 'false') {
+    warnings.push(`  [UYARI] DISABLE_MAIL: "${process.env.DISABLE_MAIL}" — yalnız true/false; true dışındaki değerler gönderimi AÇIK sayar`);
+  }
+  if (process.env.SMTP_PORT && !/^\d+$/.test(process.env.SMTP_PORT.trim())) {
+    errors.push(`  [HATA] SMTP_PORT: sayı olmalı ("${process.env.SMTP_PORT}")`);
+  }
+  if (process.env.WEB_URL && !/^https?:\/\//.test(process.env.WEB_URL.trim())) {
+    warnings.push(`  [UYARI] WEB_URL: "${process.env.WEB_URL}" — http(s):// ile başlamalı (e-posta bağlantıları buna göre kurulur)`);
+  }
+
   if (isProduction) {
+    // Production'da e-posta kapalıysa uyar (parola sıfırlama/doğrulama gitmez); açıkken SMTP panelden ya da .env'den gelmeli
+    if (disableMail === 'true') {
+      warnings.push('  [UYARI] DISABLE_MAIL=true: production\'da e-posta gönderilmez (yalnız MailLog + önizleme dosyası)');
+    } else if (!process.env.SMTP_HOST?.trim()) {
+      warnings.push('  [UYARI] SMTP_HOST boş: SMTP Ayarlar › E-posta (Setting mail.*) üzerinden tanımlı olmalı; yoksa gönderimler FAILED');
+    }
     // production'da zayıf/örnek sır değerleri yasak
     for (const [key, weak] of Object.entries(WEAK_DEFAULTS)) {
       const val = process.env[key];

@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { WholesaleLead, WholesaleLeadCreated, WholesaleLeadList } from '@bagdam/shared';
+import { NOTIFIER, type Notifier } from '../mail/notifier.interface';
 import type { CreateWholesaleLeadDto } from './dto/create-lead.dto';
 import type { WholesaleLeadPatchDto } from './dto/lead-patch.dto';
 import type { WholesaleLeadQueryDto } from './dto/lead-query.dto';
@@ -13,15 +14,18 @@ const IP_MAX = 45;
 
 /**
  * WholesaleService — toptan talepleri (BACKEND-PLANI §3 wholesale satırı, §4 ekran 13).
- *  - `createLead`: kayıt + ip; bildirim e-postası F6 (Notifier yok → log). Aynı e-postadan tekrar talep engellenmez
- *    (her gönderim ayrı satır; ops admin'de görür). Throttle 3/dk/IP controller'da.
+ *  - `createLead`: kayıt + ip; F6: Notifier `wholesale.new-lead` → yöneticiye e-posta (Setting site.contactEmail; MailNotifier
+ *    asla fırlatmaz, MailLog'a düşer). Aynı e-postadan tekrar talep engellenmez (her gönderim ayrı satır). Throttle 3/dk/IP controller'da.
  *  - Admin: liste (status filtresi, sayfalama), durum/not güncelleme.
  */
 @Injectable()
 export class WholesaleService {
   private readonly logger = new Logger(WholesaleService.name);
 
-  constructor(private readonly repo: WholesaleRepository) {}
+  constructor(
+    private readonly repo: WholesaleRepository,
+    @Inject(NOTIFIER) private readonly notifier: Notifier,
+  ) {}
 
   async createLead(dto: CreateWholesaleLeadDto, ip: string | null | undefined): Promise<WholesaleLeadCreated> {
     const row = await this.repo.create({
@@ -31,8 +35,10 @@ export class WholesaleService {
       note: dto.note ?? null,
       ip: ip ? ip.slice(0, IP_MAX) : null,
     });
-    // F6: Notifier/MailModule gelince ops'a "yeni toptan talebi" e-postası; şimdilik log (e-posta log'a yazılmaz — ADR-0015).
-    this.logger.log(`Yeni toptan talebi #${row.id} (bildirim e-postası F6'da)`);
+    this.logger.log(`Yeni toptan talebi #${row.id}`); // e-posta log'a yazılmaz (ADR-0015)
+    await this.notifier.notify('wholesale.new-lead', {
+      lead: { id: row.id, email: row.email, businessName: row.businessName, phone: row.phone, note: row.note, createdAt: row.createdAt },
+    });
     return { id: row.id };
   }
 

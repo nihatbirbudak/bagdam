@@ -2,19 +2,31 @@ const BahcedenCart = (function () {
   const CART_KEY = "bahceden_cart";
   const PREF_KEY = "bahceden_prefs";
 
-  // Tasarım prototipi test kolaylığı: herhangi bir sayfanın adresine
-  // ?sifirla ekleyince tüm yerel kayıtlar (üyelik, oturum, abonelik, sepet,
-  // siparişler, adres, kart, indirim hakkı) temizlenir — siteyi ilk kez
-  // gelen bir ziyaretçi gibi baştan denemek için.
+  // F6 auth: ?sifirla=<token> artık parola sıfırlama bağlantısıdır (e-postadaki link:
+  // uyelik.html?sifirla=<token>). Token bellekte tutulur ve adres çubuğundan silinir (geçmişe /
+  // referer'a düşmesin); yerel kayıtlara dokunulmaz. DEĞERSİZ ?sifirla eski prototip davranışını korur:
+  // tüm yerel kayıtlar temizlenir — siteyi ilk kez gelen bir ziyaretçi gibi baştan denemek için.
+  let resetToken = null;
   try {
-    if (new URLSearchParams(window.location.search).has("sifirla")) {
-      [
-        "bahceden_cart", "bahceden_prefs", "bahceden_sub", "bahceden_address",
-        "bahceden_member", "bahceden_session", "bahceden_card",
-        "bahceden_orders", "bahceden_retention_offered",
-      ].forEach((k) => localStorage.removeItem(k));
-      history.replaceState(null, "", window.location.pathname);
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.has("sifirla")) {
+      const value = (qs.get("sifirla") || "").trim();
+      if (value) {
+        resetToken = value;
+      } else {
+        [
+          "bahceden_cart", "bahceden_prefs", "bahceden_sub", "bahceden_address",
+          "bahceden_member", "bahceden_session", "bahceden_card",
+          "bahceden_orders", "bahceden_retention_offered",
+        ].forEach((k) => localStorage.removeItem(k));
+      }
+      qs.delete("sifirla");
+      const rest = qs.toString();
+      history.replaceState(null, "", window.location.pathname + (rest ? "?" + rest : "") + window.location.hash);
     }
+    // F6 auth: üyelik/oturum/adres artık sunucuda (bootstrap me + /me/address) — eski prototip
+    // anahtarları okunmaz da yazılmaz da; kalıntı varsa temizlenir. bahceden_cart/prefs/sub taslağı kalır.
+    ["bahceden_member", "bahceden_session", "bahceden_address"].forEach((k) => localStorage.removeItem(k));
   } catch (e) { /* eski tarayıcıda sessizce geç */ }
 
   function readJSON(key, fallback) {
@@ -737,44 +749,143 @@ const BahcedenCart = (function () {
     return d;
   }
 
-  // ---- Address (üyelik.html) ----
-  const ADDRESS_KEY = "bahceden_address";
+  // ---- F6 auth: API yardımcısı — BahcedenCart.api(path, {method, body}) (BACKEND-PLANI §1.2, F6 sözleşmesi) ----
+  // Aynı kaynak /api/v1; çerezli oturum (credentials: include); JSON gövde; mutasyonlarda X-CSRF-Token
+  // (csrf_token çerezinden; yoksa GET /auth/csrf). 401 TOKEN_EXPIRED → bir kez POST /auth/refresh + tekrar;
+  // diğer 401 → oturum yok: sayfa "çıkış" durumuna döner (sessionLost). 403 CSRF_INVALID → taze CSRF + bir tekrar.
+  // Başarı: çözülen JSON (204 → null). Hata: reddedilen {status, code, message (Türkçe), payload}.
+  const API_BASE = "/api/v1";
+  const CSRF_COOKIE = "csrf_token";
+  // Kendi 401'i "oturum düştü" anlamına gelmeyen uçlar (yanlış parola, geçersiz refresh, çıkış...).
+  const AUTH_PATHS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout", "/auth/forgot", "/auth/reset"];
+  // Hata zarfı `error` kodu → Türkçe metin (zarf mesajı teknikse/İngilizceyse bunlar önce gelir).
+  const API_CODE_MESSAGES = {
+    UNAUTHENTICATED: "Oturumun bulunamadı — lütfen giriş yap.",
+    TOKEN_EXPIRED: "Oturumun sona erdi — lütfen yeniden giriş yap.",
+    REFRESH_INVALID: "Oturumun sona erdi — lütfen yeniden giriş yap.",
+    CSRF_INVALID: "Güvenlik doğrulaması başarısız — sayfayı yenileyip tekrar dene.",
+    EMAIL_TAKEN: "Bu e-posta zaten kayıtlı — giriş yapmayı dene.",
+    KVKK_REQUIRED: "Devam etmek için KVKK aydınlatma metnini onaylaman gerekiyor.",
+    RESET_TOKEN_INVALID: "Sıfırlama bağlantısı geçersiz ya da süresi dolmuş — yeni bağlantı iste.",
+    CURRENT_PASSWORD_INVALID: "Mevcut parolan hatalı.",
+  };
+  const API_STATUS_MESSAGES = {
+    400: "Girdiğin bilgileri kontrol et.",
+    401: "Oturumun bulunamadı — lütfen giriş yap.",
+    403: "Bu işlem için yetkin yok.",
+    404: "Kayıt bulunamadı.",
+    409: "Bu kayıt zaten var.",
+    423: "Hesap geçici olarak kilitlendi — biraz sonra tekrar dene.",
+    429: "Çok fazla deneme — biraz sonra tekrar dene.",
+    500: "Sunucu hatası — biraz sonra tekrar dene.",
+    502: "Sunucuya şu an ulaşılamıyor — biraz sonra tekrar dene.",
+    503: "Sunucuya şu an ulaşılamıyor — biraz sonra tekrar dene.",
+  };
+  const API_NETWORK_MESSAGE = "Sunucuya ulaşılamadı — bağlantını kontrol edip tekrar dene.";
+  const API_GENERIC_MESSAGE = "Bir şeyler ters gitti — lütfen tekrar dene.";
 
-  function getAddress() {
-    return readJSON(ADDRESS_KEY, null);
+  function readCookie(name) {
+    const m = document.cookie.match(new RegExp("(?:^|;\\s*)" + name + "=([^;]*)"));
+    return m ? decodeURIComponent(m[1]) : "";
   }
-  function setAddress(addr) {
-    writeJSON(ADDRESS_KEY, addr);
+  function dropCookie(name) {
+    document.cookie = name + "=; Max-Age=0; path=/";
   }
 
-  // ---- Membership + session (checkout login/signup gate) — a design-only
-  // stand-in for real auth: the "account" is just an email/password pair
-  // sitting in localStorage, and "logged in" is a separate flag so the two
-  // can be checked independently.
-  const MEMBER_KEY = "bahceden_member";
-  const SESSION_KEY = "bahceden_session";
-
-  function getMember() {
-    return readJSON(MEMBER_KEY, null);
-  }
-  // Yeni üyelik = temiz hesap. Bu prototipte tüm kişisel kayıtlar (adres,
-  // kart, abonelik, sipariş geçmişi, indirim hakkı) tarayıcıda durduğu
-  // için, farklı bir e-postayla üye olunca öncekinin verileri kalmamalı —
-  // yoksa yeni üye sepette/üyelikte eski üyenin bilgilerini dolu görür.
-  function setMember(member) {
-    const previous = getMember();
-    if (!previous || previous.email !== member.email) {
-      // Anahtarlar açık yazıldı: CARD_KEY bu fonksiyondan sonra tanımlanıyor
-      // (const), buradan ada erişmek "önce başlatılmalı" hatası verir.
-      ["bahceden_address", "bahceden_card", "bahceden_sub", "bahceden_orders", "bahceden_prefs", "bahceden_retention_offered"]
-        .forEach((k) => localStorage.removeItem(k));
+  let csrfPromise = null;
+  function ensureCsrf() {
+    const existing = readCookie(CSRF_COOKIE);
+    if (existing) return Promise.resolve(existing);
+    if (!csrfPromise) {
+      csrfPromise = fetch(API_BASE + "/auth/csrf", { credentials: "include", cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => (j && j.csrfToken) || readCookie(CSRF_COOKIE) || "")
+        .catch(() => "")
+        .finally(() => { csrfPromise = null; });
     }
-    writeJSON(MEMBER_KEY, member);
+    return csrfPromise;
+  }
+
+  // Aynı anda birden çok 401 gelirse tek refresh (paylaşılan promise).
+  let refreshPromise = null;
+  function tryRefresh() {
+    if (!refreshPromise) {
+      refreshPromise = fetch(API_BASE + "/auth/refresh", {
+        method: "POST", credentials: "include", cache: "no-store",
+        headers: { "Content-Type": "application/json", Accept: "application/json" }, body: "{}",
+      })
+        .then((r) => r.ok)
+        .catch(() => false)
+        .finally(() => { refreshPromise = null; });
+    }
+    return refreshPromise;
+  }
+
+  function parseApiBody(res) {
+    if (res.status === 204) return Promise.resolve(null);
+    return res.text().then((text) => {
+      if (!text) return null;
+      try { return JSON.parse(text); } catch (e) { return { message: text }; }
+    });
+  }
+  function toApiError(status, payload) {
+    const p = payload && typeof payload === "object" ? payload : {};
+    const code = typeof p.error === "string" ? p.error : "";
+    const serverMessage = typeof p.message === "string" ? p.message : "";
+    // 429/5xx zarfları İngilizce/teknik olur; 400 doğrulama listesi de kullanıcıya gösterilmez.
+    const preferStatus = status === 429 || status >= 500 || !serverMessage;
+    const message = API_CODE_MESSAGES[code] || (preferStatus ? API_STATUS_MESSAGES[status] : serverMessage) ||
+      serverMessage || API_STATUS_MESSAGES[status] || API_GENERIC_MESSAGE;
+    return { status: status, code: code, message: message, payload: payload };
+  }
+
+  function apiRequest(url, method, bodyText, csrf, isAuthPath, retried) {
+    const headers = { Accept: "application/json" };
+    if (bodyText !== undefined) headers["Content-Type"] = "application/json";
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+    return fetch(url, { method: method, headers: headers, body: bodyText, credentials: "include", cache: "no-store" }).then(
+      (res) => parseApiBody(res).then((payload) => {
+        if (res.ok) return payload;
+        const err = toApiError(res.status, payload);
+        if (res.status === 403 && err.code === "CSRF_INVALID" && !retried) {
+          dropCookie(CSRF_COOKIE);
+          return ensureCsrf().then((fresh) => apiRequest(url, method, bodyText, fresh, isAuthPath, true));
+        }
+        if (res.status !== 401 || isAuthPath) throw err;
+        if (err.code === "TOKEN_EXPIRED" && !retried) {
+          return tryRefresh().then((ok) => {
+            if (ok) return ensureCsrf().then((fresh) => apiRequest(url, method, bodyText, fresh, isAuthPath, true));
+            sessionLost();
+            throw err;
+          });
+        }
+        sessionLost();
+        throw err;
+      }),
+      () => { throw { status: 0, code: "NETWORK", message: API_NETWORK_MESSAGE, payload: null }; },
+    );
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    const method = String(opts.method || "GET").toUpperCase();
+    const url = path.indexOf("/api/") === 0 ? path : API_BASE + path;
+    const apiPath = url.indexOf(API_BASE) === 0 ? url.slice(API_BASE.length) : url;
+    const isAuthPath = AUTH_PATHS.some((p) => apiPath === p || apiPath.indexOf(p + "?") === 0);
+    const bodyText = opts.body === undefined || opts.body === null ? undefined : JSON.stringify(opts.body);
+    const mutating = method !== "GET" && method !== "HEAD";
+    const prep = mutating ? ensureCsrf() : Promise.resolve("");
+    return prep.then((csrf) => apiRequest(url, method, bodyText, csrf, isAuthPath, false));
+  }
+
+  // ---- F6 auth: oturum — tek kaynak bootstrap `__BAGDAM__.me` ({loggedIn,email,name,id} | null). ----
+  // Sunucu çerezi görüp `me`'yi gömer (çerezli HTML no-store); localStorage'da oturum/üyelik izi yok.
+  function me() {
+    if (typeof __BAGDAM__ === "undefined" || !__BAGDAM__ || !__BAGDAM__.me || !__BAGDAM__.me.loggedIn) return null;
+    return __BAGDAM__.me;
   }
   function isLoggedIn() {
-    // F3 bootstrap: oturum sunucudan (__BAGDAM__.me); yoksa eski localStorage bayrağı.
-    if (typeof __BAGDAM__ !== "undefined" && __BAGDAM__.me) return !!__BAGDAM__.me.loggedIn;
-    return !!readJSON(SESSION_KEY, null);
+    return !!me();
   }
 
   // Satın alınmış abonelik yalnızca sahibi oturumdayken "görünür" —
@@ -783,8 +894,100 @@ const BahcedenCart = (function () {
   function hasPurchasedSub() {
     return isLoggedIn() && !!getSub().purchased;
   }
-  function setLoggedIn(value) {
-    writeJSON(SESSION_KEY, value ? { loggedIn: true } : null);
+
+  // Sayfadaki auth kapılarının refresh'leri — oturum durumu değişince (çıkış, oturum düşmesi) hepsi koşar.
+  const authRefreshers = [];
+  function setSessionUser(user) {
+    if (typeof window.__BAGDAM__ !== "object" || !window.__BAGDAM__) window.__BAGDAM__ = {};
+    window.__BAGDAM__.me = user ? { loggedIn: true, id: user.id, email: user.email, name: user.name || null } : null;
+    if (!user) addressCache = null;
+    authRefreshers.forEach((fn) => { try { fn(); } catch (e) { /* sayfa kendi hatasını yönetir */ } });
+  }
+  // 401 (refresh de tutmadı): çerezleri sunucu sildi; sayfa "çıkış" durumuna döner, giriş kutusunda kısa not.
+  function sessionLost() {
+    const wasLoggedIn = isLoggedIn();
+    dropCookie(CSRF_COOKIE);
+    setSessionUser(null);
+    const msgEl = document.getElementById("loginMsg");
+    if (wasLoggedIn && msgEl) { msgEl.textContent = API_CODE_MESSAGES.TOKEN_EXPIRED; msgEl.hidden = false; msgEl.style.color = ""; }
+  }
+  function logout() {
+    return api("/auth/logout", { method: "POST" })
+      .catch(() => null)
+      .then(() => { dropCookie(CSRF_COOKIE); setSessionUser(null); });
+  }
+
+  // Sayfa anonim render edildi ama csrf çerezi var (daha önce giriş yapılmış): access süresi dolmuş,
+  // refresh (30 gün) hâlâ geçerli olabilir → bir kez sessizce POST /auth/refresh; tutarsa sayfa yenilenir
+  // (bootstrap `me` dolu gelir), tutmazsa csrf çerezi silinir (bir daha denenmez). Döngü emniyeti:
+  // sessionStorage damgası — 5 dk içinde ikinci deneme yok.
+  const RECOVER_KEY = "bagdam_session_recover";
+  function recoverSession() {
+    if (isLoggedIn() || !readCookie(CSRF_COOKIE)) return;
+    let last = 0;
+    try { last = parseInt(sessionStorage.getItem(RECOVER_KEY) || "0", 10) || 0; } catch (e) { /* yok say */ }
+    if (Date.now() - last < 5 * 60 * 1000) return;
+    try { sessionStorage.setItem(RECOVER_KEY, String(Date.now())); } catch (e) { /* yok say */ }
+    tryRefresh().then((ok) => { if (ok) location.reload(); else dropCookie(CSRF_COOKIE); });
+  }
+  function getResetToken() {
+    return resetToken;
+  }
+
+  // ---- F6 auth: adres — GET/PUT /me/address (tek adres MVP); ilçe = teslimat bölgesi (GET /delivery/zones). ----
+  // getAddress() senkron sayfa içi önbelleği döner (sayfa önce loadAddress() ile doldurur); setAddress() PUT eder.
+  // İstemci şekli {name, phone, line, zoneSlug, district (bölge adı), zip} — sepet'in statik "Urla/Çeşme" select
+  // değerleri bölge ADI olduğundan district↔zoneSlug çevirisi bölge listesiyle yapılır.
+  const DEFAULT_ZONES = [{ slug: "urla", name: "Urla" }, { slug: "cesme", name: "Çeşme" }];
+  let zonesCache = null;
+  let addressCache = null;
+
+  function getZones() {
+    return zonesCache || DEFAULT_ZONES;
+  }
+  function loadZones() {
+    if (zonesCache) return Promise.resolve(zonesCache);
+    return api("/delivery/zones")
+      .then((zones) => {
+        if (Array.isArray(zones) && zones.length) zonesCache = zones.map((z) => ({ id: z.id, slug: z.slug, name: z.name }));
+        return getZones();
+      })
+      .catch(() => getZones());
+  }
+  function trSlug(text) {
+    return String(text || "").replace(/İ/g, "i").replace(/I/g, "ı").toLowerCase()
+      .replace(/ç/g, "c").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ı/g, "i")
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+  function zoneName(slug) {
+    const z = getZones().find((x) => x.slug === slug);
+    return z ? z.name : (slug || "");
+  }
+  function zoneSlugFor(nameOrSlug) {
+    const z = getZones().find((x) => x.slug === nameOrSlug || x.name === nameOrSlug);
+    return z ? z.slug : trSlug(nameOrSlug);
+  }
+  function toClientAddress(a) {
+    if (!a || typeof a !== "object") return null;
+    return {
+      id: a.id || null, name: a.fullName || "", phone: a.phone || "", line: a.line || "",
+      zoneSlug: a.zoneSlug || "", district: zoneName(a.zoneSlug), zip: a.zip || "",
+    };
+  }
+  function getAddress() {
+    return addressCache;
+  }
+  function loadAddress() {
+    if (!isLoggedIn()) { addressCache = null; return Promise.resolve(null); }
+    return api("/me/address").then((a) => { addressCache = toClientAddress(a); return addressCache; });
+  }
+  function setAddress(addr) {
+    // zip her zaman gönderilir: boş "" → sunucu null yazar (mevcut posta kodu silinebilsin).
+    const body = { fullName: addr.name, phone: addr.phone, line: addr.line, zoneSlug: addr.zoneSlug || zoneSlugFor(addr.district), zip: addr.zip || "" };
+    return api("/me/address", { method: "PUT", body: body }).then((a) => {
+      addressCache = toClientAddress(a) || Object.assign({ zoneSlug: body.zoneSlug, district: zoneName(body.zoneSlug) }, addr);
+      return addressCache;
+    });
   }
 
   // Wires the shared login/signup auth-gate markup (#checkoutAuth + its tabs
@@ -793,6 +996,10 @@ const BahcedenCart = (function () {
   // re-run it after its own state changes (e.g. right before its first
   // render). `onLoginChange(loggedIn)` is optional, for pages that need to
   // do more than toggle visibility once auth state flips.
+  // F6 auth: giriş/üye ol/parolamı unuttum/sıfırla API'ye bağlı (cookie oturum). Giriş/kayıt/sıfırlama
+  // başarılıysa DOM anında güncellenmez, sayfa YENİLENİR: bootstrap `me` (ve F9'da `sub`) sunucudan tek
+  // kaynaktan dolu gelir, çerezli yanıt no-store; login yanıtının şekli ile bootstrap'ınki ayrışamaz.
+  // Çıkış / oturum düşmesi ise yenilemeden DOM'da "çıkış" durumuna döner (setSessionUser → refresh'ler).
   function wireAuthGate(gatedElId, onLoginChange) {
     const checkoutAuth = document.getElementById("checkoutAuth");
     const gatedEl = document.getElementById(gatedElId);
@@ -805,10 +1012,16 @@ const BahcedenCart = (function () {
     const authFormLogin = document.getElementById("authFormLogin");
     const authFormSignup = document.getElementById("authFormSignup");
 
-    function showAuthMsg(el, text) {
-      el.textContent = text;
-      el.hidden = false;
+    function showAuthMsg(el, text, ok) {
+      if (!el) return;
+      el.textContent = text || "";
+      el.hidden = !text;
+      // Başarı notları (bağlantı gönderildi, parola güncellendi) hata renginde görünmesin.
+      el.style.color = ok ? "var(--olive-deep)" : "";
     }
+    function busy(btn, on) { if (btn) btn.disabled = !!on; }
+    function val(id) { const el = document.getElementById(id); return el ? el.value : ""; }
+    function labelOf(id) { const el = document.getElementById(id); return el ? el.closest("label") : null; }
 
     function refresh() {
       const loggedIn = isLoggedIn();
@@ -819,6 +1032,7 @@ const BahcedenCart = (function () {
       document.body.classList.toggle("is-logged-in", loggedIn);
       if (onLoginChange) onLoginChange(loggedIn);
     }
+    authRefreshers.push(refresh);
 
     authTabs.forEach((tab) => {
       tab.addEventListener("click", () => {
@@ -829,36 +1043,109 @@ const BahcedenCart = (function () {
       });
     });
 
+    // Giriş / kayıt / sıfırlama sonrası: sayfa yenilenir (gerekçe yukarıda).
+    function afterSignedIn() { location.reload(); }
+
     const loginBtn = document.getElementById("loginSubmit");
+    const loginMsg = document.getElementById("loginMsg");
     if (loginBtn) {
       loginBtn.addEventListener("click", () => {
-        const email = document.getElementById("loginEmail").value.trim();
-        const password = document.getElementById("loginPassword").value;
-        const msgEl = document.getElementById("loginMsg");
-        if (!email || !password) { showAuthMsg(msgEl, "E-posta ve parolanı gir."); return; }
-        const member = getMember();
-        if (!member) { showAuthMsg(msgEl, "Bu e-postayla bir hesap bulamadık — üye ol."); return; }
-        if (member.email !== email || member.password !== password) { showAuthMsg(msgEl, "E-posta ya da parola hatalı."); return; }
-        setLoggedIn(true);
-        refresh();
+        const email = val("loginEmail").trim();
+        const password = val("loginPassword");
+        if (!email || !password) { showAuthMsg(loginMsg, "E-posta ve parolanı gir."); return; }
+        showAuthMsg(loginMsg, "");
+        busy(loginBtn, true);
+        api("/auth/login", { method: "POST", body: { email: email, password: password } })
+          .then(afterSignedIn)
+          .catch((err) => {
+            busy(loginBtn, false);
+            showAuthMsg(loginMsg, err.status === 401 ? "E-posta ya da parola hatalı." : err.message);
+          });
       });
+      const loginPasswordEl = document.getElementById("loginPassword");
+      if (loginPasswordEl) loginPasswordEl.addEventListener("keydown", (e) => { if (e.key === "Enter") loginBtn.click(); });
     }
 
     const signupBtn = document.getElementById("signupSubmit");
+    const signupMsg = document.getElementById("signupMsg");
     if (signupBtn) {
       signupBtn.addEventListener("click", () => {
-        const email = document.getElementById("signupEmail").value.trim();
-        const emailConfirm = document.getElementById("signupEmailConfirm").value.trim();
-        const password = document.getElementById("signupPassword").value;
-        const passwordConfirm = document.getElementById("signupPasswordConfirm").value;
-        const msgEl = document.getElementById("signupMsg");
-        if (!email || !emailConfirm || !password || !passwordConfirm) { showAuthMsg(msgEl, "Tüm alanları doldur."); return; }
-        if (email !== emailConfirm) { showAuthMsg(msgEl, "E-posta adresleri eşleşmiyor."); return; }
-        if (password !== passwordConfirm) { showAuthMsg(msgEl, "Parolalar eşleşmiyor."); return; }
-        setMember({ email: email, password: password });
-        setLoggedIn(true);
-        refresh();
+        const email = val("signupEmail").trim();
+        const emailConfirm = val("signupEmailConfirm").trim();
+        const password = val("signupPassword");
+        const passwordConfirm = val("signupPasswordConfirm");
+        // ADR-0003 istisna 2: KVKK aydınlatma onayı (zorunlu) + pazarlama izni (isteğe bağlı) kutucukları.
+        const kvkkEl = document.getElementById("signupKvkk");
+        const marketingEl = document.getElementById("signupMarketing");
+        if (!email || !emailConfirm || !password || !passwordConfirm) { showAuthMsg(signupMsg, "Tüm alanları doldur."); return; }
+        if (email !== emailConfirm) { showAuthMsg(signupMsg, "E-posta adresleri eşleşmiyor."); return; }
+        if (password !== passwordConfirm) { showAuthMsg(signupMsg, "Parolalar eşleşmiyor."); return; }
+        if (password.length < 8) { showAuthMsg(signupMsg, "Parola en az 8 karakter olmalı."); return; }
+        if (kvkkEl && !kvkkEl.checked) { showAuthMsg(signupMsg, API_CODE_MESSAGES.KVKK_REQUIRED); return; }
+        const consents = [{ kind: "KVKK_ACK", granted: true, documentSlug: "kvkk" }];
+        if (marketingEl) consents.push({ kind: "MARKETING_EMAIL", granted: !!marketingEl.checked, documentSlug: "ticari-ileti-izni" });
+        showAuthMsg(signupMsg, "");
+        busy(signupBtn, true);
+        api("/auth/register", { method: "POST", body: { email: email, password: password, consents: consents } })
+          .then(afterSignedIn)
+          .catch((err) => { busy(signupBtn, false); showAuthMsg(signupMsg, err.message); });
       });
+    }
+
+    // ADR-0003 istisna 4: "parolamı unuttum" — POST /auth/forgot (her zaman 200; kullanıcı var/yok sızdırılmaz).
+    const forgotLink = document.getElementById("forgotLink");
+    if (forgotLink) {
+      forgotLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        const email = val("loginEmail").trim();
+        if (!email) {
+          showAuthMsg(loginMsg, "Önce e-posta adresini yaz, sonra bağlantıya tıkla.");
+          const emailEl = document.getElementById("loginEmail");
+          if (emailEl) emailEl.focus();
+          return;
+        }
+        showAuthMsg(loginMsg, "");
+        api("/auth/forgot", { method: "POST", body: { email: email } })
+          .then(() => showAuthMsg(loginMsg, "Bu e-posta kayıtlıysa sıfırlama bağlantısını gönderdik — gelen kutunu kontrol et.", true))
+          .catch((err) => showAuthMsg(loginMsg, err.message));
+      });
+    }
+
+    // ?sifirla=<token> (e-postadaki bağlantı): giriş formu içinde minimal sıfırlama dalı — e-posta/parola
+    // alanları ve "giriş yap" gizlenir, "yeni parola" alanı + "parolamı yenile" açılır (istisna 4 kapsamı).
+    const resetBtn = document.getElementById("resetSubmit");
+    const resetInput = document.getElementById("resetPassword");
+    if (resetBtn && resetInput && resetToken) {
+      const loginOnly = [labelOf("loginEmail"), labelOf("loginPassword"), loginBtn, forgotLink ? forgotLink.closest("p") : null];
+      function setResetMode(on) {
+        loginOnly.forEach((el) => { if (el) el.hidden = on; });
+        const resetLabel = resetInput.closest("label");
+        if (resetLabel) resetLabel.hidden = !on;
+        resetBtn.hidden = !on;
+      }
+      setResetMode(true);
+      showAuthMsg(loginMsg, "Yeni parolanı belirle (en az 8 karakter).", true);
+      function submitReset() {
+        const password = resetInput.value;
+        if (password.length < 8) { showAuthMsg(loginMsg, "Parola en az 8 karakter olmalı."); return; }
+        showAuthMsg(loginMsg, "");
+        busy(resetBtn, true);
+        api("/auth/reset", { method: "POST", body: { token: resetToken, password: password } })
+          .then(() => {
+            try { sessionStorage.setItem("bagdam_flash", "Parolan güncellendi."); } catch (e2) { /* yok say */ }
+            // Sunucu çerezle oturum açtıysa yenile (hesap görünür); açmadıysa giriş formuna dön.
+            return api("/auth/me").then(afterSignedIn, () => {
+              resetToken = null;
+              try { sessionStorage.removeItem("bagdam_flash"); } catch (e2) { /* yok say */ }
+              setResetMode(false);
+              busy(resetBtn, false);
+              showAuthMsg(loginMsg, "Parolan güncellendi — yeni parolanla giriş yapabilirsin.", true);
+            });
+          })
+          .catch((err) => { busy(resetBtn, false); showAuthMsg(loginMsg, err.message); });
+      }
+      resetBtn.addEventListener("click", submitReset);
+      resetInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitReset(); });
     }
 
     refresh();
@@ -1223,6 +1510,7 @@ const BahcedenCart = (function () {
 
   document.addEventListener("DOMContentLoaded", () => {
     updateBadge();
+    recoverSession(); // F6 auth: csrf çerezi var ama oturum yoksa bir kez refresh dene
     wireToggles(document);
     wireAddButtons(document);
     wireNavBurger();
@@ -1238,8 +1526,9 @@ const BahcedenCart = (function () {
     getSub, setSub, subSetTier, subTier, subSwapItem, subToggleSkip, subCancel, subSetItemPref,
     subSetFreq, subSetDeliveryDay, subSetType, subDeliveryFee,
     subExtraOptions, subExtraPrice, subExtrasTotal, subAddExtra, subRemoveExtra,
-    getAddress, setAddress, getOrders, addOrder, nextDeliveryDate,
-    getMember, setMember, isLoggedIn, setLoggedIn, hasPurchasedSub, wireAuthGate, getCard, setCard,
+    getAddress, setAddress, loadAddress, loadZones, getZones, zoneName, zoneSlugFor, getOrders, addOrder, nextDeliveryDate,
+    // F6 auth: api() sözleşmesi + oturum (me/isLoggedIn bootstrap'tan; logout; getMember/setMember/setLoggedIn kalktı)
+    api, me, isLoggedIn, hasPurchasedSub, setSessionUser, logout, getResetToken, wireAuthGate, getCard, setCard,
     freshProducts, nextCutoff, formatCountdown, lockedDeliveryDay, lockedDayNote,
   };
 })();

@@ -35,6 +35,7 @@
     <img class="shop-hero-icon" src="assets/icons/uye-icon.png" alt="Üyelik">
     <h1>hesabın <em>ve</em> aboneliğin.</h1>
     <p class="cancel-note" id="logoutNote" hidden><a href="#" id="logoutLink">çıkış yap</a></p>
+    <p class="cancel-note" id="authInfo" hidden></p>
   </section>
 
   <section class="checkout-auth" id="checkoutAuth">
@@ -45,14 +46,27 @@
     <div class="checkout-form" id="authFormLogin">
       <label>E-posta<input type="email" id="loginEmail" placeholder="ornek@eposta.com"></label>
       <label>Parola<input type="password" id="loginPassword" placeholder="••••••••"></label>
+      <!-- F6 — ?sifirla=<token> sıfırlama dalı (istisna 4 kapsamı): yalnız bağlantıyla gelince açılır -->
+      <label hidden>Yeni Parola<input type="password" id="resetPassword" placeholder="en az 8 karakter" autocomplete="new-password"></label>
       <p class="checkout-auth-msg mono" id="loginMsg" hidden></p>
       <button class="cta wide" type="button" id="loginSubmit">giriş yap</button>
+      <button class="cta wide" type="button" id="resetSubmit" hidden>parolamı yenile</button>
+      <!-- F6 — ADR-0003 istisna 4: parolamı unuttum (POST /auth/forgot) -->
+      <p class="cancel-note" id="forgotNote"><a href="#" id="forgotLink">parolamı unuttum</a></p>
     </div>
     <div class="checkout-form" id="authFormSignup" hidden>
       <label>E-posta<input type="email" id="signupEmail" placeholder="ornek@eposta.com"></label>
       <label>E-posta (Tekrar)<input type="email" id="signupEmailConfirm" placeholder="ornek@eposta.com"></label>
       <label>Parola<input type="password" id="signupPassword" placeholder="••••••••"></label>
       <label>Parola (Tekrar)<input type="password" id="signupPasswordConfirm" placeholder="••••••••"></label>
+      <!-- F6 — ADR-0003 istisna 2: KVKK aydınlatma onayı (zorunlu) + pazarlama izni (isteğe bağlı). Yalnız bu blok; styles.css'e dokunulmaz. -->
+      <style>
+        .checkout-form .consent-row{ flex-direction:row; align-items:flex-start; gap:10px; text-transform:none; letter-spacing:0; font-size:12px; line-height:1.45; color:var(--ink-soft); cursor:pointer; }
+        .checkout-form .consent-row input{ appearance:auto; -webkit-appearance:checkbox; width:15px; height:15px; padding:0; margin:2px 0 0; flex:none; accent-color:var(--olive-deep); }
+        .checkout-form .consent-row a{ color:var(--fig-deep); text-decoration:underline; text-underline-offset:3px; }
+      </style>
+      <label class="consent-row"><input type="checkbox" id="signupKvkk"><span><a href="politikalar.html#kvkk" target="_blank" rel="noopener">KVKK Aydınlatma Metni</a>'ni okudum; kişisel verilerimin bu kapsamda işleneceğini biliyorum. <span class="mono">(zorunlu)</span></span></label>
+      <label class="consent-row"><input type="checkbox" id="signupMarketing"><span>Kampanya ve yeniliklerden e-posta ile haberdar olmak istiyorum (<a href="politikalar.html#ticari-ileti-izni" target="_blank" rel="noopener">ticari elektronik ileti izni</a>, isteğe bağlı).</span></label>
       <p class="checkout-auth-msg mono" id="signupMsg" hidden></p>
       <button class="cta wide" type="button" id="signupSubmit">üye ol</button>
     </div>
@@ -86,10 +100,27 @@
   function money(n) { return n.toLocaleString("tr-TR"); }
 
   const logoutNote = document.getElementById("logoutNote");
+  // F6 auth: ?dogrulandi=1 (e-posta doğrulama dönüşü) ve yenileme sonrası kısa bilgi notu (sessionStorage flash).
+  const authInfo = document.getElementById("authInfo");
+  (function showAuthInfo() {
+    let text = "";
+    try {
+      const qs = new URLSearchParams(location.search);
+      if (qs.get("dogrulandi") === "1") {
+        text = "E-posta adresin doğrulandı — teşekkürler.";
+        qs.delete("dogrulandi");
+        const rest = qs.toString();
+        history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + location.hash);
+      }
+      const flash = sessionStorage.getItem("bagdam_flash");
+      if (flash) { sessionStorage.removeItem("bagdam_flash"); text = text ? text + " " + flash : flash; }
+    } catch (e) { /* eski tarayıcıda sessizce geç */ }
+    if (text && authInfo) { authInfo.textContent = text; authInfo.hidden = false; }
+  })();
   // Kartlar aşağıda tanımlanır; auth değişince hepsini tazeleyen fonksiyon
   // sayfa kurulumu bitince atanır (ilk kurulum çağrısında henüz yoktur).
   let onAuthChange = null;
-  const refreshAuthGate = BahcedenCart.wireAuthGate("accountGrid", (loggedIn) => {
+  BahcedenCart.wireAuthGate("accountGrid", (loggedIn) => {
     logoutNote.hidden = !loggedIn;
     if (onAuthChange) onAuthChange();
   });
@@ -443,17 +474,19 @@
   }
   renderOrders();
 
-  // ---- Teslimat adresi — ödeme yöntemiyle aynı kalıp: kayıtlıysa özet +
-  // "adresi düzenle" butonu, düzenle deyince (ya da hiç kayıt yoksa) form. ----
+  // ---- Teslimat adresi — F6 auth: GET/PUT /me/address (tek adres); ilçe = teslimat bölgesi
+  // (GET /delivery/zones; ADR-0003 istisna 5: #addrDistrict text→select). Ödeme yöntemiyle aynı
+  // kalıp: kayıtlıysa özet + "adresi düzenle" butonu, düzenle deyince (ya da hiç kayıt yoksa) form. ----
   const addressCard = document.getElementById("addressCard");
 
-  function escAttr(v) { return String(v || "").replace(/"/g, "&quot;"); }
+  function escAttr(v) { return String(v || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+  function escText(v) { return String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
 
   function renderAddressSaved(addr) {
     addressCard.innerHTML =
       '<p class="account-empty">' +
-        addr.name + " — " + addr.phone + "<br>" +
-        addr.line + ", " + addr.district + (addr.zip ? " " + addr.zip : "") +
+        escText(addr.name) + " — " + escText(addr.phone) + "<br>" +
+        escText(addr.line) + ", " + escText(addr.district) + (addr.zip ? " " + escText(addr.zip) : "") +
       "</p>" +
       '<button class="btn" type="button" id="editAddrBtn">adresi düzenle</button>';
     document.getElementById("editAddrBtn").addEventListener("click", () => renderAddressForm(addr));
@@ -461,43 +494,68 @@
 
   function renderAddressForm(addr) {
     addr = addr || {};
+    const zones = BahcedenCart.getZones();
+    const selectedZone = addr.zoneSlug || (addr.district ? BahcedenCart.zoneSlugFor(addr.district) : "");
+    const zoneOptions = '<option value="">Seç</option>' + zones.map((z) =>
+      '<option value="' + escAttr(z.slug) + '"' + (z.slug === selectedZone ? " selected" : "") + ">" + escText(z.name) + "</option>"
+    ).join("");
+    // checkout-form sınıfı yalnız select'in site stilini alması için (account-form'da select kuralı yok; styles.css'e dokunulmaz).
     addressCard.innerHTML =
-      '<form class="account-form" id="addressForm">' +
+      '<form class="account-form checkout-form" id="addressForm">' +
         '<label>Ad Soyad<input type="text" id="addrName" placeholder="Ad Soyad" value="' + escAttr(addr.name) + '" required></label>' +
         '<label>Telefon<input type="tel" id="addrPhone" placeholder="05xx xxx xx xx" value="' + escAttr(addr.phone) + '" required></label>' +
-        '<label>Adres<textarea id="addrLine" placeholder="Mahalle, sokak, no, daire" required>' + (addr.line || "") + "</textarea></label>" +
+        '<label>Adres<textarea id="addrLine" placeholder="Mahalle, sokak, no, daire" required>' + escText(addr.line) + "</textarea></label>" +
         '<div class="form-row">' +
-          '<label>İlçe<input type="text" id="addrDistrict" placeholder="Örn. Urla" value="' + escAttr(addr.district) + '" required></label>' +
+          '<label>İlçe<select id="addrDistrict" required>' + zoneOptions + "</select></label>" +
           '<label>Posta Kodu<input type="text" id="addrZip" placeholder="35xxx" value="' + escAttr(addr.zip) + '"></label>' +
         "</div>" +
-        '<button class="cta" type="submit">adresi kaydet</button>' +
+        '<p class="checkout-auth-msg mono" id="addrMsg" hidden></p>' +
+        '<button class="cta" type="submit" id="addrSubmit">adresi kaydet</button>' +
       "</form>";
+    const msgEl = document.getElementById("addrMsg");
     document.getElementById("addressForm").addEventListener("submit", (e) => {
       e.preventDefault();
-      const saved = {
+      const draft = {
         name: document.getElementById("addrName").value.trim(),
         phone: document.getElementById("addrPhone").value.trim(),
         line: document.getElementById("addrLine").value.trim(),
-        district: document.getElementById("addrDistrict").value.trim(),
+        zoneSlug: document.getElementById("addrDistrict").value,
         zip: document.getElementById("addrZip").value.trim(),
-        email: addr.email || "", // sepet formundan gelen e-postayı koru
       };
-      BahcedenCart.setAddress(saved);
-      renderAddressSaved(saved);
+      if (!draft.name || !draft.phone || !draft.line || !draft.zoneSlug) {
+        msgEl.textContent = "Ad soyad, telefon, adres ve ilçe zorunlu.";
+        msgEl.hidden = false;
+        return;
+      }
+      const submitBtn = document.getElementById("addrSubmit");
+      submitBtn.disabled = true;
+      msgEl.hidden = true;
+      BahcedenCart.setAddress(draft)
+        .then((saved) => renderAddressSaved(saved))
+        .catch((err) => { submitBtn.disabled = false; msgEl.textContent = err.message; msgEl.hidden = false; });
     });
   }
 
   function renderAddress() {
+    if (!BahcedenCart.isLoggedIn()) { addressCard.innerHTML = ""; return; }
     const existingAddr = BahcedenCart.getAddress();
-    // Sepet, yazarken alan alan kaydettiği için yarım kayıt kalmış olabilir —
-    // özet görünümüne ancak ad + adres tamamsa geçilir.
     if (existingAddr && existingAddr.name && existingAddr.line) {
       renderAddressSaved(existingAddr);
     } else {
       renderAddressForm(existingAddr);
     }
   }
-  renderAddress();
+  // Adres sunucudan gelir: bölgeler + adres yüklenince çizilir (oturum yoksa kart zaten gizli).
+  function loadAndRenderAddress() {
+    if (!BahcedenCart.isLoggedIn()) { renderAddress(); return; }
+    addressCard.innerHTML = '<p class="account-empty">Adresin yükleniyor…</p>';
+    BahcedenCart.loadZones()
+      .then(() => BahcedenCart.loadAddress())
+      .then(renderAddress, (err) => {
+        addressCard.innerHTML = '<p class="account-empty">' + escText(err && err.message ? err.message : "Adres yüklenemedi.") + "</p>";
+      });
+  }
+  loadAndRenderAddress();
 
   // ---- Payment method — same saved-card store sepet.html reads/writes ----
   const paymentCard = document.getElementById("paymentCard");
@@ -552,14 +610,15 @@
     cancelFlowOpen = false;
     renderSub();
     renderOrders();
-    renderAddress();
+    loadAndRenderAddress();
     renderPayment();
   };
 
   document.getElementById("logoutLink").addEventListener("click", (e) => {
     e.preventDefault();
-    BahcedenCart.setLoggedIn(false);
-    refreshAuthGate();
+    // F6 auth: POST /auth/logout (çerezler sunucuda silinir) → oturum değişince wireAuthGate refresh'i koşar,
+    // sayfa "çıkış" durumuna döner (yenileme gerekmez).
+    BahcedenCart.logout();
   });
 })();
 </script>

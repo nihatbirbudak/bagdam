@@ -1,0 +1,15 @@
+# Satır sonları: repo'da her zaman LF (sunucu Linux; CRLF'li deploy.sh/bash bozulur)
+* text=auto eol=lf
+*.sh text eol=lf
+*.hbs text eol=lf
+# İkili dosyalar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pdf binary

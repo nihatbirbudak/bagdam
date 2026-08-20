@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bağdam — üyelik</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo/logo-icon.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <button class="nav-burger" type="button" aria-label="Menü" aria-expanded="false" aria-controls="navLinks">
+      <img class="nav-burger-closed" src="assets/icons/hamburger-kapali.png" alt="">
+      <img class="nav-burger-open" src="assets/icons/hamburger-acik.png" alt="">
+    </button>
+    <a class="wordmark" href="index.html"><img src="assets/logo/logo-horizontal.svg" alt="Bağdam"></a>
+    <nav class="nav-links" id="navLinks">
+      <a href="urunler.html">tüm ürünler</a>
+      <a href="gunluk.html">blog</a>
+      <a href="toptan.html">toptan</a>
+      <a href="nasil-seciyoruz.html">nasıl seçiyoruz</a>
+    </nav>
+    <div class="nav-icons">
+      <a href="uyelik.html" class="nav-icon on" aria-label="Üyelik">
+        <img src="assets/icons/uye-icon.png" alt="Üyelik">
+      </a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="shop-hero">
+    <img class="shop-hero-icon" src="assets/icons/uye-icon.png" alt="Üyelik">
+    <h1>hesabın <em>ve</em> aboneliğin.</h1>
+    <p class="cancel-note" id="logoutNote" hidden><a href="#" id="logoutLink">çıkış yap</a></p>
+  </section>
+
+  <section class="checkout-auth" id="checkoutAuth">
+    <div class="checkout-auth-tabs">
+      <button class="checkout-auth-tab active" type="button" data-mode="login">giriş yap</button>
+      <button class="checkout-auth-tab" type="button" data-mode="signup">üye ol</button>
+    </div>
+    <div class="checkout-form" id="authFormLogin">
+      <label>E-posta<input type="email" id="loginEmail" placeholder="ornek@eposta.com"></label>
+      <label>Parola<input type="password" id="loginPassword" placeholder="••••••••"></label>
+      <p class="checkout-auth-msg mono" id="loginMsg" hidden></p>
+      <button class="cta wide" type="button" id="loginSubmit">giriş yap</button>
+    </div>
+    <div class="checkout-form" id="authFormSignup" hidden>
+      <label>E-posta<input type="email" id="signupEmail" placeholder="ornek@eposta.com"></label>
+      <label>E-posta (Tekrar)<input type="email" id="signupEmailConfirm" placeholder="ornek@eposta.com"></label>
+      <label>Parola<input type="password" id="signupPassword" placeholder="••••••••"></label>
+      <label>Parola (Tekrar)<input type="password" id="signupPasswordConfirm" placeholder="••••••••"></label>
+      <p class="checkout-auth-msg mono" id="signupMsg" hidden></p>
+      <button class="cta wide" type="button" id="signupSubmit">üye ol</button>
+    </div>
+  </section>
+
+  <div id="accountGrid" hidden>
+    <section class="account-grid">
+      <div class="account-card account-sub" id="subCard"><!-- filled by JS --></div>
+
+      <div class="account-side">
+        <div class="checkout-auth-tabs account-tabs" id="accountTabs">
+          <button class="checkout-auth-tab active" type="button" data-panel="address">teslimat adresi</button>
+          <button class="checkout-auth-tab" type="button" data-panel="payment">ödeme yöntemi</button>
+          <button class="checkout-auth-tab" type="button" data-panel="orders">önceki siparişler</button>
+        </div>
+        <div class="account-panel account-address" id="addressCard" data-panel="address"><!-- filled by JS --></div>
+        <div class="account-panel account-payment" id="paymentCard" data-panel="payment" hidden><!-- filled by JS --></div>
+        <div class="account-panel account-orders" data-panel="orders" hidden>
+          <div id="ordersList"><!-- filled by JS --></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-foot">
+  <div class="site-foot-top">
+    <div class="site-foot-brand">
+      <div class="site-foot-logo-row">
+        <a class="wordmark small" href="index.html" aria-label="Bağdam ana sayfa"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></a>
+      </div>
+    </div>
+    <div class="site-foot-contact-row">
+      <a class="site-foot-contact" href="tel:+905309494093">
+        <img src="assets/icons/mutlu-musteri.png" alt="">
+        <span class="site-foot-contact-text">
+          <span class="site-foot-contact-label mono">mutlu müşteri hattı</span>
+          <span class="site-foot-contact-value">+90 (530) 949 40 93</span>
+        </span>
+      </a>
+      <a class="site-foot-contact site-foot-contact-location" href="https://www.google.com/maps/search/?api=1&query=8034%20Sokak%20No%3A38%20Ku%C5%9F%C3%A7ular%20Urla%20%C4%B0zmir" target="_blank" rel="noopener">
+        <img src="assets/icons/konum.png" alt="">
+        <span class="site-foot-contact-text">
+          <span class="site-foot-contact-label mono">bağdam</span>
+          <span class="site-foot-contact-value">8034 Sokak No:38,<span class="addr-break"> </span>Kuşçular — Urla / İzmir</span>
+        </span>
+      </a>
+    </div>
+    <div class="site-foot-social">
+      <a class="site-foot-ig-link" href="#" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg>
+      </a>
+      <a class="site-foot-yt-link" href="#" aria-label="YouTube">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l6 3-6 3z" fill="currentColor" stroke="none"/></svg>
+      </a>
+    </div>
+  </div>
+  <div class="site-foot-bottom">
+    <div class="site-foot-left mono">
+      <span class="site-foot-copyright">© 2026 — BAĞDAM. TÜM HAKLARI SAKLIDIR.</span>
+      <span class="site-foot-sep">|</span>
+      <a class="policies-link" href="politikalar.html">Tüm Politikalar</a>
+    </div>
+    <a class="site-foot-credit" href="https://youmedya.com/iletisim/" target="_blank" rel="noopener">
+      <span class="mono">designed and powered by</span>
+      <span class="site-foot-credit-logo" role="img" aria-label="You Medya"></span>
+    </a>
+  </div>
+</footer>
+
+<script src="assets/products.js"></script>
+<script src="assets/cart.js"></script>
+<script>
+(function () {
+  function money(n) { return n.toLocaleString("tr-TR"); }
+
+  const logoutNote = document.getElementById("logoutNote");
+  // Kartlar aşağıda tanımlanır; auth değişince hepsini tazeleyen fonksiyon
+  // sayfa kurulumu bitince atanır (ilk kurulum çağrısında henüz yoktur).
+  let onAuthChange = null;
+  const refreshAuthGate = BahcedenCart.wireAuthGate("accountGrid", (loggedIn) => {
+    logoutNote.hidden = !loggedIn;
+    if (onAuthChange) onAuthChange();
+  });
+
+  const subCard = document.getElementById("subCard");
+
+  // ---- Sağ sütun sekmeleri: teslimat adresi / ödeme yöntemi / önceki
+  // siparişler — hangisine basılırsa yalnızca o panel görünür.
+  const accountTabs = document.getElementById("accountTabs");
+  const accountPanels = document.querySelectorAll(".account-panel");
+  accountTabs.addEventListener("click", (e) => {
+    const tab = e.target.closest(".checkout-auth-tab");
+    if (!tab) return;
+    const key = tab.getAttribute("data-panel");
+    if (tab.classList.contains("active")) return;
+    accountTabs.querySelectorAll(".checkout-auth-tab").forEach((t) => t.classList.toggle("active", t === tab));
+    accountPanels.forEach((p) => { p.hidden = p.getAttribute("data-panel") !== key; });
+    // Sekme değişince açık kalmış "düzenle" formları kapanır: kaydedilmemiş
+    // girdiler atılır, adres/ödeme kayıtlı haliyle (özet olarak) geri gelir.
+    // (renderAddress/renderPayment aşağıda tanımlı — tıklama anında var.)
+    renderAddress();
+    renderPayment();
+  });
+
+  // Gün değişikliği ve ekstra silme burada da anında kaydedilmez — taslakta
+  // birikir, "değişiklikleri onayla" ile aboneliğe işlenir (kutu.html ile
+  // aynı kural). Atlama ve iptal ise kendi onay sorularından geçer.
+  let subDraft = null;
+  let skipConfirmOpen = false;
+  let cancelFlowOpen = false;
+  let cancelOfferThisFlow = false;
+  // İptalden caydırma teklifi üye başına tek seferlik: akış İLK açılışta
+  // işaretlenir; ikinci kez iptale basana teklif çıkmaz.
+  const RETENTION_KEY = "bahceden_retention_offered";
+
+  function ensureDraft() {
+    if (!subDraft) subDraft = JSON.parse(JSON.stringify(BahcedenCart.getSub()));
+    return subDraft;
+  }
+  function hasPending() {
+    return !!subDraft && JSON.stringify(subDraft) !== JSON.stringify(BahcedenCart.getSub());
+  }
+
+  function renderSub() {
+    const savedSub = BahcedenCart.getSub();
+    const sub = subDraft || savedSub;
+    // "active" kutunun sepette beklediğini, "purchased" ödemenin sepette
+    // tamamlandığını söyler — aboneliklerim kartı yalnızca satın alınmış
+    // kutuyu gösterir; sepetteki taslak için aşağıdaki yönlendirme yeter.
+    const purchased = !!savedSub.purchased;
+    const tier = purchased ? BahcedenCart.subTier() : null;
+
+    if (!tier) {
+      const draftTier = BahcedenCart.subTier();
+      subCard.innerHTML =
+        '<p class="pcard-meta mono">ABONELİK</p>' +
+        '<p class="account-empty">Henüz bir aboneliğin yok.</p>' +
+        (draftTier
+          ? '<a class="cta" href="kutu.html?tier=' + draftTier.id + '">kutunu tamamla</a>'
+          : '<a class="cta" href="urunler.html">kutunu oluştur</a>');
+      return;
+    }
+
+    const itemNames = sub.items
+      .map((id) => { const p = PRODUCTS.find((x) => x.id === id); return p ? p.name : ""; })
+      .filter(Boolean)
+      .join(", ");
+
+    // Taslak varken toplam da taslaktan hesaplanır — subExtrasTotal()
+    // kayıtlı hali okur, henüz onaylanmamış silmeleri görmez.
+    const extras = sub.extras || [];
+    const extrasTotal = extras.reduce((sum, ex) => sum + BahcedenCart.subExtraPrice(ex), 0);
+
+    const cutoff = BahcedenCart.nextCutoff();
+    const countdown = BahcedenCart.formatCountdown(cutoff);
+    const editable = countdown !== "kilitlendi";
+    const isSub = sub.type === "subscription";
+    const freq = isSub ? FREQ_OPTIONS.find((f) => f.id === sub.freq) : null;
+    const freqLabel = freq ? freq.label + (!freq.allDays && sub.deliveryDay ? " — " + (DELIVERY_DAYS.find((d) => d.id === sub.deliveryDay) || {}).label : "") : null;
+
+    const skipLabel = sub.skipThisWeek
+      ? "atlamayı iptal et"
+      : (sub.skipUsed ? "atlama hakkın kullanıldı" : "bir sonraki siparişi atla");
+    const skipDisabled = !sub.skipThisWeek && sub.skipUsed;
+
+    // Bu haftanın çekilecek tutarı: kutu + o hafta eklenen ekstralar.
+    // Hafta atlandıysa o hafta ödeme de yok. İptalden vazgeçme teklifi
+    // kullanıldıysa bir sonraki kutuya 1 seferlik %50 indirim işler.
+    const hasRetentionDiscount = !!sub.nextBoxDiscount;
+    const discountAmount = hasRetentionDiscount ? Math.round(tier.price / 2) : 0;
+    const weekTotal = sub.skipThisWeek ? 0 : tier.price - discountAmount + extrasTotal;
+
+    // O haftaki ekstralar (meyve/sebze de, sepetten "kutuma ekle" ile taşınan
+    // fırın/kiler/süt ürünleri de) buradan tek tek çıkarılabilir — değişiklik
+    // süresi dolduysa yalnızca listelenir.
+    const TRASH_SVG =
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+    const extrasListHtml = extras.length
+      ? '<div class="account-extras">' +
+          '<p class="pcard-meta mono">BU HAFTAKİ EKSTRALAR</p>' +
+          extras.map((ex, i) => {
+            const p = PRODUCTS.find((x) => x.id === ex.id);
+            if (!p) return "";
+            return (
+              '<div class="account-extra-row">' +
+                "<span>" + p.name + ' <span class="mono">(' + ex.label + ")</span></span>" +
+                '<span class="mono">' + money(BahcedenCart.subExtraPrice(ex)) + " TL</span>" +
+                (editable ? '<button class="qty-stepper-dec trash" data-extra-idx="' + i + '" type="button" aria-label="Ekstrayı kaldır">' + TRASH_SVG + "</button>" : "") +
+              "</div>"
+            );
+          }).join("") +
+        "</div>"
+      : "";
+
+    // Teslimat günü kutu sayfasına gitmeden buradan da değiştirilebilir.
+    // Kesimi geçmiş gün de seçilebilir — not, teslimatın sonraki haftaya
+    // kaldığını söyler.
+    const dayNoteText = BahcedenCart.lockedDayNote(sub.deliveryDay);
+    const dayToggleHtml =
+      '<div class="freq-row account-day-row">' +
+        '<span class="pcard-pref-label mono">teslimat günü</span>' +
+        '<div class="toggle-list small" id="accountDayToggle">' +
+          DELIVERY_DAYS.map((d) => {
+            const isActive = sub.deliveryDay === d.id;
+            return '<button class="toggle' + (isActive ? " active" : "") + '" type="button" data-day="' + d.id + '">' + d.label + "</button>";
+          }).join("") +
+        "</div>" +
+        (dayNoteText ? '<p class="day-note mono">' + dayNoteText + "</p>" : "") +
+      "</div>";
+
+    // "Bu haftayı atla" kendi onay sorusundan geçer.
+    const skipConfirmHtml =
+      '<div class="skip-confirm">' +
+        '<span>Bu haftaki kutunu atlamak istediğine emin misin?</span>' +
+        '<button class="btn" id="skipYesBtn" type="button">atla</button>' +
+        '<button class="btn" id="skipNoBtn" type="button">vazgeç</button>' +
+      "</div>";
+
+    // İptal akışı: önce kısa bir ayrılma-nedeni formu (boş bırakılabilir),
+    // teklif hakkı daha önce kullanılmadıysa 1 kutuluk %50 indirim önerilir.
+    const cancelFlowHtml =
+      '<div class="cancel-flow">' +
+        '<p class="cancel-flow-title">Gittiğine üzüldük.</p>' +
+        '<p class="account-empty">Neden ayrıldığını bize söylemek ister misin? İstersen boş bırakabilirsin.</p>' +
+        '<div class="toggle-list small" id="cancelReasons">' +
+          ["Fiyat", "Ürün çeşitliliği", "Teslimat günleri", "Diğer"].map((r) =>
+            '<button class="toggle" type="button" data-reason="' + r + '">' + r + "</button>"
+          ).join("") +
+        "</div>" +
+        '<textarea class="cancel-reason-text" id="cancelReasonText" placeholder="Bize kısaca yazabilirsin…"></textarea>' +
+        (cancelOfferThisFlow
+          ? '<p class="cancel-offer"><b>Gitmeden önce:</b> sana 1 kutuluk <b>%50 indirim</b> hakkı veriyoruz — kullanmak ister misin?</p>' +
+            '<div class="account-actions">' +
+              '<button class="cta" id="useOfferBtn" type="button">indirimi kullan, üye kal</button>' +
+              '<button class="btn" id="confirmCancelBtn" type="button">yine de aboneliği iptal et</button>' +
+            "</div>"
+          : '<div class="account-actions">' +
+              '<button class="btn" id="confirmCancelBtn" type="button">aboneliği iptal et</button>' +
+            "</div>") +
+        '<p class="cancel-note"><a href="#" id="cancelFlowBack">vazgeç</a></p>' +
+      "</div>";
+
+    subCard.innerHTML =
+      '<p class="pcard-meta mono">' + (isSub ? "AKTİF ABONELİK" : "TEK SEFERLİK SİPARİŞ") + "</p>" +
+      "<h2>" + tier.label + "</h2>" +
+      '<p class="pcard-meta mono">' + itemNames + "</p>" +
+      extrasListHtml +
+      (isSub ? '<p class="account-freq mono">Gönderim: ' + freqLabel + "</p>" : "") +
+      (sub.skipThisWeek ? '<p class="sub-skip-note mono">BİR SONRAKİ SİPARİŞ ATLANDI</p>' : "") +
+      dayToggleHtml +
+      '<div class="account-pay">' +
+        '<div class="ps-row"><span>Kutu</span><span class="mono">' + money(sub.skipThisWeek ? 0 : tier.price) + " TL</span></div>" +
+        (hasRetentionDiscount ? '<div class="ps-row ps-note"><span>1 kutuluk %50 indirim (üye kaldığın için)</span><span class="mono">-' + money(sub.skipThisWeek ? 0 : discountAmount) + " TL</span></div>" : "") +
+        (extras.length ? '<div class="ps-row"><span>Bu haftaki ekstralar</span><span class="mono">+' + money(sub.skipThisWeek ? 0 : extrasTotal) + " TL</span></div>" : "") +
+        '<div class="ps-row ps-total"><span>Bu haftaki ödeme</span><span class="mono">' + money(weekTotal) + " TL</span></div>" +
+        '<p class="account-freq mono">Ödemen teslimat günü çekilir — ekstralar kutu ücretiyle birlikte tahsil edilir ve kutunla aynı gün teslim edilir. Sonraki hafta kutun ekstrasız yenilenir.</p>' +
+      "</div>" +
+      '<div class="pd-price-row">' +
+        '<span class="cutoff mono">DEĞİŞİKLİK İÇİN: ' + countdown.toUpperCase() + " SÜREN VAR</span>" +
+      "</div>" +
+      (hasPending()
+        ? '<div class="account-actions account-pending">' +
+            '<button class="cta" id="applyAccountChanges" type="button">değişiklikleri onayla</button>' +
+            '<button class="btn" id="discardAccountChanges" type="button">vazgeç</button>' +
+          "</div>"
+        : "") +
+      '<div class="account-actions">' +
+        (editable
+          ? '<a class="cta olive" href="kutu.html?tier=' + tier.id + '">kutunu düzenle + ekstra ekle</a>'
+          : '<span class="account-locked mono">Bu haftanın değişiklik süresi doldu</span>') +
+        (isSub && !skipConfirmOpen ? '<button class="btn" type="button" id="skipWeekBtn"' + (skipDisabled ? " disabled" : "") + '>' + skipLabel + "</button>" : "") +
+      "</div>" +
+      (skipConfirmOpen ? skipConfirmHtml : "") +
+      (cancelFlowOpen ? cancelFlowHtml : '<p class="cancel-note"><a href="#" id="cancelSubLink">aboneliği iptal et</a></p>');
+
+    // Ekstra silme ve gün değişikliği taslağa yazılır — onay bekler.
+    subCard.querySelectorAll("[data-extra-idx]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const d = ensureDraft();
+        const idx = parseInt(btn.getAttribute("data-extra-idx"), 10);
+        d.extras = (d.extras || []).filter((_, i2) => i2 !== idx);
+        renderSub();
+      });
+    });
+
+    const dayToggle = document.getElementById("accountDayToggle");
+    if (dayToggle) {
+      dayToggle.querySelectorAll(".toggle").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          ensureDraft().deliveryDay = btn.getAttribute("data-day");
+          renderSub();
+        });
+      });
+    }
+
+    const applyBtn = document.getElementById("applyAccountChanges");
+    if (applyBtn) {
+      applyBtn.addEventListener("click", () => {
+        BahcedenCart.setSub(subDraft);
+        const saved = BahcedenCart.getSub();
+        if ((saved.extras || []).length) {
+          saved.extrasCutoff = BahcedenCart.nextCutoff().getTime();
+          BahcedenCart.setSub(saved);
+        }
+        subDraft = null;
+        renderSub();
+      });
+      document.getElementById("discardAccountChanges").addEventListener("click", () => {
+        subDraft = null;
+        renderSub();
+      });
+    }
+
+    const skipWeekBtn = document.getElementById("skipWeekBtn");
+    if (skipWeekBtn) {
+      skipWeekBtn.addEventListener("click", () => {
+        if (BahcedenCart.getSub().skipThisWeek) {
+          // Atlamayı geri almak zaten güvenli — soru sormadan aç.
+          BahcedenCart.subToggleSkip();
+          if (subDraft) {
+            const s2 = BahcedenCart.getSub();
+            subDraft.skipThisWeek = s2.skipThisWeek;
+            subDraft.skipUsed = s2.skipUsed;
+          }
+        } else {
+          skipConfirmOpen = true;
+        }
+        renderSub();
+      });
+    }
+    const skipYesBtn = document.getElementById("skipYesBtn");
+    if (skipYesBtn) {
+      skipYesBtn.addEventListener("click", () => {
+        BahcedenCart.subToggleSkip();
+        if (subDraft) {
+          const s2 = BahcedenCart.getSub();
+          subDraft.skipThisWeek = s2.skipThisWeek;
+          subDraft.skipUsed = s2.skipUsed;
+        }
+        skipConfirmOpen = false;
+        renderSub();
+      });
+      document.getElementById("skipNoBtn").addEventListener("click", () => {
+        skipConfirmOpen = false;
+        renderSub();
+      });
+    }
+
+    const cancelSubLink = document.getElementById("cancelSubLink");
+    if (cancelSubLink) {
+      cancelSubLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        cancelFlowOpen = true;
+        // Teklif üye başına tek sefer — ama hak yalnızca "indirimi kullan"a
+        // basılınca yanar; bakıp vazgeçmek ya da yine de iptal etmek hakkı
+        // harcamaz, sonraki iptal denemesinde teklif yeniden çıkar.
+        cancelOfferThisFlow = !localStorage.getItem(RETENTION_KEY);
+        renderSub();
+      });
+    }
+    const cancelReasons = document.getElementById("cancelReasons");
+    if (cancelReasons) {
+      cancelReasons.querySelectorAll(".toggle").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          cancelReasons.querySelectorAll(".toggle").forEach((b) => b.classList.toggle("active", b === btn));
+        });
+      });
+      document.getElementById("confirmCancelBtn").addEventListener("click", () => {
+        BahcedenCart.subCancel();
+        subDraft = null;
+        cancelFlowOpen = false;
+        skipConfirmOpen = false;
+        renderSub();
+      });
+      document.getElementById("cancelFlowBack").addEventListener("click", (e) => {
+        e.preventDefault();
+        cancelFlowOpen = false;
+        renderSub();
+      });
+      const useOfferBtn = document.getElementById("useOfferBtn");
+      if (useOfferBtn) {
+        useOfferBtn.addEventListener("click", () => {
+          const s2 = BahcedenCart.getSub();
+          s2.nextBoxDiscount = true;
+          BahcedenCart.setSub(s2);
+          if (subDraft) subDraft.nextBoxDiscount = true;
+          // Hak burada, gerçekten kullanınca yanar.
+          localStorage.setItem(RETENTION_KEY, "1");
+          cancelFlowOpen = false;
+          renderSub();
+        });
+      }
+    }
+  }
+  renderSub();
+
+  // ---- Önceki siparişler — sepet.html her tamamlanan ödemede bir kayıt
+  // düşer; burada en yenisi üstte listelenir. Teslimat henüz gelmediyse
+  // (kayıt 2 günden yeniyse) "hazırlanıyor" görünür.
+  function renderOrders() {
+    const listEl = document.getElementById("ordersList");
+    const orders = BahcedenCart.getOrders();
+    if (!orders.length) {
+      listEl.innerHTML = '<p class="account-empty">Henüz tamamlanmış bir siparişin yok.</p>';
+      return;
+    }
+    listEl.innerHTML = orders.map((o) => {
+      const d = new Date(o.date);
+      const orderDateStr = d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+      const orderTimeStr = d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+      // Teslimat: tarih + gün adı. Eski kayıtlarda tarih yoksa gün adıyla yetinilir.
+      const delivD = o.deliveryDate ? new Date(o.deliveryDate) : null;
+      const delivStr = delivD
+        ? delivD.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }) + ", " + delivD.toLocaleDateString("tr-TR", { weekday: "long" })
+        : ((DELIVERY_DAYS.find((x) => x.id === o.deliveryDay) || {}).label || "—");
+      const typeLabel = o.type === "subscription" ? "ABONELİK · " : (o.type === "onetime" ? "TEK SEFERLİK KUTU · " : "");
+      const pending = delivD ? Date.now() < delivD.getTime() : Date.now() - o.date < 2 * 86400000;
+      return (
+        '<div class="order-row">' +
+          '<div class="order-row-head">' +
+            '<span class="mono order-no">' + typeLabel + "SİPARİŞ #" + (o.no || "—") + "</span>" +
+            '<span class="order-status mono' + (pending ? " pending" : "") + '">' + (pending ? "HAZIRLANIYOR" : "TESLİM EDİLDİ") + "</span>" +
+          "</div>" +
+          '<p class="order-meta mono">Sipariş: ' + orderDateStr + " · " + orderTimeStr + "</p>" +
+          '<p class="order-meta mono">Teslimat: ' + delivStr + "</p>" +
+          '<p class="order-lines">' + o.lines.join(" · ") + "</p>" +
+          '<p class="order-total mono">' + money(o.total) + " TL</p>" +
+        "</div>"
+      );
+    }).join("");
+  }
+  renderOrders();
+
+  // ---- Teslimat adresi — ödeme yöntemiyle aynı kalıp: kayıtlıysa özet +
+  // "adresi düzenle" butonu, düzenle deyince (ya da hiç kayıt yoksa) form. ----
+  const addressCard = document.getElementById("addressCard");
+
+  function escAttr(v) { return String(v || "").replace(/"/g, "&quot;"); }
+
+  function renderAddressSaved(addr) {
+    addressCard.innerHTML =
+      '<p class="account-empty">' +
+        addr.name + " — " + addr.phone + "<br>" +
+        addr.line + ", " + addr.district + (addr.zip ? " " + addr.zip : "") +
+      "</p>" +
+      '<button class="btn" type="button" id="editAddrBtn">adresi düzenle</button>';
+    document.getElementById("editAddrBtn").addEventListener("click", () => renderAddressForm(addr));
+  }
+
+  function renderAddressForm(addr) {
+    addr = addr || {};
+    addressCard.innerHTML =
+      '<form class="account-form" id="addressForm">' +
+        '<label>Ad Soyad<input type="text" id="addrName" placeholder="Ad Soyad" value="' + escAttr(addr.name) + '" required></label>' +
+        '<label>Telefon<input type="tel" id="addrPhone" placeholder="05xx xxx xx xx" value="' + escAttr(addr.phone) + '" required></label>' +
+        '<label>Adres<textarea id="addrLine" placeholder="Mahalle, sokak, no, daire" required>' + (addr.line || "") + "</textarea></label>" +
+        '<div class="form-row">' +
+          '<label>İlçe<input type="text" id="addrDistrict" placeholder="Örn. Urla" value="' + escAttr(addr.district) + '" required></label>' +
+          '<label>Posta Kodu<input type="text" id="addrZip" placeholder="35xxx" value="' + escAttr(addr.zip) + '"></label>' +
+        "</div>" +
+        '<button class="cta" type="submit">adresi kaydet</button>' +
+      "</form>";
+    document.getElementById("addressForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const saved = {
+        name: document.getElementById("addrName").value.trim(),
+        phone: document.getElementById("addrPhone").value.trim(),
+        line: document.getElementById("addrLine").value.trim(),
+        district: document.getElementById("addrDistrict").value.trim(),
+        zip: document.getElementById("addrZip").value.trim(),
+        email: addr.email || "", // sepet formundan gelen e-postayı koru
+      };
+      BahcedenCart.setAddress(saved);
+      renderAddressSaved(saved);
+    });
+  }
+
+  function renderAddress() {
+    const existingAddr = BahcedenCart.getAddress();
+    // Sepet, yazarken alan alan kaydettiği için yarım kayıt kalmış olabilir —
+    // özet görünümüne ancak ad + adres tamamsa geçilir.
+    if (existingAddr && existingAddr.name && existingAddr.line) {
+      renderAddressSaved(existingAddr);
+    } else {
+      renderAddressForm(existingAddr);
+    }
+  }
+  renderAddress();
+
+  // ---- Payment method — same saved-card store sepet.html reads/writes ----
+  const paymentCard = document.getElementById("paymentCard");
+
+  function renderPaymentSaved(card) {
+    paymentCard.innerHTML =
+      '<p class="account-empty">•••• •••• •••• ' + card.number.slice(-4) + " — " + card.name + "</p>" +
+      '<button class="btn" type="button" id="editCardBtn">kartı değiştir</button>';
+    document.getElementById("editCardBtn").addEventListener("click", () => renderPaymentForm(card));
+  }
+
+  function renderPaymentForm(card) {
+    card = card || {};
+    paymentCard.innerHTML =
+      '<form class="account-form" id="cardForm">' +
+        '<label>Kart Üzerindeki İsim<input type="text" id="cardFormName" placeholder="Ad Soyad" value="' + (card.name || "") + '" required></label>' +
+        '<label>Kart Numarası<input type="text" id="cardFormNumber" placeholder="0000 0000 0000 0000" inputmode="numeric" maxlength="19" value="' + (card.number || "") + '" required></label>' +
+        '<div class="form-row">' +
+          '<label>Son Kullanma<input type="text" id="cardFormExpiry" placeholder="AA/YY" maxlength="5" value="' + (card.expiry || "") + '" required></label>' +
+          '<label>CVC<input type="text" id="cardFormCvc" placeholder="123" inputmode="numeric" maxlength="4" value="' + (card.cvc || "") + '" required></label>' +
+        "</div>" +
+        '<button class="cta" type="submit">kartı kaydet</button>' +
+      "</form>";
+    document.getElementById("cardForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const saved = {
+        name: document.getElementById("cardFormName").value.trim(),
+        number: document.getElementById("cardFormNumber").value.trim(),
+        expiry: document.getElementById("cardFormExpiry").value.trim(),
+        cvc: document.getElementById("cardFormCvc").value.trim(),
+      };
+      BahcedenCart.setCard(saved);
+      renderPaymentSaved(saved);
+    });
+  }
+
+  function renderPayment() {
+    const existingCard = BahcedenCart.getCard();
+    if (existingCard) {
+      renderPaymentSaved(existingCard);
+    } else {
+      renderPaymentForm();
+    }
+  }
+  renderPayment();
+
+  // Giriş / üye ol / çıkış sonrası tüm kartlar depodan yeniden çizilir —
+  // yeni üye temiz hesap görür, eski üyenin bilgileri ekranda kalmaz.
+  onAuthChange = () => {
+    subDraft = null;
+    skipConfirmOpen = false;
+    cancelFlowOpen = false;
+    renderSub();
+    renderOrders();
+    renderAddress();
+    renderPayment();
+  };
+
+  document.getElementById("logoutLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    BahcedenCart.setLoggedIn(false);
+    refreshAuthGate();
+  });
+})();
+</script>
+
+</body>
+</html>

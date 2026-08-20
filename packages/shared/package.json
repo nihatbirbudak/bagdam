@@ -1,0 +1,30 @@
+{
+  "name": "@bagdam/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bağdam — api, admin ve (ileride) mobil arasında paylaşılan enum'lar, DTO tipleri, durum makineleri ve fiyatlama kuralları (ADR-0002).",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "type-check": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.2",
+    "vitest": "^4.1.2"
+  }
+}

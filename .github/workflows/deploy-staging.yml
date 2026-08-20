@@ -1,0 +1,49 @@
+name: Deploy to Staging
+
+# staging'e push → sunucuda /opt/bagdam-staging/deploy.sh bagdam-staging (ADR-0011).
+# Aynı kısıtlı SSH anahtarı; deploy-dispatch.sh yalnız "bagdam" | "bagdam-staging" kabul eder.
+# Secrets: SERVER_HOST, SERVER_PORT, SERVER_SSH_KEY (production ile aynı repo secret'ları).
+
+on:
+  push:
+    branches: [staging]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 30
+
+    steps:
+      - name: Deploy via SSH (attempt 1)
+        id: deploy1
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          timeout: 120s
+          command_timeout: 25m
+          script: bagdam-staging
+
+      - name: Deploy via SSH (attempt 2 — retry)
+        if: steps.deploy1.outcome == 'failure'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          timeout: 120s
+          command_timeout: 25m
+          script: bagdam-staging

@@ -1,0 +1,56 @@
+name: Deploy to Production
+
+# main'e push → sunucuda /opt/bagdam/deploy.sh bagdam (ADR-0012/0015).
+# SSH anahtarı Bağdam'a özel ve kısıtlıdır: authorized_keys'te
+#   command="/opt/birbudak/scripts/deploy-dispatch.sh",restrict
+# olduğundan aşağıdaki `script` yalnız uygulama adıdır ("bagdam"); başka komut çalıştırılamaz.
+# Secrets (repo → Settings → Secrets → Actions): SERVER_HOST, SERVER_PORT, SERVER_SSH_KEY.
+# `environment: production` → ortam koruma kuralları (reviewer) buradan bağlanır.
+# F2'de test job'u (services: postgres:14 → migrate deploy + seed + test) bu job'un önüne `needs` ile eklenir.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+
+    steps:
+      # GitHub runner'dan sunucuya SSH bağlantısı ara ara "dial tcp i/o timeout" ile düşüyor
+      # (UA'da aynı gün 2 kez görüldü). deploy.sh idempotent + flock'lu olduğu için başarısız
+      # ilk denemeden sonra bir kez daha denenir; ikincisi de düşerse job fail olur.
+      - name: Deploy via SSH (attempt 1)
+        id: deploy1
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          timeout: 120s
+          command_timeout: 25m
+          script: bagdam
+
+      - name: Deploy via SSH (attempt 2 — retry)
+        if: steps.deploy1.outcome == 'failure'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          timeout: 120s
+          command_timeout: 25m
+          script: bagdam

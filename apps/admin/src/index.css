@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/*
+ * Bağdam yönetim paneli teması (Tailwind 4 @theme).
+ * Renkler website/styles.css :root token'larından türetildi:
+ *   --bg #F4F0E6 · --surface #FBF8F0 · --surface-deep #E8DEC5 · --ink #292922 · --ink-soft #5B594C
+ *   --tomato #E85B2A/#B4441E · --olive #68704A/#4B5136 · --butter #F2D98C/#8A6A1E · --fig #805064/#5E3A4A
+ * UA iskeletindeki `brand-*` / `accent` adları korunur; yalnız değerler Bağdam.
+ */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-admin: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Nötr sıcak skala: surface (50) → bg (100) → surface-deep (200) → ink-soft (700) → ink (900) */
+  --color-brand-50: #FBF8F0;
+  --color-brand-100: #F4F0E6;
+  --color-brand-200: #E8DEC5;
+  --color-brand-300: #D8CCAE;
+  --color-brand-400: #B8AE93;
+  --color-brand-500: #8F8873;
+  --color-brand-600: #6F6B5B;
+  --color-brand-700: #5B594C;
+  --color-brand-800: #403F35;
+  --color-brand-900: #292922;
+
+  /* Vurgu: domates */
+  --color-accent: #E85B2A;
+  --color-accent-dark: #B4441E;
+  --color-accent-soft: #F7D9C4;
+  --color-accent-light: #FBF3EC;
+
+  /* İkincil aile */
+  --color-olive: #68704A;
+  --color-olive-deep: #4B5136;
+  --color-olive-soft: #DCE0C4;
+  --color-butter: #F2D98C;
+  --color-butter-deep: #8A6A1E;
+  --color-fig: #805064;
+  --color-fig-deep: #5E3A4A;
+  --color-fig-soft: #EAD7DF;
+  --color-cream: #E8DEC5;
+
+  --color-line: rgba(41, 41, 34, 0.16);
+  --color-line-strong: rgba(41, 41, 34, 0.32);
+
+  /* Hafif geçişler (motion bağımlılığı yok) */
+  --animate-toast-in: toast-in 0.2s ease-out both;
+  --animate-fade-in: fade-in 0.15s ease-out both;
+  --animate-pop-in: pop-in 0.15s ease-out both;
+  --animate-slide-up: slide-up 0.2s ease-out both;
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes pop-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-brand-100 text-brand-800 font-admin antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-admin text-brand-900 font-semibold;
+  }
+
+  a {
+    @apply transition-colors;
+  }
+
+  code, kbd, pre, samp {
+    @apply font-mono;
+  }
+
+  ::selection {
+    @apply bg-accent-soft text-brand-900;
+  }
+}
+
+@layer components {
+  /* Ortak liste tablosu; sınıf adları lib/tableStyles.ts ile uyumlu */
+  .admin-table {
+    @apply w-full border-collapse text-sm;
+  }
+  .admin-table th {
+    @apply border-b border-brand-300 bg-brand-100 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-brand-700;
+  }
+  .admin-table td {
+    @apply border-b border-brand-200 px-3 py-2 text-sm text-brand-800;
+  }
+  .admin-table tbody tr:hover td {
+    @apply bg-brand-50;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

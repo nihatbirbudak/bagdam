@@ -43,15 +43,15 @@ Toplam ≈ **55 iş günü** tek geliştirici (≈ 11 hafta) · iki geliştirici
 
 ### F1 — Walking skeleton (4 gün) — *ilk kurulacak yapı*
 Amaç: boş ama **canlı** iskelet. Apex coming-soon, staging'de bugünkü statik site, API health, CI/CD, yedek — hepsi ilk hafta kanıtlanır.
-- [ ] Monorepo: `pnpm-workspace.yaml`, `turbo.json`, `.npmrc`, `.env.example`, root `package.json` (UA'dan kopya, `@bagdam/*`); `.gitignore`: `docs/sunucu-*.md`, `*.pem`, `*.key`, `.env*` (`!.env.example`), `apps/api/uploads/`, `node_modules/`, `dist/`
-- [ ] `apps/api`: Nest 11 bootstrap (UA `main.ts/app.module.ts/env-validator/common/*`), `api/v1` öneki, hbs view engine, `useStaticAssets`, `HOST 127.0.0.1`; `HealthController`; `WebController` (10 `.hbs` + `404.hbs` + `coming-soon.hbs`); `NotFoundExceptionFilter` (HTML 404)
-- [ ] `website/*.html` → `apps/api/views/*.hbs`, `website/assets + styles.css` → `apps/api/public/`; `website/unused` → `docs/arsiv-prototip/`
-- [ ] `apps/admin` kabuğu (Vite + React; UA iskeleti; login sayfası boş), `packages/shared` boş paket, `database/` klasörü
+- [x] Monorepo: `pnpm-workspace.yaml`, `turbo.json`, `.npmrc`, `.env.example`, root `package.json` (UA'dan kopya, `@bagdam/*`); `.gitignore`: `docs/sunucu-*.md`, `*.pem`, `*.key`, `.env*` (`!.env.example`), `apps/api/uploads/`, `node_modules/`, `dist/` *(✓ 2026-08-20)*
+- [x] `apps/api`: Nest 11 bootstrap (UA `main.ts/app.module.ts/env-validator/common/*`), `api/v1` öneki, hbs view engine, `useStaticAssets`, `HOST 127.0.0.1`; `HealthController`; `WebController` (10 `.hbs` + `404.hbs` + `coming-soon.hbs`); `NotFoundExceptionFilter` (HTML 404) *(✓ 2026-08-20 — lokalde :4010, 10 sayfa byte-byte aynı, health/404/coming-soon doğrulandı)*
+- [x] `website/*.html` → `apps/api/views/*.hbs`, `website/assets + styles.css` → `apps/api/public/`; `website/unused` → `docs/arsiv-prototip/` *(✓)*
+- [x] `apps/admin` kabuğu (Vite + React; UA iskeleti; login sayfası boş), `packages/shared` boş paket, `database/` klasörü *(✓ 2026-08-20 — :4011, login/dashboard/menü, lint+tsc+test temiz; shared: 36 test iki TZ'de yeşil)*
 - [ ] Sunucu: Node 22 ikilisi (proje bazlı) + PM2 `interpreter`; `/opt/bagdam`, `/opt/bagdam-staging`; PG `bagdam_db` + `bagdam_staging` (+ `citext`), roller `bagdam`, `bagdam_ro`; `.env` (600); `ecosystem.config.js` (cluster×1, TZ, HOST, 768M)
 - [ ] nginx: `conf.d/02-bagdam-cache.conf` (proxy_cache_path) + gzip_types; vhost'lar (apex → coming-soon location; `admin.bagdam.com`; `staging.*` basic auth + `auth_basic off` callback/webhook/pay); bakım sayfası `/var/www/maintenance/bagdam`
 - [ ] SSL: Cloudflare Origin CA wildcard → `/etc/ssl/bagdam/`; Cloudflare kayıtları (A @, CNAME www/admin/staging/admin-staging proxied; SPF/DKIM/DMARC + MX DNS-only); Full (strict), Always HTTPS, HSTS, WAF istisnası webhook/callback, Cache Rule `/api/*` bypass + `/assets/*` cache
-- [ ] CI/CD: `deploy.yml` (main) + `deploy-staging.yml`; Bağdam'a özel kısıtlı SSH anahtarı + `/opt/birbudak/scripts/deploy-dispatch.sh`; `deploy.sh` (flock → fetch/reset → install → generate → build → `psql citext` → pg_dump pre-migrate → migrate deploy → reload → health → pm2 save)
-- [ ] Ops: `backup-bagdam.sh` (03:30; db dump + uploads; 7 gün yerel + şifreli off-site 30 gün), `health-check.sh ENDPOINTS` 5010/5011, `error-watcher/daily-error-digest` DBS, `daily-report` satırı, logrotate
+- [x] CI/CD: `deploy.yml` (main) + `deploy-staging.yml`; Bağdam'a özel kısıtlı SSH anahtarı + `/opt/birbudak/scripts/deploy-dispatch.sh`; `deploy.sh` (flock → fetch/reset → install → generate → build → `psql citext` → pg_dump pre-migrate → migrate deploy → reload → health → pm2 save) *(dosyalar repo'da ✓ — sunucuda anahtar/dispatch kurulumu ve ilk çalıştırma bekliyor)*
+- [x] Ops: `backup-bagdam.sh` (03:30; db dump + uploads; 7 gün yerel + şifreli off-site 30 gün), `health-check.sh ENDPOINTS` 5010/5011, `error-watcher/daily-error-digest` DBS, `daily-report` satırı, logrotate *(script'ler `deploy/scripts/` ✓ — sunucuya kopyalama/cron/health satırları bekliyor)*
 - [ ] Playwright baseline: 10 sayfa × 3 viewport (staging)
 - **Bitti sayılır:** `https://bagdam.com` coming-soon 200; `https://staging.bagdam.com` bugünkü site (diff 0, basic auth); `/api/v1/health` 200 (prod+staging); push → deploy yeşil; gece yedeği + off-site kopya alındı; health-check Bağdam satırlarını raporluyor.
 

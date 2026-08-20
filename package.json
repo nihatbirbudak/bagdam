@@ -1,0 +1,33 @@
+{
+  "name": "bagdam",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:api": "pnpm --filter @bagdam/api dev",
+    "dev:admin": "pnpm --filter @bagdam/admin dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.0",
+    "prisma": "6.19.2",
+    "tsx": "^4.21.0",
+    "turbo": "^2.5.0",
+    "typescript": "~5.8.2",
+    "vitest": "^4.1.2"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.2"
+  },
+  "pnpm": {
+    "overrides": { "typescript": "~5.8.2" }
+  },
+  "prisma": {
+    "seed": "npx tsx database/seeds/seed.ts"
+  }
+}

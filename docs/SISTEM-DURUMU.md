@@ -8,9 +8,13 @@
 |---|---|---|
 | F0 Karar sprinti | ✅ | 16 ADR (docs/adr), state-machines.md; kullanıcı aksiyonları (iyzico/e-posta sağlayıcısı/ETBİS) bekliyor |
 | F1 Walking skeleton | ✅ (lokal) | Monorepo + apps/api + apps/admin + packages/shared + deploy/ dosyaları. Sunucu kurulumu ADR-0017 ile F10b'ye taşındı |
-| F2–F11 | ⬜ | — |
+| F2 Şema-a + seed + pricing | ✅ | `database/schema.prisma` (23 model, F2a), 3 migration, seed idempotent, shared pricing 103 test, health `db: up` |
+| F3–F11 | ⬜ | — |
 
 ## Lokal ortam (doğrulandı 2026-08-20)
+
+| Veritabanı | ✅ PostgreSQL 18.4 `bagdam_dev` / `bagdam_test` (rol `bagdam`, citext, TZ Europe/Istanbul); `pnpm db:status` güncel; seed: categories 4 · producers 15 · products 22 · product_images 27 · product_lots 22 · media_files 29 · box_tiers 2 · box_templates 2 (16 item) · delivery_zones 2 · delivery_dates 48 · settings 28 · site_content 3 · users 1 (admin) |
+|---|---|
 
 | Bileşen | Durum |
 |---|---|
@@ -25,7 +29,15 @@
 
 ## Sunucu
 
+> Coming-soon / apex yayını bu çalışmanın kapsamı dışında (kullanıcı ayrı çalışmada yürütüyor).
+
 ADR-0017: sunucu kurulumu ve yayın **F10b**'de (lansmandan hemen önce). `deploy/README.md` runbook'u hazır. Portlar 5010 (prod) / 5011 (staging) ayrılmış durumda.
+
+## Açık ürün kararları (kuyruk ≤3 — ADR-0016)
+
+1. **Ücretsiz kargo eşiği:** `≥ 1000 TL` (pricing testleri böyle) mi, prototipteki gibi `> 1000` mi? (tek satır: `shipping.ts`)
+2. **İlk-2-kutu/retention indirimi yuvarlama:** 649 → 324,50 (Decimal, kuruş) mi, prototipteki gibi 325 (tam TL) mi?
+3. **Aktif abonenin tekil ürün siparişinde kargo:** 0 (ADR-0005 "abone") mi, zone kuralı mı (state-machines.md #15 / prototip)? → F7'de tek cümleyle hizalanacak.
 
 ## Bilinen açık notlar (F1 ajan raporlarından, sonraki fazlarda ele alınacak)
 
@@ -34,3 +46,8 @@ ADR-0017: sunucu kurulumu ve yayın **F10b**'de (lansmandan hemen önce). `deplo
 - Admin API sözleşmesi varsayımları (`/auth/csrf`, `/auth/login`, `/auth/me`, `/auth/logout`) F4'te teyit edilecek.
 - dunning `retryHours [24,72]` teslimat gününü aşabilir → F7 spike'ında pencere daraltılacak (state-machines.md §14).
 - Off-site yedek için sunucuda rclone/age yok → kurulum `deploy/README.md` §10.
+- Raw SQL migration'larda kolon adları camelCase (`"userId"`, `"isDefault"`); F7 `raw_commerce` için `orders_orderNo_seq` / `"providerPaymentId"` kullanılacak (BACKEND-PLANI §2 notu güncellendi).
+- `pnpm db:migrate -- --name x` yazımı prisma'yı interaktif soruya düşürür; doğru: `pnpm db:migrate --create-only --name <ad>` (CLAUDE.md'de).
+- Kargo KDV oranı planda yok (vatTotal yalnız satır KDV'si) → fatura için F8 öncesi karar.
+- `MediaFile.path` unique değil; F4 media:import aynı path-upsert kuralını kullanmalı (ileride additive `@@unique([path])`).
+- Prisma 7 `package.json#prisma.seed` alanını kaldıracak → ileride `prisma.config.ts` (kapsam dışı).

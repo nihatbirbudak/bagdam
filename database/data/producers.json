@@ -1,0 +1,159 @@
+[
+  {
+    "slug": "huseyin-dag",
+    "name": "Hüseyin Dağ",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 0,
+    "productSlugs": [
+      "incir"
+    ]
+  },
+  {
+    "slug": "bagdam-ciftlik",
+    "name": "Bağdam Çiftlik",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 1,
+    "productSlugs": [
+      "zeytinyagi",
+      "zeytin",
+      "domatespuresi",
+      "tereyagi",
+      "yogurt"
+    ]
+  },
+  {
+    "slug": "mehmet-aydin",
+    "name": "Mehmet Aydın",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 2,
+    "productSlugs": [
+      "yumurta"
+    ]
+  },
+  {
+    "slug": "ali-karaca",
+    "name": "Ali Karaca",
+    "village": "Zeytineli",
+    "district": "Urla",
+    "sortOrder": 3,
+    "productSlugs": [
+      "uzum"
+    ]
+  },
+  {
+    "slug": "fatma-guler",
+    "name": "Fatma Güler",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 4,
+    "productSlugs": [
+      "pazi"
+    ]
+  },
+  {
+    "slug": "ramazan-oz",
+    "name": "Ramazan Öz",
+    "village": "Güzelbahçe",
+    "district": "Urla",
+    "sortOrder": 5,
+    "productSlugs": [
+      "domates"
+    ]
+  },
+  {
+    "slug": "ibrahim-sari",
+    "name": "İbrahim Sarı",
+    "village": "Gülbahçe",
+    "district": "Urla",
+    "sortOrder": 6,
+    "productSlugs": [
+      "kavun"
+    ]
+  },
+  {
+    "slug": "emine-yaman",
+    "name": "Emine Yaman",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 7,
+    "productSlugs": [
+      "acur"
+    ]
+  },
+  {
+    "slug": "halil-ucar",
+    "name": "Halil Uçar",
+    "village": "Bademler",
+    "district": "Urla",
+    "sortOrder": 8,
+    "productSlugs": [
+      "misir"
+    ]
+  },
+  {
+    "slug": "kadir-aksoy",
+    "name": "Kadir Aksoy",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 9,
+    "productSlugs": [
+      "biber"
+    ]
+  },
+  {
+    "slug": "zehra-tekin",
+    "name": "Zehra Tekin",
+    "village": "Güzelbahçe",
+    "district": "Urla",
+    "sortOrder": 10,
+    "productSlugs": [
+      "patlican"
+    ]
+  },
+  {
+    "slug": "serife-kaya",
+    "name": "Şerife Kaya",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 11,
+    "productSlugs": [
+      "bamya"
+    ]
+  },
+  {
+    "slug": "emrem-ciftlik",
+    "name": "Emrem Çiftlik",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 12,
+    "productSlugs": [
+      "salca",
+      "beyazpeynir",
+      "kirikpeynir"
+    ]
+  },
+  {
+    "slug": "hatice-yildiz",
+    "name": "Hatice Yıldız",
+    "village": "Yağcılar",
+    "district": "Urla",
+    "sortOrder": 13,
+    "productSlugs": [
+      "ekmek"
+    ]
+  },
+  {
+    "slug": "nuran-canbulat",
+    "name": "Nuran Canbulat",
+    "village": "Kuşçular",
+    "district": "Urla",
+    "sortOrder": 14,
+    "productSlugs": [
+      "cevizliekmek",
+      "sadeekmek"
+    ]
+  }
+]

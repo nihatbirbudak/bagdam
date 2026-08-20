@@ -11,10 +11,21 @@
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "db:generate": "prisma generate --schema database/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema database/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema database/schema.prisma",
+    "db:status": "prisma migrate status --schema database/schema.prisma",
+    "db:reset": "prisma migrate reset --schema database/schema.prisma",
+    "db:seed": "tsx database/seeds/seed.ts",
+    "db:studio": "prisma studio --schema database/schema.prisma",
+    "db:validate": "prisma validate --schema database/schema.prisma"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.0",
+    "@types/bcrypt": "^6.0.0",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.0",
     "prisma": "6.19.2",
     "tsx": "^4.21.0",
     "turbo": "^2.5.0",
@@ -25,9 +36,11 @@
     "@prisma/client": "6.19.2"
   },
   "pnpm": {
-    "overrides": { "typescript": "~5.8.2" }
+    "overrides": {
+      "typescript": "~5.8.2"
+    }
   },
   "prisma": {
-    "seed": "npx tsx database/seeds/seed.ts"
+    "seed": "tsx database/seeds/seed.ts"
   }
 }

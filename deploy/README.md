@@ -142,6 +142,8 @@ Origin CA yalnız Cloudflare proxy arkasında güvenilirdir; yerel testlerde `cu
 
 ## 7. nginx
 
+> ⚠️ **2026-08-20 itibarıyla sunucuda geçici bir `sites-available/bagdam.com.conf` VAR** (statik coming-soon, Let's Encrypt sertifikalı — bkz. [deploy/coming-soon/README.md](coming-soon/README.md)). Aşağıdaki döngü bu dosyanın **üzerine yazar**; önce `/etc/ssl/bagdam/origin.pem` hazır olmalı (§6), aksi hâlde `nginx -t` düşer. `/var/www/bagdam-comingsoon` ve LE sertifikası (`/etc/letsencrypt/live/bagdam.com`) zararsız, silinmeyebilir.
+
 ```bash
 cd /opt/bagdam/deploy/nginx
 mkdir -p /var/cache/nginx/bagdam && chown www-data:www-data /var/cache/nginx/bagdam

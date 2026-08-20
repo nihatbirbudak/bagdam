@@ -29,7 +29,7 @@ docs/         plan, ADR, yol haritası, araştırma; sunucu-baglanti.md gitignor
 ## Kurallar
 - Dil: kod/tanımlayıcı İngilizce; commit, yorum, doküman **Türkçe**.
 - Paket yöneticisi **pnpm** (workspace). `pnpm dev:api`, `pnpm dev:admin`, `pnpm build`, `pnpm type-check`, `pnpm test`.
-- DB: lokal PostgreSQL 14 `bagdam_dev`; `prisma migrate dev` yalnız lokal; **`prisma db push` yasak**; prod/staging'e yalnız `migrate deploy` (deploy.sh). Tek DB kuralı YOK (ADR-0011).
+- DB: lokal PostgreSQL (`bagdam_dev`, rol `bagdam`; kök `.env` + `apps/api/.env` gitignore'lu). Komutlar: `pnpm db:validate | db:generate | db:migrate --create-only --name <ad> | db:migrate | db:status | db:seed | db:reset` (**`--` koyma**, pnpm 9 literal geçirir). `prisma migrate dev` yalnız lokal; **`prisma db push` yasak**; prod/staging'e yalnız `migrate deploy` (deploy.sh). Tek DB kuralı YOK (ADR-0011).
 - Tasarım: `views/*.hbs` ve `public/styles.css` piksel piksel korunur; yalnız ADR-0003'teki 7 istisna. Handlebars `{{` çakışmasına dikkat.
 - Zaman: tüm an alanları `@db.Timestamptz(3)`; ham SQL'de `now()` yasak; TZ Europe/Istanbul (ADR-0004).
 - Sır yok: `.env` yalnız sunucuda; repo public; sunucu IP/port yazma (gitignore'lu `docs/sunucu-baglanti.md`).

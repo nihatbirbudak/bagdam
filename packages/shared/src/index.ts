@@ -17,9 +17,10 @@ export * from './types/content';
 export * from './types/wholesale';
 export * from './types/order';
 export * from './types/subscription';
+export * from './types/pricing';
 
 // Durum makineleri (Order / Subscription / Cycle / Payment / Cancellation) — docs/state-machines.md ile aynı
 export * from './state-machines';
 
-// Fiyatlama (F2'de dolacak)
+// Fiyatlama — tek doğruluk kaynağı (KDV, ilk-2-kutu, ekstra yuvarlama, kargo/eşik zone'dan, kesim TZ'li)
 export * from './pricing';

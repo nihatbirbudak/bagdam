@@ -26,5 +26,9 @@
   "devDependencies": {
     "typescript": "~5.8.2",
     "vitest": "^4.1.2"
+  },
+  "dependencies": {
+    "date-fns": "^4.4.0",
+    "date-fns-tz": "^3.2.0"
   }
 }

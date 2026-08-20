@@ -1,0 +1,744 @@
+// database/schema.prisma — Bağdam v2 (PostgreSQL 14+, Prisma 6)
+// Kaynak: docs/BACKEND-PLANI.md §2 (F2a kapsamı) · ADR-0004 (Timestamptz) · ADR-0013 (F2a/F2b, additive migration)
+//
+// İlkeler:
+// - Tüm an alanları `@db.Timestamptz(3)`, takvim günleri `@db.Date` (ADR-0004).
+// - Her değerin tek sahibi; "şema-var/UI-yok" alanlar yorumla etiketli (ADR-0013).
+// - F2b modelleri (Cart, Order, OrderLine, PaymentMethod, Payment, Refund, WebhookEvent,
+//   Subscription, SubscriptionCycle, CycleItem, SubscriptionEvent, SubscriptionCancellation)
+//   F7 1. gününde `0003_commerce` ile eklenir; bu dosyadaki `// F2b:` yorumları ilişki yer tutucusudur.
+// - Enum'lar F2b dahil TAMAMI burada (packages/shared/src/enums.ts ile birebir).
+// - Migration zinciri: 0000_extensions (citext) → 0001_init_core → 0002_raw_core (addresses_one_default).
+// - Client çıktısı: varsayılan — @prisma/client 6.19.2 kökte ve apps/api'de aynı pnpm store girdisine
+//   çözümlenir (node_modules/.pnpm/@prisma+client@…/node_modules/.prisma/client); `pnpm db:generate` yeterli.
+// - Migration üretimi: `pnpm db:migrate --create-only --name <ad>` (pnpm 9'da `--` KULLANMA: prisma'ya
+//   literal geçer ve isim sorusunda takılır).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────── ENUM ─────────
+
+enum UserRole {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  HIDDEN
+}
+
+/// Müşteri bootstrap'ında yalnız IN_STOCK/LOW görünür [B22]
+enum StockStatus {
+  IN_STOCK
+  LOW
+  SOLD_OUT
+  OUT_OF_SEASON
+}
+
+enum DeliveryDay {
+  SALI
+  PERSEMBE
+  CUMARTESI
+}
+
+enum DeliveryDateStatus {
+  OPEN
+  LOCKED
+  CLOSED
+}
+
+/// Karışık sepet: SUBSCRIPTION > BOX_ONE_TIME > SINGLE [B15]
+enum OrderKind {
+  SINGLE
+  BOX_ONE_TIME
+  SUBSCRIPTION
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  DELIVERY_FAILED
+  CANCELLED
+  REFUNDED
+  PAYMENT_FAILED
+}
+
+enum OrderLineKind {
+  PRODUCT
+  BOX
+  EXTRA
+}
+
+enum BillingParty {
+  INDIVIDUAL
+  CORPORATE
+}
+
+/// PAUSED: şema-var/UI-yok (P2); COMPLETED: tek seferlik kutu [B2]
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  PAUSED
+  CANCEL_REQUESTED
+  CANCELLED
+  COMPLETED
+}
+
+/// AWAITING_PAYMENT: ödeme linki stratejisi [B27]
+enum CycleStatus {
+  SCHEDULED
+  LOCKED
+  AWAITING_PAYMENT
+  SKIPPED
+  CHARGED
+  UNPAID
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum CycleItemSource {
+  TEMPLATE
+  SWAP
+  EXTRA
+  CART_MERGE
+}
+
+enum SkipSource {
+  USER
+  OPS
+  UNPAID
+}
+
+enum ChargeStrategy {
+  MERCHANT_INITIATED
+  PAYMENT_LINK
+}
+
+enum PaymentProvider {
+  IYZICO
+  PAYTR
+  MANUAL
+}
+
+enum PaymentKind {
+  CHECKOUT
+  CYCLE_CHARGE
+  DELTA
+  RETRY
+  LINK
+}
+
+enum PaymentStatus {
+  PENDING
+  REQUIRES_3DS
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIAL_REFUNDED
+  EXPIRED
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum LegalKind {
+  PRIVACY
+  TERMS
+  DISTANCE_SALES
+  DELIVERY
+  RETURNS
+  KVKK
+  COOKIE
+  COOKIE_SETTINGS
+  PREINFO
+  SUBSCRIPTION_CONTRACT
+  MARKETING_CONSENT
+}
+
+enum ConsentKind {
+  PREINFO_ACK
+  CONTRACT_ACK
+  SUBSCRIPTION_CONTRACT_ACK
+  KVKK_ACK
+  MARKETING_EMAIL
+  MARKETING_SMS
+  COOKIE_ANALYTICS
+  COOKIE_MARKETING
+}
+
+enum IysStatus {
+  NOT_APPLICABLE
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum CancelReason {
+  PRICE
+  VARIETY
+  DELIVERY_DAYS
+  OTHER
+}
+
+/// Her iptal akışının sonucu [B8]
+enum CancelOutcome {
+  PENDING
+  RETENTION_ACCEPTED
+  CANCELLED
+  ABANDONED
+}
+
+enum SubEventType {
+  CREATED
+  ACTIVATED
+  TIER_CHANGED
+  FREQ_CHANGED
+  DAY_CHANGED
+  PREF_CHANGED
+  SWAP
+  EXTRA_ADDED
+  EXTRA_REMOVED
+  CART_MERGED
+  SKIP
+  UNSKIP
+  LOCKED
+  AWAITING_PAYMENT
+  CHARGED
+  DELTA_CHARGED
+  PAYMENT_FAILED
+  RETRY
+  UNPAID
+  CARD_UPDATED
+  CANCEL_REQUESTED
+  RETENTION_OFFERED
+  RETENTION_USED
+  CANCELLED
+  COMPLETED
+  PAUSED
+  RESUMED
+  ADMIN_NOTE
+}
+
+enum MailStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+// ───────── F2a: KULLANICI / ADRES / BÖLGE / TESLİMAT TARİHİ ─────────
+
+model User {
+  id                    String    @id @default(cuid())
+  /// FE #loginEmail / #signupEmail — citext: büyük/küçük harf duyarsız benzersiz
+  email                 String    @unique @db.Citext
+  passwordHash          String
+  name                  String?   @db.VarChar(120)
+  /// opsiyonel; zorunlu telefon Address/Order'da [B10]
+  phone                 String?   @db.VarChar(30)
+  role                  UserRole  @default(CUSTOMER)
+  isActive              Boolean   @default(true)
+  emailVerifiedAt       DateTime? @db.Timestamptz(3)
+  refreshTokenHash      String?
+  passwordResetToken    String?   @unique
+  passwordResetExpires  DateTime? @db.Timestamptz(3)
+  failedLoginAttempts   Int       @default(0)
+  lockedUntil           DateTime? @db.Timestamptz(3)
+  /// FE bahceden_prefs
+  prefs                 Json?
+  /// FE bahceden_retention_offered (üye başına 1)
+  retentionOfferUsedAt  DateTime? @db.Timestamptz(3)
+  /// ilk 2 kutu %50 (üye başına 1 abonelik)
+  firstBoxesPromoUsedAt DateTime? @db.Timestamptz(3)
+  marketingOptIn        Boolean   @default(false)
+  lastLoginAt           DateTime? @db.Timestamptz(3)
+  /// KVKK anonimleştirme [B43]
+  anonymizedAt          DateTime? @db.Timestamptz(3)
+  createdAt             DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt             DateTime? @db.Timestamptz(3)
+  addresses             Address[]
+  consents              Consent[]
+  // F2b: orders Order[] · subscriptions Subscription[] · paymentMethods PaymentMethod[] · cart Cart?
+
+  @@map("users")
+}
+
+/// FE #custDistrict: Urla / Çeşme — kargo/eşik TEK SAHİBİ [B11]
+model DeliveryZone {
+  id             String         @id @default(cuid())
+  name           String         @db.VarChar(60)
+  slug           String         @unique @db.VarChar(60)
+  /// FE DELIVERY_FEE
+  fee            Decimal        @default(49) @db.Decimal(12, 2)
+  /// FE 1000 TL
+  freeThreshold  Decimal?       @db.Decimal(12, 2)
+  /// fiilen sınırsız; ops düşürür [B9]
+  capacityPerDay Int            @default(999)
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
+  addresses      Address[]
+  dates          DeliveryDate[]
+  // F2b: subscriptions Subscription[] · orders Order[]
+
+  @@map("delivery_zones")
+}
+
+/// TEK kesim+kapasite kaynağı; cron 8 hafta ileri üretir
+model DeliveryDate {
+  id       String             @id @default(cuid())
+  zoneId   String
+  zone     DeliveryZone       @relation(fields: [zoneId], references: [id])
+  day      DeliveryDay
+  date     DateTime           @db.Date
+  /// zonedTimeToUtc(date-1 12:00, Europe/Istanbul) [B34]
+  cutoffAt DateTime           @db.Timestamptz(3)
+  capacity Int
+  /// UPDATE … WHERE reserved < capacity (atomik)
+  reserved Int                @default(0)
+  status   DeliveryDateStatus @default(OPEN)
+  // F2b: cycles SubscriptionCycle[] · orders Order[]
+
+  @@unique([zoneId, date])
+  @@index([date, status])
+  @@map("delivery_dates")
+}
+
+/// FE bahceden_address + #addressForm (MVP tek adres)
+model Address {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName  String       @db.VarChar(120)
+  /// zorunlu [B10]
+  phone     String       @db.VarChar(30)
+  line      String       @db.VarChar(500)
+  zoneId    String
+  zone      DeliveryZone @relation(fields: [zoneId], references: [id])
+  zip       String?      @db.VarChar(10)
+  /// şema-var/UI-yok (çoklu adres P2)
+  isDefault Boolean      @default(true)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime?    @db.Timestamptz(3)
+  // F2b: subscriptions Subscription[]
+  // raw (0002_raw_core): CREATE UNIQUE INDEX addresses_one_default ON addresses("userId") WHERE "isDefault" AND "deletedAt" IS NULL;
+  // (kolon adları camelCase — alanlarda @map yok; plandaki snake_case yazımı buna göre uyarlandı)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+// ───────── F2a: KATALOG / ÜRETİCİ / PARTİ ─────────
+
+/// FE sekmeler; ikon STATİK assets/icons/<slug>.png [B17]
+model Category {
+  id        String    @id @default(cuid())
+  /// boxes | dairy | firin | cellar (UI data-tab)
+  slug      String    @unique @db.VarChar(40)
+  /// bootstrap product.tab: cellar→"pantry", dairy, firin, boxes→null [B6]
+  legacyTab String?   @db.VarChar(20)
+  label     String    @db.VarChar(60)
+  /// FE urunler.html:86,92,98 — TEK SAHİP [B11]
+  panelNote String?
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  products  Product[]
+
+  @@map("categories")
+}
+
+/// FE meta "Üretici · Köy · Urla[ — not]"
+model Producer {
+  id           String       @id @default(cuid())
+  name         String       @db.VarChar(120)
+  slug         String       @unique @db.VarChar(120)
+  village      String?      @db.VarChar(80)
+  district     String       @default("Urla") @db.VarChar(80)
+  /// şema-var/UI-yok (üretici sayfası P2)
+  story        String?
+  photoMediaId String?
+  /// şema-var/UI-yok
+  photoMedia   MediaFile?   @relation("ProducerPhoto", fields: [photoMediaId], references: [id], onDelete: SetNull)
+  isActive     Boolean      @default(true)
+  sortOrder    Int          @default(0)
+  products     Product[]
+  lots         ProductLot[]
+
+  @@map("producers")
+}
+
+model Product {
+  id            String            @id @default(cuid())
+  /// FE id → urun.html?id=, data-add-to-cart
+  slug          String            @unique @db.VarChar(80)
+  name          String            @db.VarChar(120)
+  categoryId    String
+  category      Category          @relation(fields: [categoryId], references: [id])
+  /// FE category meyve|sebze|bakliyat|süt ürünleri|fırın
+  group         String?           @db.VarChar(40)
+  producerId    String?
+  producer      Producer?         @relation(fields: [producerId], references: [id], onDelete: SetNull)
+  /// "Erken Hasat"
+  metaNote      String?           @db.VarChar(80)
+  price         Decimal           @db.Decimal(12, 2)
+  vatRate       Int               @default(1)
+  unit          String            @db.VarChar(40)
+  /// FE "kutuda: …"
+  boxAmount     String?           @db.VarChar(60)
+  /// [{factor,label}] — null → Setting commerce.extraAmountOptions
+  extraOptions  Json?
+  description   String
+  /// FE urun.html:124-130 koddan alana
+  storageText   String?
+  allergenText  String?           @db.VarChar(120)
+  freshnessNote String?           @db.VarChar(120)
+  prefLabel     String?           @db.VarChar(40)
+  prefOptions   String[]
+  prefDefault   Int?
+  isFresh       Boolean           @default(false)
+  season        String?           @db.VarChar(40)
+  status        ProductStatus     @default(ACTIVE)
+  stockStatus   StockStatus       @default(IN_STOCK)
+  /// FE kutu.html pairIds
+  pairWithBox   Boolean           @default(false)
+  pairOrder     Int               @default(0)
+  sortOrder     Int               @default(0)
+  images        ProductImage[]
+  /// why = lots(isCurrent).tastingNote [B11]
+  lots          ProductLot[]
+  templateItems BoxTemplateItem[]
+  // F2b: orderLines OrderLine[] · cycleItems CycleItem[]
+  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime          @updatedAt @db.Timestamptz(3)
+  deletedAt     DateTime?         @db.Timestamptz(3)
+
+  @@index([categoryId])
+  @@index([status, isFresh])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String    @id @default(cuid())
+  productId String
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     MediaFile @relation(fields: [mediaId], references: [id])
+  alt       String?   @db.VarChar(160)
+  isCover   Boolean   @default(false)
+  sortOrder Int       @default(0)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+/// FE batch + why (parti sürümü) — her ürünün ≥1 lot'u seed'lenir
+model ProductLot {
+  id          String    @id @default(cuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  producerId  String?
+  producer    Producer? @relation(fields: [producerId], references: [id], onDelete: SetNull)
+  /// FE batch
+  lotCode     String    @db.VarChar(40)
+  harvestDate DateTime? @db.Date
+  bestBefore  DateTime? @db.Date
+  /// FE why — TEK SAHİP
+  tastingNote String?
+  isCurrent   Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  // F2b: cycleItems CycleItem[]
+
+  @@unique([productId, lotCode])
+  @@map("product_lots")
+}
+
+// ───────── F2a: KUTU / HAFTALIK ŞABLON ─────────
+
+/// FE SUB_TIERS
+model BoxTier {
+  id            String        @id @default(cuid())
+  /// small | sezon
+  slug          String        @unique @db.VarChar(40)
+  label         String        @db.VarChar(80)
+  itemCount     Int
+  price         Decimal       @db.Decimal(12, 2)
+  note          String?       @db.VarChar(160)
+  imageMediaId  String?
+  imageMedia    MediaFile?    @relation("TierImage", fields: [imageMediaId], references: [id], onDelete: SetNull)
+  isRecommended Boolean       @default(false)
+  isActive      Boolean       @default(true)
+  sortOrder     Int           @default(0)
+  templates     BoxTemplate[]
+  // F2b: subscriptions Subscription[]
+
+  @@map("box_tiers")
+}
+
+/// "bu haftanın kutusu" — cycle içeriğinin TEK kaynağı [B4]
+model BoxTemplate {
+  id          String            @id @default(cuid())
+  tierId      String
+  tier        BoxTier           @relation(fields: [tierId], references: [id])
+  weekStart   DateTime          @db.Date
+  /// şema-var/UI: yalnız packing fişi
+  curatorName String?           @db.VarChar(60)
+  status      ContentStatus     @default(DRAFT)
+  items       BoxTemplateItem[]
+
+  @@unique([tierId, weekStart])
+  @@map("box_templates")
+}
+
+model BoxTemplateItem {
+  id          String      @id @default(cuid())
+  templateId  String
+  template    BoxTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product     @relation(fields: [productId], references: [id])
+  qtyLabel    String      @db.VarChar(60)
+  isSwappable Boolean     @default(true)
+  sortOrder   Int         @default(0)
+
+  @@unique([templateId, productId])
+  @@map("box_template_items")
+}
+
+// ───────── F2b: SEPET / SİPARİŞ / ÖDEME / ABONELİK MOTORU → F7 (0003_commerce) ─────────
+// Cart, Order, OrderLine, PaymentMethod, Payment, Refund, WebhookEvent,
+// Subscription, SubscriptionCycle, CycleItem, SubscriptionEvent, SubscriptionCancellation
+// (bkz. docs/BACKEND-PLANI.md §2 — additive olarak eklenir, ADR-0013)
+
+// ───────── F2a: TOPTAN / İÇERİK / YASAL / AYAR / MEDYA / LOG ─────────
+
+model WholesaleLead {
+  id           String     @id @default(cuid())
+  email        String     @db.Citext
+  /// şema-var/UI-yok (form yalnız e-posta)
+  businessName String?    @db.VarChar(160)
+  phone        String?    @db.VarChar(30)
+  note         String?
+  status       LeadStatus @default(NEW)
+  ip           String?    @db.VarChar(45)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+  @@map("wholesale_leads")
+}
+
+model Post {
+  id           String        @id @default(cuid())
+  slug         String        @unique @db.VarChar(120)
+  kind         String        @db.VarChar(30)
+  readMinutes  Int           @default(4)
+  titleHtml    String
+  excerpt      String?
+  bodyHtml     String
+  coverMediaId String?
+  coverMedia   MediaFile?    @relation("PostCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+  relatedSlugs String[]
+  status       ContentStatus @default(DRAFT)
+  publishedAt  DateTime?     @db.Timestamptz(3)
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  @@index([status, publishedAt])
+  @@map("posts")
+}
+
+/// satır başına versiyon
+model LegalDocument {
+  id            String    @id @default(cuid())
+  kind          LegalKind
+  slug          String    @db.VarChar(60)
+  title         String    @db.VarChar(160)
+  version       Int
+  leadHtml      String?
+  bodyHtml      String
+  contentHash   String    @db.VarChar(64)
+  effectiveFrom DateTime  @db.Timestamptz(3)
+  isCurrent     Boolean   @default(false)
+  requiresAck   Boolean   @default(false)
+  /// 8 politika true; PREINFO/SUBSCRIPTION_CONTRACT/MARKETING_CONSENT hash/link ile [B16]
+  showInNav     Boolean   @default(false)
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  consents      Consent[]
+
+  @@unique([slug, version])
+  @@index([kind, isCurrent])
+  @@map("legal_documents")
+}
+
+model Consent {
+  id          String         @id @default(cuid())
+  userId      String?
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  guestKey    String?        @db.VarChar(64)
+  /// F2b: Order FK (onDelete: SetNull) F7'de additive eklenir; şimdilik ilişkisiz
+  orderId     String?
+  kind        ConsentKind
+  documentId  String?
+  document    LegalDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  granted     Boolean        @default(true)
+  source      String         @default("HS_WEB") @db.VarChar(20)
+  ipAddress   String?        @db.VarChar(64)
+  userAgent   String?        @db.VarChar(255)
+  iysStatus   IysStatus      @default(NOT_APPLICABLE)
+  iysSyncedAt DateTime?      @db.Timestamptz(3)
+  revokedAt   DateTime?      @db.Timestamptz(3)
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, kind])
+  @@index([orderId])
+  @@map("consents")
+}
+
+model SiteContent {
+  key       String   @id @db.VarChar(80)
+  label     String   @db.VarChar(120)
+  schema    Json
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("site_content")
+}
+
+model Setting {
+  key       String   @id @db.VarChar(100)
+  group     String   @db.VarChar(40)
+  value     Json
+  isSecret  Boolean  @default(false)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([group])
+  @@map("settings")
+}
+
+model MediaFile {
+  id            String         @id @default(cuid())
+  path          String         @db.VarChar(255)
+  thumbPath     String?        @db.VarChar(255)
+  originalName  String         @db.VarChar(255)
+  mimeType      String         @db.VarChar(80)
+  size          Int
+  width         Int?
+  height        Int?
+  alt           String?        @db.VarChar(160)
+  folder        String         @default("genel") @db.VarChar(80)
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  productImages ProductImage[]
+  posts         Post[]         @relation("PostCover")
+  producers     Producer[]     @relation("ProducerPhoto")
+  tiers         BoxTier[]      @relation("TierImage")
+
+  @@index([folder])
+  @@map("media_files")
+}
+
+/// silinmez; müşteri PII'si anonimleştirmede [silindi] ile maskelenir [B43]
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorEmail String?  @db.VarChar(160)
+  action     String   @db.VarChar(20)
+  module     String   @db.VarChar(40)
+  entityId   String?  @db.VarChar(60)
+  summary    String?  @db.VarChar(255)
+  oldValues  Json?
+  newValues  Json?
+  requestId  String?  @db.VarChar(60)
+  ipAddress  String?  @db.VarChar(64)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([module, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// 90 gün saklanır
+model MailLog {
+  id           String     @id @default(cuid())
+  to           String     @db.VarChar(160)
+  subject      String     @db.VarChar(255)
+  templateSlug String     @db.VarChar(60)
+  entityId     String?    @db.VarChar(60)
+  status       MailStatus @default(QUEUED)
+  error        String?
+  messageId    String?    @db.VarChar(160)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  sentAt       DateTime?  @db.Timestamptz(3)
+
+  @@unique([templateSlug, entityId])
+  @@map("mail_logs")
+}
+
+/// 30 gün saklanır; ops script'leriyle uyumlu kolonlar [B39]
+model SystemLog {
+  id              String   @id @default(cuid())
+  level           String   @db.VarChar(10)
+  module          String   @db.VarChar(40)
+  action          String?  @db.VarChar(40)
+  message         String
+  requestId       String?  @db.VarChar(60)
+  userId          String?
+  metadata        Json?
+  fingerprint     String?  @db.VarChar(64)
+  occurrenceCount Int      @default(1)
+  firstSeenAt     DateTime @default(now()) @db.Timestamptz(3)
+  lastSeenAt      DateTime @default(now()) @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([level, lastSeenAt])
+  @@index([createdAt])
+  @@map("system_logs")
+}
+
+/// 90 gün saklanır
+model CronLog {
+  id             String    @id @default(cuid())
+  name           String    @db.VarChar(60)
+  status         String    @db.VarChar(10)
+  itemsProcessed Int       @default(0)
+  errors         Int       @default(0)
+  details        Json?
+  startedAt      DateTime  @db.Timestamptz(3)
+  finishedAt     DateTime? @db.Timestamptz(3)
+  durationMs     Int?
+
+  @@index([name, startedAt])
+  @@map("cron_logs")
+}

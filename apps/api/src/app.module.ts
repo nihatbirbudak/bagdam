@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { RequestLoggerInterceptor } from './common/interceptors/request-logger.interceptor';
 import { TIMEOUT_MS, TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
+import { PrismaModule } from './common/prisma.module';
 import { HealthModule } from './modules/health/health.module';
 import { WebModule } from './web/web.module';
 
@@ -33,9 +34,10 @@ new Logger('AppModule').log(
         limit: 100, // IP başına max 100 istek/dk
       },
     ]),
+    PrismaModule, // @Global — PrismaService tüm repository'lerde (F2)
     HealthModule,
     WebModule,
-    // F2: PrismaModule · F3: CatalogModule · F4: AuthModule, MediaModule ...
+    // F3: CatalogModule · F4: AuthModule, MediaModule ...
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -55,13 +55,13 @@ Amaç: çalışan iskelet — **lokalde** (ADR-0017: sunucu kurulumu ve yayın F
 - [→F10b] Playwright baseline: 10 sayfa × 3 viewport (staging)
 - **Bitti sayılır (lokal, ADR-0017):** `http://127.0.0.1:4010` 10 sayfa byte-byte aynı ✓; `/api/v1/health` 200 ✓; admin :4011 açılıyor ✓; shared/api/admin tsc+build+test yeşil ✓; Playwright baseline lokalde (F3 başında alınır). Sunucu DoD'si → F10b.
 
-### F2 — Şema-a + seed + paylaşılan kurallar (3 gün)
-- [ ] `database/schema.prisma` F2a modelleri (User, Address, DeliveryZone, DeliveryDate, Category, Producer, Product, ProductImage, ProductLot, BoxTier, BoxTemplate(+Item), WholesaleLead, Post, LegalDocument, Consent, SiteContent, Setting, MediaFile, AuditLog, MailLog, SystemLog, CronLog) — tümü `Timestamptz(3)`
-- [ ] Migration'lar: `0000_extensions` (citext) → `0001_init_core` → `0002_raw_core` (addresses_one_default)
-- [ ] Seed: `convert-products-js.ts` (products.js → catalog.json; meta → Producer), `seed.ts` (22 ürün / 15 üretici / 4 kategori+legacyTab / 2 tier / 2 zone / ProductLot (batch+why) / bu haftanın BoxTemplate'i / Setting commerce.* / admin env'den)
-- [ ] `packages/shared`: enum'lar, DTO tipleri, durum makineleri (F2b tasarım olarak), `pricing/` (KDV, ilk-2-kutu, ekstra yuvarlama, kargo/eşik zone'dan, kesim hesabı TZ'li) + vitest (UTC ve +03)
-- [ ] CI: `services: postgres:14` ile `migrate deploy + seed + test`; `prisma validate + migrate diff`
-- **Bitti sayılır:** migration prod+staging'de; seed yüklü; testler iki TZ'de yeşil; ERD çıktı.
+### F2 — Şema-a + seed + paylaşılan kurallar (3 gün) — ✅ TAMAM (2026-08-20)
+- [x] `database/schema.prisma` F2a modelleri (User, Address, DeliveryZone, DeliveryDate, Category, Producer, Product, ProductImage, ProductLot, BoxTier, BoxTemplate(+Item), WholesaleLead, Post, LegalDocument, Consent, SiteContent, Setting, MediaFile, AuditLog, MailLog, SystemLog, CronLog) — tümü `Timestamptz(3)` *(✓ 27 enum + 23 model, 41 timestamptz / 0 timestamp)*
+- [x] Migration'lar: `0000_extensions` (citext) → `0001_init_core` → `0002_raw_core` (addresses_one_default) *(✓ `20260820000000_extensions` → `20260820130020_init_core` → `20260820130055_raw_core`; prisma timestamp adlandırması; `db:status` güncel)*
+- [x] Seed: `convert-products-js.ts` (products.js → catalog.json; meta → Producer), `seed.ts` (22 ürün / 15 üretici / 4 kategori+legacyTab / 2 tier / 2 zone / ProductLot (batch+why) / bu haftanın BoxTemplate'i / Setting commerce.* / admin env'den) *(✓ idempotent; 22 ürün/15 üretici/4 kategori/2 tier/2 zone/48 teslimat tarihi/28 ayar/admin)*
+- [x] `packages/shared`: enum'lar, DTO tipleri, durum makineleri (F2b tasarım olarak), `pricing/` (KDV, ilk-2-kutu, ekstra yuvarlama, kargo/eşik zone'dan, kesim hesabı TZ'li) + vitest (UTC ve +03) *(✓ pricing modülü: 13 dosya/103 test — UTC, Europe/Istanbul, America/New_York)*
+- [x] CI: `services: postgres:14` ile `migrate deploy + seed + test`; `prisma validate + migrate diff` *(ADR-0017: CI/PG14 provası F10b'ye — şimdilik yok)*
+- **Bitti sayılır (lokal):** migration `bagdam_dev`'de ✓; seed yüklü ve idempotent ✓; testler üç TZ'de yeşil ✓; ERD `docs/erd.md` ✓; API health `db: up` ✓; sayfa paritesi 10/10 ✓.
 
 ### F3 — Inline bootstrap + katalog dinamik (2 gün)
 - [ ] `CatalogModule` + `GET /api/v1/bootstrap` (products.js şekline birebir; `tab=legacyTab`, freqOptions şekli, why/batch lot'tan, SOLD_OUT/OUT_OF_SEASON/HIDDEN hariç) + snapshot testi
@@ -112,6 +112,7 @@ Amaç: çalışan iskelet — **lokalde** (ADR-0017: sunucu kurulumu ve yayın F
 - **Bitti sayılır:** her yaşam döngüsü olayı MailLog'da; restore raporu; go-live checklist.
 
 ### F10b — Sunucu kurulumu + yayın hazırlığı (3 gün) — *ADR-0017: lansmandan hemen önce*
+> Not (2026-08-20): apex `bagdam.com` "yakında" sayfası **ayrı çalışmada yayınlandı ✓** — statik coming-soon (`/var/www/bagdam-comingsoon`, geçici `sites-available/bagdam.com.conf`, Let's Encrypt, Cloudflare A/CNAME proxied + Full strict); aynı sayfanın "artık Bağdam" sürümü `bahcedenal.com.tr`'de. Ayrıntı: `deploy/coming-soon/README.md`. F10b'de tam vhost bu geçici vhost'un **üzerine yazar** (önce Origin CA), `SITE_MODE=coming-soon` apex'i devralır; bahcedenal → bagdam 301 yönlendirmesi kullanıcı kararıyla ayrıca.
 - [ ] Sunucu: Node 22 ikilisi (proje bazlı) + PM2 `interpreter`; `/opt/bagdam`, `/opt/bagdam-staging`; PG `bagdam_db` + `bagdam_staging` (+ `citext`), roller `bagdam`, `bagdam_ro`; `.env` (600); `ecosystem.config.js`
 - [ ] nginx: `conf.d/02-bagdam-cache.conf` + gzip_types; vhost'lar (apex, admin, staging, admin-staging; staging basic auth); bakım sayfası; `nginx -t`
 - [ ] SSL: Cloudflare Origin CA wildcard → `/etc/ssl/bagdam/`; Cloudflare kayıtları (A @, CNAME www/admin/staging/admin-staging proxied; SPF/DKIM/DMARC + MX DNS-only); Full (strict), Always HTTPS, HSTS, WAF istisnası, Cache Rule

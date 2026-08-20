@@ -11,6 +11,7 @@ import { CatalogService } from '../modules/catalog/catalog.service';
 import { toBootstrapJson, toScriptJson } from './bootstrap-json';
 import {
   buildCategoryTabs,
+  buildCheckoutBootstrap,
   buildLegalArticles,
   buildLegalNav,
   buildPanelNotes,
@@ -74,6 +75,7 @@ const TOPTAN_TEXT_DEFAULTS: ToptanTexts = {
  * Şablonlara giden veri: `{{> bootstrap}}` partial'ı `bootstrapJson` + `assetVersion` okur (F3);
  * F5: `site` (SiteContent ağacı, kaçışlı), `legal`/`legalDocs` (politikalar), `posts` (gunluk tümü / index ilk 3),
  * `categories` + `panelNotes` (index/urunler sekmeleri, panel notları), `featured` (index kartları), `toptanTextsJson`.
+ * F8: `checkoutJson` (sepet: requiresAck belgeler + teslimat bölgeleri → `window.__BAGDAM_CHECKOUT__`).
  * coming-soon/404 yalnız `assetVersion`.
  */
 interface ViewData {
@@ -95,6 +97,8 @@ interface ViewData {
   legalDocs?: LegalArticleView[];
   /** toptan: form mesajları (script içi JSON). */
   toptanTextsJson?: string;
+  /** sepet (F8): `{legal:[{slug,kind,title,version}], zones:[…]}` — checkout onay kutuları + ilçe seçenekleri (script içi JSON). */
+  checkoutJson?: string;
 }
 
 /**
@@ -228,6 +232,11 @@ export class WebController {
       }
       if (view === 'toptan') {
         data.toptanTextsJson = toScriptJson(this.toptanTexts(site));
+      }
+      if (view === 'sepet') {
+        // F8 checkout: onay gerektiren belgeler (ADR-0003 istisna 3) + aktif bölgeler; sayfa JS'i API'ye gitmeden başlar.
+        const [docs, zones] = await Promise.all([this.content.getLegalCurrent(), this.content.getDeliveryZones()]);
+        data.checkoutJson = toScriptJson(buildCheckoutBootstrap(docs, zones));
       }
       return true;
     } catch (err) {

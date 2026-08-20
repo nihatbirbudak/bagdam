@@ -6,7 +6,7 @@ import type { Id, IsoDateTime } from './common';
  * Şablon slug'ları — SiteContent anahtarı `mail.<slug>` (`{subject, html}`; Handlebars).
  * Kaynak liste apps/api `modules/mail/mail.constants.ts` + `site-content.registry.ts` (grup `mail`); burada yalnız tip.
  */
-export type MailTemplateSlug = 'welcome' | 'verify' | 'reset' | 'password-changed' | 'wholesale-lead' | 'test';
+export type MailTemplateSlug = 'welcome' | 'verify' | 'reset' | 'password-changed' | 'wholesale-lead' | 'test' | 'order-paid'; // F8: order-paid (sipariş onayı + yasal belge kopyası)
 
 /** Notifier olayları — `Notifier.notify(event, payload)` (MailNotifier → MailService). F7+ yeni olaylar buraya EKLENİR. */
 export type NotifierEvent =
@@ -14,7 +14,8 @@ export type NotifierEvent =
   | 'customer.verify'
   | 'customer.reset'
   | 'customer.password-changed'
-  | 'wholesale.new-lead';
+  | 'wholesale.new-lead'
+  | 'order.paid'; // F8: sipariş ödendi (OrdersService PAID yan etkisi → mail.order-paid)
 
 /** Admin `GET /admin/mail-logs?page&limit&status&to` satırı. */
 export interface MailLogItem {
@@ -55,3 +56,4 @@ export interface MailTestResult {
   previewPath: string | null;
   error: string | null;
 }
+

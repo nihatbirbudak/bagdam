@@ -3,6 +3,7 @@ import { PAYMENT_PROVIDER_NAMES, paymentProviderNameFromEnum, type PaymentProvid
 import { SettingsService } from '../../settings/settings.service';
 import { ManualProvider } from './manual.provider';
 import type { PaymentProvider } from './payment-provider.interface';
+import { PayTrProvider } from './paytr/paytr.provider';
 
 function isProviderName(value: unknown): value is PaymentProviderName {
   return typeof value === 'string' && (PAYMENT_PROVIDER_NAMES as readonly string[]).includes(value);
@@ -11,20 +12,26 @@ function isProviderName(value: unknown): value is PaymentProviderName {
 /**
  * PaymentProviderFactory — aktif sağlayıcıyı çözer (UA `PaymentGatewayFactory` kalıbı).
  * Sıra: Setting `payment.provider` (panelden yazılmış satır varsa) → env `PAYMENT_PROVIDER` → Setting varsayılanı (`manual`).
- * `iyzico` F8'de eklenir; o güne kadar seçilirse 503 `PAYMENT_PROVIDER_UNAVAILABLE` (checkout kapalı mesajı F8).
+ * Kayıtlı sağlayıcılar: `manual` (F7) · `paytr` (F8, ADR-0019). `iyzico` P2 — seçilirse 503 `PAYMENT_PROVIDER_UNAVAILABLE`.
  * Saklı karttan tahsilatta kartın sağlayıcısı esastır: `getByEnum(paymentMethod.provider)`.
  */
 @Injectable()
 export class PaymentProviderFactory {
   private readonly logger = new Logger(PaymentProviderFactory.name);
   private readonly byName: Map<PaymentProviderName, PaymentProvider>;
+  /** Üretimde "manual" uyarısı yalnız bir kez yazılır (her checkout'ta değil). */
+  private manualInProductionWarned = false;
 
   constructor(
     private readonly settings: SettingsService,
     private readonly manual: ManualProvider,
+    private readonly paytr: PayTrProvider,
   ) {
-    this.byName = new Map<PaymentProviderName, PaymentProvider>([['manual', this.manual]]);
-    // F8: this.byName.set('iyzico', iyzicoProvider);
+    this.byName = new Map<PaymentProviderName, PaymentProvider>([
+      ['manual', this.manual],
+      ['paytr', this.paytr],
+    ]);
+    // P2: this.byName.set('iyzico', iyzicoProvider);
   }
 
   /** Aktif sağlayıcı adı (Setting → env → varsayılan). */
@@ -45,7 +52,13 @@ export class PaymentProviderFactory {
   }
 
   async getActive(): Promise<PaymentProvider> {
-    return this.get(await this.resolveName());
+    const name = await this.resolveName();
+    // Manuel sağlayıcı gerçek tahsilat yapmaz (checkout anında PAID) — üretimde seçiliyse tek seferlik uyarı (F11 checklist).
+    if (name === 'manual' && process.env.NODE_ENV === 'production' && !this.manualInProductionWarned) {
+      this.manualInProductionWarned = true;
+      this.logger.error('DİKKAT: üretimde ödeme sağlayıcısı "manual" — gerçek tahsilat YAPILMAZ. Ayarlar › Ödeme › Sağlayıcı = PayTR olmalı.');
+    }
+    return this.get(name);
   }
 
   get(name: PaymentProviderName): PaymentProvider {
@@ -59,7 +72,7 @@ export class PaymentProviderFactory {
     return provider;
   }
 
-  /** Prisma enum (Payment.provider / PaymentMethod.provider) → sağlayıcı. PAYTR (P2) → 503. */
+  /** Prisma enum (Payment.provider / PaymentMethod.provider) → sağlayıcı. IYZICO (P2) → 503. */
   getByEnum(value: PaymentProviderEnum): PaymentProvider {
     const name = paymentProviderNameFromEnum(value);
     if (!name) {

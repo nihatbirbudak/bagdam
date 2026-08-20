@@ -144,16 +144,16 @@ describe('Abonelik motoru — F7 DoD senaryoları', () => {
   });
 
   it('tek seferlik → COMPLETED: tek cycle, ensure üretmez, DELIVERED olunca abonelik tamamlanır', async () => {
-    const fx = await app.createFixture({ isOneTime: true }); // prepaid 649 = 600 + kargo 49
+    const fx = await app.createFixture({ isOneTime: true }); // fixture prepaid 649 = 600 + kargo 49 (checkout Order'ında); F8 KARAR: cycle#1 snapshot'ında kargo 0 (DELTA'da kargo yok)
     expect((await app.cyclesOf(fx.subscriptionId)).length).toBe(1);
     const ensure = await app.cycles.ensure(BASE_NOW, { subscriptionId: fx.subscriptionId });
     expect(ensure.created).toBe(0);
     await app.cycles.lockAndCharge(afterCutoff('2027-03-02'));
     let c1 = await app.cycle(fx.firstCycleId);
     expect(c1.status).toBe('CHARGED');
-    expect(Number(c1.shippingFee)).toBe(49);
+    expect(Number(c1.shippingFee)).toBe(0); // F8: kargo checkout Order.shippingFee'de; cycle#1 kilit snapshot'ında yeniden hesaplanmaz
     expect(Number(c1.discount)).toBe(0);
-    expect(Number(c1.total)).toBe(649);
+    expect(Number(c1.total)).toBe(600);
     expect(c1.deltaOrderId).toBeNull();
     expect((await app.cyclesOf(fx.subscriptionId)).length).toBe(1);
 

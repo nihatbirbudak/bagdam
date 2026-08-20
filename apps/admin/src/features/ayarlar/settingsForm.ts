@@ -58,10 +58,19 @@ export const SETTINGS_FIELD_LABELS: Record<string, Record<string, string>> = {
   sms: { provider: 'Sağlayıcı', user: 'Kullanıcı', pass: 'Parola', header: 'Başlık (gönderici adı)' },
   payment: {
     provider: 'Sağlayıcı',
+    // ADR-0019 (PayTR birincil) — registry alan adları: paytr* + storedCardEnabled + nonThreeDsGranted + maxInstallment
+    paytrMerchantId: 'PayTR mağaza no (merchant_id)',
+    paytrMerchantKey: 'PayTR merchant key',
+    paytrMerchantSalt: 'PayTR merchant salt',
+    paytrTestMode: 'PayTR test modu',
+    paytrCallbackAllowedIps: 'Callback IP izin listesi',
+    storedCardEnabled: 'Kayıtlı kart / tekrarlayan tahsilat açık (PayTR onayı)',
+    nonThreeDsGranted: 'NON3D (saklı karttan) yetkisi teyitli',
+    maxInstallment: 'En fazla taksit',
+    // iyzico P2 (ADR-0010 → ADR-0019); eski kayıtlar için etiketler kalır
     iyzicoApiKey: 'iyzico API anahtarı',
     iyzicoSecretKey: 'iyzico gizli anahtar',
     iyzicoBaseUrl: 'iyzico taban URL',
-    nonThreeDsGranted: 'NON3D (saklı karttan) yetkisi teyitli',
     enabled: 'Ödeme açık',
   },
 };
@@ -211,9 +220,10 @@ export function selectOptionsFor(group: string, field: AdminSettingField): Selec
   }
   if (group === 'mail' && field.key === 'provider') return ['smtp', 'resend', 'ses'].map((v) => ({ value: v, label: v.toUpperCase() }));
   if (group === 'sms' && field.key === 'provider') return [{ value: 'netgsm', label: 'Netgsm' }];
+  // ADR-0019: PayTR birincil; manuel yalnız geliştirme/test. iyzico P2 (sunucu options verirse o kazanır).
   if (group === 'payment' && field.key === 'provider') return [
-    { value: 'iyzico', label: 'iyzico' },
-    { value: 'manual', label: 'Manuel (ödeme sağlayıcısı yok)' },
+    { value: 'paytr', label: 'PayTR' },
+    { value: 'manual', label: 'Manuel (ödeme sağlayıcısı yok — geliştirme/test)' },
   ];
   return [];
 }
@@ -305,4 +315,81 @@ export function isSettingsDraftDirty(fields: AdminSettingField[], initial: Setti
     if (initial[f.key] !== current[f.key]) return true;
   }
   return false;
+}
+
+/* ── Ödeme ayarı uyarıları (Ayarlar › Ödeme, ADR-0019) ────────────────────── */
+
+export interface PaymentModeWarning {
+  code: 'REGISTRY_NO_PAYTR' | 'MANUAL_PROVIDER' | 'IYZICO_P2' | 'PAYTR_TEST_MODE' | 'PAYTR_CREDENTIALS_MISSING' | 'STORED_CARD_OFF' | 'PAYMENTS_DISABLED';
+  tone: 'warning' | 'info';
+  message: string;
+}
+
+function fieldBool(f: AdminSettingField | undefined): boolean | undefined {
+  if (!f) return undefined;
+  const v = f.value ?? f.default;
+  if (v === true || v === 'true' || v === 1) return true;
+  if (v === false || v === 'false' || v === 0) return false;
+  return undefined;
+}
+
+function fieldHasValue(f: AdminSettingField | undefined): boolean {
+  if (!f) return false;
+  if (f.type === 'secret') return !!f.hasValue;
+  const v = f.value ?? f.default;
+  return v !== undefined && v !== null && String(v).trim() !== '';
+}
+
+const PAYTR_CREDENTIAL_KEYS = ['paytrMerchantId', 'paytrMerchantKey', 'paytrMerchantSalt'] as const;
+
+/**
+ * Ödeme grubu alanlarından operatöre gösterilecek uyarılar (saf): manuel sağlayıcı (gerçek tahsilat yok), PayTR test modu,
+ * eksik mağaza bilgileri, kayıtlı kart kapalı (abonelik → ödeme linki), ödeme alma kapalı, registry'de PayTR alanı yok (A).
+ */
+export function paymentModeWarnings(group: Pick<AdminSettingGroup, 'fields'> | null | undefined): PaymentModeWarning[] {
+  if (!group) return [];
+  const byKey = new Map(group.fields.map((f) => [f.key, f] as const));
+  const providerField = byKey.get('provider');
+  const provider = String(providerField?.value ?? providerField?.default ?? '').toLowerCase();
+  const out: PaymentModeWarning[] = [];
+  const hasPaytrFields = PAYTR_CREDENTIAL_KEYS.some((k) => byKey.has(k));
+  if (!hasPaytrFields) {
+    out.push({
+      code: 'REGISTRY_NO_PAYTR',
+      tone: 'info',
+      message: 'Ayar kaydında PayTR alanları (paytrMerchantId / paytrMerchantKey / paytrMerchantSalt) henüz yok — settings registry ADR-0019 ile güncellenince burada otomatik görünür.',
+    });
+  }
+  if (provider === 'manual') {
+    out.push({
+      code: 'MANUAL_PROVIDER',
+      tone: 'warning',
+      message: 'Sağlayıcı "manuel": gerçek tahsilat yapılmaz, checkout ödemeleri anında başarılı sayılır (yalnız geliştirme/test). Lansman öncesi PayTR seçilmeli.',
+    });
+  } else if (provider === 'iyzico') {
+    out.push({ code: 'IYZICO_P2', tone: 'warning', message: 'iyzico adaptörü P2 (ADR-0019): bu seçimle ödeme alınamaz (503 PAYMENT_PROVIDER_UNAVAILABLE). PayTR seçin.' });
+  } else if (provider === 'paytr') {
+    if (fieldBool(byKey.get('paytrTestMode')) === true) {
+      out.push({
+        code: 'PAYTR_TEST_MODE',
+        tone: 'warning',
+        message: 'PayTR TEST MODU açık: iFrame ödemeleri gerçek kart çekimi yapmaz (test kartları). Canlıya geçerken kapatın ve PayTR panelinde callback URL\'sini doğrulayın.',
+      });
+    }
+    const missing = PAYTR_CREDENTIAL_KEYS.filter((k) => byKey.has(k) && !fieldHasValue(byKey.get(k)));
+    if (missing.length) {
+      out.push({ code: 'PAYTR_CREDENTIALS_MISSING', tone: 'warning', message: `PayTR mağaza bilgileri eksik: ${missing.join(', ')} — iFrame token alınamaz, callback hash doğrulanamaz.` });
+    }
+    if (byKey.has('storedCardEnabled') && fieldBool(byKey.get('storedCardEnabled')) === false) {
+      out.push({
+        code: 'STORED_CARD_OFF',
+        tone: 'info',
+        message: 'Kayıtlı kart / tekrarlayan tahsilat kapalı: abonelik dönem tahsilatları ödeme linki (PAYMENT_LINK) ile yapılır. PayTR onayı gelince açın.',
+      });
+    }
+  }
+  if (byKey.has('enabled') && fieldBool(byKey.get('enabled')) === false) {
+    out.push({ code: 'PAYMENTS_DISABLED', tone: 'warning', message: 'Ödeme alma kapalı: checkout bakım metni gösterir, yeni sipariş alınmaz.' });
+  }
+  return out;
 }

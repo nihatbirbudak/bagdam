@@ -1,4 +1,4 @@
-import { Activity, Boxes, CheckCircle2, Gift, History, ImageIcon, Package, RefreshCw, Tractor, XCircle, type LucideIcon } from 'lucide-react';
+import { Activity, Boxes, CheckCircle2, Gift, History, ImageIcon, Package, Receipt, RefreshCw, Tractor, XCircle, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
@@ -7,8 +7,10 @@ import { API_BASE, api, errorMessage } from '../../lib/api';
 import type { AdminAuditLog } from '../../lib/adminTypes';
 import type { HealthResponse, Paginated } from '../../lib/apiTypes';
 import { boxTemplatesApi, producersApi } from '../../features/catalog/api';
+import { ordersApi } from '../../features/siparisler/api';
+import { summarizeOrders, todayIsoDate, type OrdersDigest } from '../../features/siparisler/orders';
 import { CURRENT_PHASE } from '../../lib/phases';
-import { cn, formatDateTime } from '../../lib/utils';
+import { cn, formatDateTime, formatTry } from '../../lib/utils';
 import { addDays, currentWeekStart } from '../../lib/week';
 import { AdminPageHeader } from '../../features/components/AdminPageHeader';
 
@@ -49,6 +51,85 @@ function StatTile({ label, value, to, icon: Icon, hint }: { label: string; value
   );
 }
 
+interface TodayState {
+  day: string;
+  /** Bugün oluşturulan sipariş sayısı (sunucu total). */
+  total: number;
+  /** Bugünün ilk 100 siparişinden türetilen özet (ciro = ödenmiş siparişler). */
+  digest: OrdersDigest;
+  /** Tüm zamanlar ödeme başarısız (PAYMENT_FAILED) — ekran 18 F9'a kadar buradan izlenir. */
+  failedTotal: number | null;
+}
+
+function MiniStat({ label, value, to, tone = 'neutral' }: { label: string; value: string | number; to: string; tone?: 'neutral' | 'good' | 'bad' }) {
+  return (
+    <Link to={to} className="block rounded-md border border-brand-200 bg-brand-50/60 px-3 py-2 transition-colors hover:border-accent">
+      <span className={cn('block text-lg font-semibold tabular-nums', tone === 'good' ? 'text-olive-deep' : tone === 'bad' ? 'text-accent-dark' : 'text-brand-900')}>{value}</span>
+      <span className="block text-[11px] text-brand-600">{label}</span>
+    </Link>
+  );
+}
+
+/**
+ * F8 — Bugünkü sipariş / ciro kartı: `GET /admin/orders?from=bugün&to=bugün` (Europe/Istanbul takvim günü) → sayı (total) +
+ * ilk 100 satırdan ciro/bekleyen; `status=PAYMENT_FAILED` toplamı ayrı. Tıklanınca Siparişler filtreli açılır.
+ */
+function TodayOrdersCard({ refreshKey }: { refreshKey: number }) {
+  const [state, setState] = useState<TodayState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    const day = todayIsoDate();
+    (async () => {
+      const [today, failed] = await Promise.allSettled([
+        ordersApi.list({ from: day, to: day, page: 1, limit: 100 }),
+        ordersApi.list({ status: 'PAYMENT_FAILED', page: 1, limit: 1 }),
+      ]);
+      if (cancelled) return;
+      if (today.status === 'fulfilled') {
+        setState({
+          day,
+          total: today.value.total,
+          digest: summarizeOrders(today.value.items),
+          failedTotal: failed.status === 'fulfilled' ? failed.value.total : null,
+        });
+      } else {
+        setState(null);
+        setError(errorMessage(today.reason, 'Sipariş özeti alınamadı'));
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  const dayQuery = state ? `?from=${state.day}&to=${state.day}` : '';
+  return (
+    <Card title="Bugün — sipariş ve ciro" icon={Receipt} className="mb-4">
+      {loading ? (
+        <p className="text-xs text-brand-500">Yükleniyor…</p>
+      ) : error || !state ? (
+        <p className="text-xs text-accent-dark" role="alert">
+          {error ?? 'Sipariş özeti alınamadı'}
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MiniStat label="Bugünkü sipariş" value={state.total} to={`/siparisler${dayQuery}`} />
+          <MiniStat label={`Bugünkü ciro (ödenmiş ${state.digest.paidCount})`} value={formatTry(state.digest.revenue)} to={`/siparisler${dayQuery}&status=PAID`} tone="good" />
+          <MiniStat label="Ödeme bekleyen (bugün)" value={state.digest.pendingCount} to={`/siparisler${dayQuery}&status=PENDING_PAYMENT`} />
+          <MiniStat label="Ödeme başarısız (tümü)" value={state.failedTotal === null ? '—' : state.failedTotal} to="/siparisler?status=PAYMENT_FAILED" tone={state.failedTotal ? 'bad' : 'neutral'} />
+        </div>
+      )}
+      {state && state.total > 100 && <p className="mt-2 text-[11px] text-brand-400">Ciro ilk 100 siparişten hesaplandı (toplam {state.total}); tam döküm için CSV dışa aktarım.</p>}
+    </Card>
+  );
+}
+
 /** Özet (F4 sürümü): sayılar (GET uçlarının total'ı) + API sağlığı + son audit satırları (ADMIN). */
 export function AdminDashboardPage() {
   const { user, isAdmin } = useAdminAuth();
@@ -56,6 +137,7 @@ export function AdminDashboardPage() {
   const [counts, setCounts] = useState<Counts>({ products: null, producers: null, templates: null, media: null });
   const [countsError, setCountsError] = useState<string | null>(null);
   const [audit, setAudit] = useState<AdminAuditLog[] | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const loadCounts = useCallback(async () => {
     setCountsError(null);
@@ -105,8 +187,8 @@ export function AdminDashboardPage() {
         title="Özet"
         description={
           <>
-            Hoş geldiniz{user?.name ? `, ${user.name}` : ''}. Faz <strong>{CURRENT_PHASE}</strong>: katalog, haftanın kutusu ve medya yönetimi açık; sipariş/abonelik
-            göstergeleri F9'da.
+            Hoş geldiniz{user?.name ? `, ${user.name}` : ''}. Faz <strong>{CURRENT_PHASE}</strong>: katalog, içerik, müşteriler, siparişler ve kuponlar açık;
+            abonelik/ops göstergeleri F9'da.
           </>
         }
         actions={
@@ -115,6 +197,7 @@ export function AdminDashboardPage() {
             onClick={() => {
               void loadCounts();
               health.refetch();
+              setRefreshKey((k) => k + 1);
             }}
             className="inline-flex items-center gap-1.5 rounded-md border border-brand-300 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 hover:border-accent hover:text-accent"
           >
@@ -135,6 +218,8 @@ export function AdminDashboardPage() {
           Bazı sayılar alınamadı: {countsError}
         </p>
       )}
+
+      <TodayOrdersCard refreshKey={refreshKey} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card title="API sağlığı" icon={Activity}>
@@ -166,6 +251,8 @@ export function AdminDashboardPage() {
         <Card title="Hızlı erişim" icon={Boxes}>
           <ul className="grid grid-cols-1 gap-1 text-sm">
             {[
+              { to: '/siparisler', label: 'Siparişler' },
+              { to: '/kuponlar', label: 'Kuponlar' },
               { to: '/katalog/urunler/yeni', label: 'Yeni ürün ekle' },
               { to: '/katalog/haftanin-kutusu', label: 'Haftanın kutusunu düzenle' },
               { to: '/medya', label: 'Görsel yükle' },

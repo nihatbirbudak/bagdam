@@ -5,7 +5,7 @@ import { TextInput } from '../../components/ui/FormField';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { SettingsGroupForm } from '../../features/ayarlar/SettingsGroupForm';
 import { settingsApi } from '../../features/ayarlar/api';
-import { SETTINGS_GROUP_LABELS } from '../../features/ayarlar/settingsForm';
+import { SETTINGS_GROUP_LABELS, paymentModeWarnings } from '../../features/ayarlar/settingsForm';
 import { AdminEmptyState } from '../../features/components/AdminEmptyState';
 import { AdminPageHeader } from '../../features/components/AdminPageHeader';
 import { AdminTabPanel } from '../../features/components/AdminTabPanel';
@@ -23,13 +23,15 @@ type GroupsViewProps = {
   groups: string[];
   /** Grup başına alt çubuk ek aksiyonu. */
   footerExtra?: (group: AdminSettingGroup) => ReactNode;
+  /** Aktif grubun formu üstünde gösterilen uyarı/bilgi şeridi (ör. Ödeme: test modu). */
+  banner?: (group: AdminSettingGroup) => ReactNode;
 };
 
 /**
  * Generic ayar grupları görünümü (UA kalıbı): `GET /admin/settings` → istenen gruplar sekme olarak; her sekme
  * registry'den üretilen `SettingsGroupForm`. Sekme `?grup=` parametresiyle kalıcı.
  */
-export function SettingsGroupsView({ title, description, groups, footerExtra }: GroupsViewProps) {
+export function SettingsGroupsView({ title, description, groups, footerExtra, banner }: GroupsViewProps) {
   const [params, setParams] = useSearchParams();
   const [all, setAll] = useState<AdminSettingGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,7 @@ export function SettingsGroupsView({ title, description, groups, footerExtra }: 
               Registry'de tanımsız grup(lar): {missing.map((m) => SETTINGS_GROUP_LABELS[m] ?? m).join(', ')}.
             </InlineNotice>
           )}
+          {active && banner ? <div className="mb-3">{banner(active)}</div> : null}
           {visible.length > 1 ? (
             <AdminTabPanel tabs={visible.map((g) => ({ key: g.group, label: g.label }))} activeTab={activeKey} onTabChange={selectTab}>
               {active && <SettingsGroupForm key={active.group} group={active} onSaved={onSaved} footerExtra={footerExtra?.(active)} />}
@@ -198,13 +201,29 @@ export function AdminEpostaPage() {
   );
 }
 
-/** Ekran 15 — Ödeme: iyzico anahtarları (şifreli), taban URL, NON3D yetkisi, açık/kapalı. */
+/** Ödeme grubu uyarıları (saf `paymentModeWarnings`): test modu, manuel sağlayıcı, eksik mağaza bilgisi, kayıtlı kart kapalı, ödeme kapalı. */
+export function PaymentModeNotices({ group }: { group: AdminSettingGroup }) {
+  const warnings = paymentModeWarnings(group);
+  if (!warnings.length) return null;
+  return (
+    <div className="space-y-2" data-testid="payment-mode-notices">
+      {warnings.map((w) => (
+        <InlineNotice key={w.code} tone={w.tone}>
+          {w.message}
+        </InlineNotice>
+      ))}
+    </div>
+  );
+}
+
+/** Ekran 15 — Ödeme (ADR-0019 PayTR): mağaza no / key / salt (şifreli), test modu, callback IP listesi, kayıtlı kart onayı, NON3D, taksit. */
 export function AdminOdemePage() {
   return (
     <SettingsGroupsView
       title="Ödeme"
-      description="iyzico API/gizli anahtarları (şifreli, maskeli) ve taban URL (sandbox/prod). NON3D yetkisi teyit edilince tahsilat stratejisi Genel › Ticaret'ten MERCHANT_INITIATED yapılır (F11)."
+      description="PayTR mağaza bilgileri (merchant id / key / salt — şifreli, maskeli), test modu, callback IP izin listesi, kayıtlı kart (tekrarlayan tahsilat) onayı ve taksit sınırı. Kayıtlı kart onayı yoksa abonelik tahsilatı ödeme linki ile çalışır (ChargeStrategy Genel › Ticaret'te). Alanlar settings registry'den gelir; 'manuel' sağlayıcı yalnız geliştirme/test içindir."
       groups={['payment']}
+      banner={(g) => <PaymentModeNotices group={g} />}
     />
   );
 }

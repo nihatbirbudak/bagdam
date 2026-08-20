@@ -2,7 +2,7 @@
  * API sözleşmesi zarfları (panelin kendi ihtiyaç duyduğu şekiller). Alan/enum tipleri
  * `@bagdam/shared`'dan; admin DTO şekilleri `lib/adminTypes.ts`'te.
  */
-import type { UserRole } from '@bagdam/shared';
+import type { Coupon, CouponRedemption, UserRole } from '@bagdam/shared';
 
 /** Global hata zarfı (AllExceptionsFilter): `{ statusCode, message, error, requestId, timestamp, path }`. */
 export interface ApiErrorEnvelope {
@@ -508,3 +508,45 @@ export interface AdminMailSendResult {
   logId?: string;
   message?: string;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * F8 sözleşmesi — siparişler (ekran 17), ödeme/iade, kuponlar (ekran 23).
+ * Sipariş/ödeme DTO'ları `@bagdam/shared` (types/order.ts, F7 OrdersModule) — burada yalnız yeniden dışa aktarım;
+ * kupon admin uçları (B) sözleşmeden: `GET /admin/coupons?q&active&page`, `GET /admin/coupons/:id` (+ redemptions),
+ * `POST`, `PUT`, `DELETE` (soft), `PATCH /:id/active`. İade: `POST /admin/payments/:id/refund {amount, reason?}`.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+export type {
+  AdminOrderList,
+  AdminOrderListQuery,
+  AdminRefundResult,
+  Coupon,
+  CouponInput,
+  CouponListItem,
+  CouponRedemption,
+  Order,
+  OrderBillingPatch,
+  OrderInvoicePatch,
+  OrderLine,
+  OrderNoteRequest,
+  OrderStatusPatch,
+  OrderSummary,
+  Payment,
+  Refund,
+  RefundRequest,
+} from '@bagdam/shared';
+
+/** `GET /admin/coupons?q&active&page&limit` sorgusu (B). `active`: '' tümü · 'true' · 'false'. */
+export interface AdminCouponListQuery {
+  q?: string;
+  active?: '' | 'true' | 'false';
+  page?: number;
+  limit?: number;
+}
+
+/** `GET /admin/coupons/:id` — kupon + kullanımlar (CouponRedemption; sipariş no/e-posta mapper verirse). */
+export interface AdminCouponDetail extends Coupon {
+  redemptions: Array<CouponRedemption & { customerEmail?: string | null }>;
+}
+
+// `AdminRefundResult` (POST /admin/payments/:id/refund yanıtı) artık shared'dan: ok/refund/payment/refundedTotal + orderStatus/orderTransitioned (F8/E).

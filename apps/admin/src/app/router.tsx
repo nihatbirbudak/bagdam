@@ -21,6 +21,9 @@ import { AdminBolgelerPage } from '../pages/ayarlar/AdminBolgelerPage';
 import { AdminMusterilerListePage } from '../pages/musteriler/AdminMusterilerListePage';
 import { AdminMusteriDetayPage } from '../pages/musteriler/AdminMusteriDetayPage';
 import { AdminMailGunluguPage } from '../pages/sistem/AdminMailGunluguPage';
+import { AdminSiparislerListePage } from '../pages/siparisler/AdminSiparislerListePage';
+import { AdminSiparisDetayPage } from '../pages/siparisler/AdminSiparisDetayPage';
+import { AdminKuponlarPage } from '../pages/kuponlar/AdminKuponlarPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
@@ -48,7 +51,7 @@ export function RequireAdminAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Menüde yer tutucu kalan ekranlar (F8+); F4/F5/F6 ekranları aşağıda gerçek sayfaya bağlı. */
+/** Menüde yer tutucu kalan ekranlar (F9+); F4/F5/F6/F8 ekranları aşağıda gerçek sayfaya bağlı. */
 const placeholderLeaves = getAllNavLeaves().filter((leaf) => leaf.to !== ADMIN_ROOT && leaf.comingSoon);
 
 export function AdminRouter() {
@@ -98,6 +101,11 @@ export function AdminRouter() {
         <Route path="/musteriler" element={<AdminMusterilerListePage />} />
         <Route path="/musteriler/:id" element={<AdminMusteriDetayPage />} />
         <Route path="/sistem/e-posta-gunlugu" element={<AdminMailGunluguPage />} />
+
+        {/* F8 — Satış › Siparişler (ekran 17), Kuponlar (ekran 23) */}
+        <Route path="/siparisler" element={<AdminSiparislerListePage />} />
+        <Route path="/siparisler/:id" element={<AdminSiparisDetayPage />} />
+        <Route path="/kuponlar" element={<AdminKuponlarPage />} />
 
         {placeholderLeaves.map((leaf) => (
           <Route key={leaf.to} path={leaf.to} element={<PlaceholderPage />} />

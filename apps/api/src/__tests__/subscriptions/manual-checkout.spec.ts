@@ -2,6 +2,7 @@
 // (`POST /admin/subscriptions`: quote → Order PAID (MANUAL) → Subscription ACTIVE + cycle#1) + `POST /admin/jobs/:name/run {now}`.
 // Gerçek Nest + guard'lar + gerçek DB; zaman `now` ile (2027 takvimi, TZ'den bağımsız).
 import { CookieJar } from '../auth/cookie-jar';
+import { deleteMailLogsWithPreviews } from '../auth/f6-harness';
 import { afterCutoff, bodyOf, createSubsApp, type JsonBody, type SubsApp } from './harness';
 
 jest.setTimeout(300_000);
@@ -195,6 +196,8 @@ async function cleanupUser(app: SubsApp, userId: string): Promise<void> {
   const orderIds = orders.map((o) => o.id);
   await app.prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
   await app.prisma.subscriptionCycle.deleteMany({ where: { subscriptionId: { in: subIds } } });
+  // F8: manuel checkout Order PAID → `order.paid` e-postası (MailLog SKIPPED + önizleme) — test artığı bırakma
+  await deleteMailLogsWithPreviews(app.prisma, { templateSlug: 'order-paid', entityId: { in: orderIds } });
   await app.prisma.order.deleteMany({ where: { id: { in: orderIds } } });
   await app.prisma.subscription.deleteMany({ where: { id: { in: subIds } } });
   await app.prisma.auditLog.deleteMany({ where: { entityId: { in: [...subIds, userId] } } });

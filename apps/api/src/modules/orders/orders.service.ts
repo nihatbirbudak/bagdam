@@ -26,6 +26,9 @@ import {
 } from '@bagdam/shared';
 import { Prisma } from '@prisma/client';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { CouponsService } from '../coupons/coupons.service';
+import { webUrl } from '../mail/mail.constants';
+import { NOTIFIER, type Notifier, type NotifierOrder } from '../mail/notifier.interface';
 import type { OrderBillingPatchDto } from './dto/order-billing.dto';
 import type { OrderInvoicePatchDto } from './dto/order-invoice.dto';
 import type { AdminOrdersQueryDto } from './dto/orders-query.dto';
@@ -40,7 +43,7 @@ import {
   ORDERS_DEFAULT_PAGE,
 } from './orders.constants';
 import { ORDERS_DEPS, type OrdersDeps } from './orders.deps';
-import { toOrderDto, toOrderStatusResponse, toOrderSummary, toOrdersCsv } from './orders.mapper';
+import { toMoney, toOrderDto, toOrderStatusResponse, toOrderSummary, toOrdersCsv } from './orders.mapper';
 import { OrdersRepository, type CycleForOrderRecord, type OrderLineRecord, type OrderRecord } from './orders.repository';
 import type {
   CreateForCycleOptions,
@@ -76,6 +79,11 @@ function shouldReleaseDeliveryDate(from: OrderStatus, to: OrderStatus): boolean 
   return false;
 }
 
+/** Checkout siparişi mi (CHECKOUT türünde ödemesi var) — sipariş onayı e-postası yalnız bunlara (cycle#n Order'ları motorun olayları). */
+export function isCheckoutOrder(order: Pick<OrderRecord, 'payments'>): boolean {
+  return order.payments.some((p) => p.kind === 'CHECKOUT');
+}
+
 /**
  * OrdersService — Order çekirdeği (F7/B2; BACKEND-PLANI §3 checkout/orders satırı, docs/state-machines.md §1, ADR-0006/0008):
  *  - `createFromQuote` (checkout: DeliveryDate rezerv + Order PENDING_PAYMENT + satır snapshot'ı — fiyat yeniden HESAPLANMAZ,
@@ -83,6 +91,8 @@ function shouldReleaseDeliveryDate(from: OrderStatus, to: OrderStatus): boolean 
  *    `createDeltaForCycle` (cycle#1 peşin sonrası ekstralar: ayrı küçük DELTA Order),
  *  - `transition` (shared Order durum makinesi; geçersiz → 409 ORDER_TRANSITION_INVALID; yan etki: CANCELLED/REFUNDED → DD iade,
  *    PAID → paidAt; abonelik siparişinde ADMIN/OPS müdahalesi SubscriptionEvent ADMIN_NOTE), `cancel`, müşteri iptali (kesimden önce),
+ *    F8: PAID → kupon kullanımı (usedCount++) + Notifier `order.paid` (yalnız checkout siparişleri; sipariş özeti + yasal belge kopyaları);
+ *    CANCELLED/REFUNDED → kupon kullanımı serbest (satır silinir, ödenmişse usedCount--).
  *  - admin liste/detay/CSV/not/fatura/billing, müşteri liste/detay/durum.
  * Prisma yalnız repository'de; DeliveryDate rezerv/iade `ORDERS_DEPS` (B1 DeliveryDatesService ile aynı imza). Zaman `now` parametreyle.
  * Cycle/Subscription durumları bu serviste DEĞİŞMEZ (C'nin alanı); yalnız cycle.orderId/deltaOrderId bağlanır.
@@ -94,6 +104,8 @@ export class OrdersService {
   constructor(
     private readonly repo: OrdersRepository,
     @Inject(ORDERS_DEPS) private readonly deps: OrdersDeps,
+    private readonly coupons: CouponsService,
+    @Inject(NOTIFIER) private readonly notifier: Notifier,
   ) {}
 
   // ── Oluşturma ────────────────────────────────────────────────────────────────
@@ -270,13 +282,14 @@ export class OrdersService {
 
   /**
    * Durum geçişi — shared `assertOrderTransition` (geçersiz → 409 ORDER_TRANSITION_INVALID); iyimser kilit (arada değişmişse
-   * 409 ORDER_STATE_CHANGED). Yan etkiler: PAID → paidAt; CANCELLED/REFUNDED → cancelledAt/cancelReason + DeliveryDate iade
-   * (CANCELLED'a her giriş, REFUNDED yalnız PAID'den — yalnız tekil/checkout siparişlerinde; abonelik siparişinde rezervin sahibi
-   * cycle motorudur, `ctx.releaseDeliveryDate` ile ezilebilir); abonelik siparişinde ADMIN/OPS geçişi → SubscriptionEvent ADMIN_NOTE
-   * (SYSTEM/USER/PSP geçişlerini C/F8 kendi olaylarıyla yazar — çift kayıt olmasın).
+   * 409 ORDER_STATE_CHANGED). Yan etkiler: PAID → paidAt + kupon usedCount++ (F8) + Notifier `order.paid` (checkout siparişi; işlem sonrası,
+   * asla fırlatmaz); CANCELLED/REFUNDED → cancelledAt/cancelReason + DeliveryDate iade (CANCELLED'a her giriş, REFUNDED yalnız PAID'den —
+   * yalnız tekil/checkout siparişlerinde; abonelik siparişinde rezervin sahibi cycle motorudur, `ctx.releaseDeliveryDate` ile ezilebilir)
+   * + kupon kullanımı serbest (F8); abonelik siparişinde ADMIN/OPS geçişi → SubscriptionEvent ADMIN_NOTE (SYSTEM/USER/PSP geçişlerini
+   * C/F8 kendi olaylarıyla yazar — çift kayıt olmasın).
    */
-  transition(orderId: string, to: OrderStatus, ctx: OrderTransitionContext, tx?: Tx): Promise<OrderRecord> {
-    return this.repo.runInTransaction(async (db) => {
+  async transition(orderId: string, to: OrderStatus, ctx: OrderTransitionContext, tx?: Tx): Promise<OrderRecord> {
+    const result = await this.repo.runInTransaction(async (db) => {
       const order = await this.repo.findById(orderId, db);
       if (!order) throw new NotFoundException({ message: 'Sipariş bulunamadı', error: 'ORDER_NOT_FOUND' });
       const from = order.status as OrderStatus;
@@ -308,6 +321,13 @@ export class OrdersService {
       if (order.deliveryDateId && releaseWanted && shouldReleaseDeliveryDate(from, to)) {
         await this.deps.release(order.deliveryDateId, db);
       }
+      // F8 kupon: PAID → usedCount++ (aynı işlem); CANCELLED/REFUNDED → kullanım satırı silinir, ödenmişse usedCount--
+      if (order.couponCode) {
+        if (to === OrderStatus.PAID) await this.coupons.confirmRedemption(order.id, db);
+        else if (to === OrderStatus.CANCELLED || to === OrderStatus.REFUNDED) {
+          await this.coupons.releaseRedemption(order.id, { wasPaid: order.paidAt !== null }, db);
+        }
+      }
       if (order.subscriptionId && (ctx.actor === 'ADMIN' || ctx.actor === 'OPS')) {
         await this.repo.createSubscriptionEvent(
           {
@@ -324,6 +344,11 @@ export class OrdersService {
       const updated = await this.repo.findById(orderId, db);
       return updated ?? order;
     }, tx);
+    // F8: sipariş onayı e-postası (checkout siparişi; Notifier asla fırlatmaz; işlem dışı — dış `tx` verildiyse çağıranın commit'inden hemen önce olabilir)
+    if (to === OrderStatus.PAID && ctx.notify !== false && isCheckoutOrder(result)) {
+      void this.notifyPaid(result).catch((err: unknown) => this.logger.error(`order.paid bildirimi başarısız (#${result.orderNo}): ${(err as Error).message}`));
+    }
+    return result;
   }
 
   /** İptal (ops/sistem/müşteri): `transition(CANCELLED)` + neden; yan etkiler orada. */
@@ -357,6 +382,13 @@ export class OrdersService {
     return toOrderDto(updated);
   }
 
+  // ── F8: sipariş onayı e-postası ──────────────────────────────────────────────
+
+  /** Notifier `order.paid` — sipariş özeti + onaylanan yasal belgelerin kopya bağlantıları (politikalar.html#slug). */
+  async notifyPaid(order: OrderRecord): Promise<void> {
+    await this.notifier.notify('order.paid', { order: buildNotifierOrder(order) });
+  }
+
   // ── Müşteri okuma ────────────────────────────────────────────────────────────
 
   /** `GET /me/orders` — yeni → eski, en çok ME_ORDERS_LIMIT (zarf `{items,total}`; F6 iskeletiyle aynı). */
@@ -372,7 +404,7 @@ export class OrdersService {
     return toOrderDto(row);
   }
 
-  /** `GET /orders/:orderNo/status` — sepet.html `?siparis=`. */
+  /** `GET /orders/:orderNo/status` — sepet.html `?siparis=` (F8: 2 s polling; paidAt + subscriptionStatus). */
   async getStatusForUser(userId: string, orderNo: number): Promise<OrderStatusResponse> {
     const row = await this.repo.findForUser(userId, orderNo);
     if (!row) throw new NotFoundException({ message: 'Sipariş bulunamadı', error: 'ORDER_NOT_FOUND' });
@@ -447,6 +479,16 @@ export class OrdersService {
 
   async findRecordByOrderNo(orderNo: number, tx?: Tx): Promise<OrderRecord | null> {
     return this.repo.findByOrderNo(orderNo, tx);
+  }
+
+  /** F8 checkout: kullanıcının ödemesi tamamlanmamış checkout siparişleri (yeni → eski). */
+  findOpenCheckoutOrdersForUser(userId: string, tx?: Tx): Promise<OrderRecord[]> {
+    return this.repo.findOpenCheckoutOrdersForUser(userId, tx);
+  }
+
+  /** F8 `payments:reconcile`: ödemesiz kalmış eski checkout siparişleri. */
+  findStaleUnpaidOrders(olderThan: Date, take = 200, tx?: Tx): Promise<OrderRecord[]> {
+    return this.repo.findStaleUnpaidOrders(olderThan, take, tx);
   }
 
   private async requireOrder(id: string): Promise<OrderRecord> {
@@ -585,6 +627,48 @@ export function snapshotFromSubscription(cycle: CycleForOrderRecord): { customer
     ? { fullName: addr.fullName, phone: addr.phone, line: addr.line, zoneId: addr.zoneId, zoneName: addr.zone.name, zip: addr.zip }
     : { fullName: name, phone, line: '', zoneId: sub.zoneId, zoneName: sub.zone.name, zip: null };
   return { customer: { name, email: clip(sub.user.email, 160), phone }, address };
+}
+
+/** Order kaydı → Notifier `order.paid` yükü (sipariş özeti + onaylanan yasal belgelerin politikalar.html#slug bağlantıları). */
+export function buildNotifierOrder(order: OrderRecord): NotifierOrder {
+  const base = webUrl();
+  const snapshot = (order.addressSnapshot ?? {}) as Partial<AddressSnapshot>;
+  const seen = new Set<string>();
+  const legalDocuments = order.consents
+    .filter((c) => c.granted && c.document !== null)
+    .map((c) => c.document!)
+    .filter((d) => {
+      const key = `${d.slug}:${d.version}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((d) => ({ slug: d.slug, version: d.version, title: d.title, url: `${base}/politikalar.html#${d.slug}` }));
+  return {
+    id: order.id,
+    orderNo: order.orderNo,
+    kind: order.kind,
+    status: order.status,
+    customerEmail: order.customerEmail,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    deliveryOn: utcToIsoDate(order.deliveryOn),
+    deliveryDay: order.deliveryDay,
+    addressLine: snapshot.line ?? '',
+    zoneName: snapshot.zoneName ?? order.zone?.name ?? '',
+    lines: order.lines.map((l) => ({ kind: l.kind, name: l.name, qty: num(l.qty), unit: l.unit, pref: l.pref, lineTotal: toMoney(l.lineTotal) })),
+    subtotal: toMoney(order.subtotal),
+    discountTotal: toMoney(order.discountTotal),
+    shippingFee: toMoney(order.shippingFee),
+    vatTotal: toMoney(order.vatTotal),
+    grandTotal: toMoney(order.grandTotal),
+    couponCode: order.couponCode,
+    isSubscription: order.kind === OrderKind.SUBSCRIPTION,
+    isOneTimeBox: order.kind === OrderKind.BOX_ONE_TIME,
+    paidAt: order.paidAt ?? new Date(),
+    legalDocuments,
+    orderUrl: `${base}/uyelik.html`,
+  };
 }
 
 /** Admin sorgu → filtre: from/to Europe/Istanbul takvim günü (dahil) → UTC instant; deliveryOn → UTC gece yarısı. */

@@ -27,6 +27,9 @@ const BahcedenCart = (function () {
     // F6 auth: üyelik/oturum/adres artık sunucuda (bootstrap me + /me/address) — eski prototip
     // anahtarları okunmaz da yazılmaz da; kalıntı varsa temizlenir. bahceden_cart/prefs/sub taslağı kalır.
     ["bahceden_member", "bahceden_session", "bahceden_address"].forEach((k) => localStorage.removeItem(k));
+    // F8 checkout: kart ve sipariş geçmişi de sunucuda (PaymentMethod / Order: /me/cards, /me/orders) — prototip
+    // anahtarları okunmaz/yazılmaz; kalıntı silinir. bahceden_sub taslağı yalnız satın alma tamamlanınca temizlenir.
+    ["bahceden_card", "bahceden_orders"].forEach((k) => localStorage.removeItem(k));
   } catch (e) { /* eski tarayıcıda sessizce geç */ }
 
   function readJSON(key, fallback) {
@@ -720,33 +723,12 @@ const BahcedenCart = (function () {
     updateBadge();
   }
 
-  // ---- Sipariş geçmişi — üyelik sayfasındaki "önceki siparişler" alanı
-  // buradan beslenir. Her tamamlanan ödeme bir kayıt düşer (en yeni üstte).
-  const ORDERS_KEY = "bahceden_orders";
-
-  function getOrders() {
-    return readJSON(ORDERS_KEY, []);
-  }
-  function addOrder(order) {
-    const orders = getOrders();
-    // Sıralı sipariş numarası — ilk sipariş #1001, sonrakiler artarak.
-    order.no = orders.length && orders[0].no ? orders[0].no + 1 : 1001;
-    orders.unshift(order);
-    writeJSON(ORDERS_KEY, orders);
-  }
-
-  // Seçilen teslimat gününün gerçekleşeceği tarih: haftanın bir sonraki o
-  // günü; gün kilitliyse (kesim geçti / bugün) bir hafta sonrası.
-  const DELIVERY_WEEKDAY = { sali: 2, persembe: 4, cumartesi: 6 };
-  function nextDeliveryDate(dayId) {
-    const target = DELIVERY_WEEKDAY[dayId];
-    if (target === undefined) return null;
-    const d = new Date();
-    let diff = (target - d.getDay() + 7) % 7;
-    if (lockedDeliveryDay() === dayId) diff = diff === 0 ? 7 : diff + 7;
-    d.setDate(d.getDate() + diff);
-    d.setHours(0, 0, 0, 0);
-    return d;
+  // F8 checkout: sipariş geçmişi (bahceden_orders, getOrders/addOrder) ve nextDeliveryDate kalktı — siparişler
+  // sunucuda (GET /me/orders), teslimat tarihi DeliveryDate'ten (GET /delivery/dates). Satın alma sonrası
+  // kutu taslağı temizlenir (clearSubDraft).
+  function clearSubDraft() {
+    try { localStorage.removeItem(SUB_KEY); } catch (e) { /* yok say */ }
+    updateBadge();
   }
 
   // ---- F6 auth: API yardımcısı — BahcedenCart.api(path, {method, body}) (BACKEND-PLANI §1.2, F6 sözleşmesi) ----
@@ -990,6 +972,164 @@ const BahcedenCart = (function () {
     });
   }
 
+  // ---- F8 checkout: sepet → sipariş akışı yardımcıları (BACKEND-PLANI §3 checkout/orders/me satırları, ADR-0019) ----
+  // Fiyat hesabı istemcide YAPILMAZ (P1): özet POST /checkout/quote'tan; sipariş POST /checkout; sonuç
+  // GET /orders/:orderNo/status ile izlenir (PayTR iFrame callback'i sunucuya düşer). Kutu taslağı
+  // (bahceden_sub: active && !purchased) ve tekil satırlar (bahceden_cart) tek yükte gönderilir.
+  const FREQ_WEEKS_BY_ID = { "1hafta": 1, "2hafta": 2, "4hafta": 4 };
+  function freqWeeks(freqId) {
+    if (FREQ_WEEKS_BY_ID[freqId]) return FREQ_WEEKS_BY_ID[freqId];
+    const m = /^(\d+)hafta$/.exec(String(freqId || ""));
+    return m ? parseInt(m[1], 10) : 1;
+  }
+  // Sepetteki tekil satırlar → {id (slug), qty, pref?} (pref yalnız doluysa gönderilir).
+  function checkoutLines() {
+    return getCart()
+      .filter((item) => item && item.id && item.qty > 0)
+      .map((item) => (item.pref ? { id: item.id, qty: item.qty, pref: item.pref } : { id: item.id, qty: item.qty }));
+  }
+  // Sepetteki kutu taslağı → box yükü; kutu yoksa null. (Satın alınmış abonelik sepette değildir: purchased → null.)
+  function checkoutBox() {
+    const sub = getSub();
+    if (!sub.active || sub.purchased || !sub.tierId) return null;
+    if (typeof SUB_TIERS !== "undefined" && !SUB_TIERS.some((t) => t.id === sub.tierId)) return null;
+    const box = {
+      tier: sub.tierId,
+      items: (sub.items || []).slice(),
+      extras: (sub.extras || []).map((ex) => ({ id: ex.id, factor: ex.factor, label: ex.label })),
+      isOneTime: sub.type === "onetime",
+      frequencyWeeks: freqWeeks(sub.freq),
+    };
+    if (sub.deliveryDay) box.deliveryDay = sub.deliveryDay;
+    // Kutu içi ürün tercihleri (kutu.html "nasıl istersin": {slug: etiket}) → cycle#1 CycleItem.pref (B DTO: box.itemPrefs).
+    const prefs = sub.itemPrefs && typeof sub.itemPrefs === "object" ? sub.itemPrefs : null;
+    if (prefs && Object.keys(prefs).some((k) => prefs[k])) {
+      box.itemPrefs = {};
+      Object.keys(prefs).forEach((k) => { if (prefs[k]) box.itemPrefs[k] = String(prefs[k]); });
+    }
+    return box;
+  }
+  // Teklif/sipariş yükünün ortak parçası: {lines, box?}. Boş sepette {lines:[]}.
+  function buildCheckoutPayload() {
+    const payload = { lines: checkoutLines() };
+    const box = checkoutBox();
+    if (box) payload.box = box;
+    return payload;
+  }
+  function hasCheckoutItems() {
+    return checkoutLines().length > 0 || !!checkoutBox();
+  }
+  // POST /checkout/quote (misafir de çağırabilir) → PricingResult + couponStatus.
+  function quoteCheckout(extra) {
+    return api("/checkout/quote", { method: "POST", body: Object.assign(buildCheckoutPayload(), extra || {}) });
+  }
+  // POST /checkout (oturumlu) → {orderNo, orderId, status, payment:{provider, checkoutFormContent?, redirectUrl?, token?}}.
+  function submitCheckout(fields) {
+    return api("/checkout", { method: "POST", body: Object.assign(buildCheckoutPayload(), fields || {}) });
+  }
+  // GET /orders/:orderNo/status (sahibi) → {status, paymentStatus, paidAt?, subscriptionStatus?, subscriptionId?}.
+  function orderStatus(orderNo) {
+    return api("/orders/" + encodeURIComponent(orderNo) + "/status");
+  }
+  // Sipariş durumunu aralıklarla sorar; PAID (ya da sonrası) / kesin başarısızlıkta çözülür, süre dolunca {timedOut:true}.
+  // onTick(status) her yanıtta çağrılır. Dönen promise'in stop() yöntemiyle durdurulur (sayfa görünümü değişince).
+  function pollOrderStatus(orderNo, opts) {
+    opts = opts || {};
+    const intervalMs = opts.intervalMs || 2000;
+    const timeoutMs = opts.timeoutMs || 120000;
+    const startedAt = Date.now();
+    let stopped = false;
+    let timer = null;
+    const promise = new Promise((resolve) => {
+      function tick() {
+        if (stopped) return;
+        orderStatus(orderNo).then(
+          (s) => {
+            if (stopped) return;
+            if (typeof opts.onTick === "function") { try { opts.onTick(s); } catch (e) { /* sayfa kendi hatasını yönetir */ } }
+            const st = s && s.status;
+            if (st === "PAID" || st === "PREPARING" || st === "OUT_FOR_DELIVERY" || st === "DELIVERED") return resolve({ ok: true, status: s });
+            if (st === "PAYMENT_FAILED" || st === "CANCELLED") return resolve({ ok: false, status: s });
+            if (Date.now() - startedAt >= timeoutMs) return resolve({ ok: false, timedOut: true, status: s });
+            timer = setTimeout(tick, intervalMs);
+          },
+          (err) => {
+            if (stopped) return;
+            // Oturum düştüyse ya da sipariş bulunamıyorsa (404: sahibi değil / yok) beklemenin anlamı yok; diğer hatalarda (ağ) denemeye devam.
+            if (err && (err.status === 401 || err.status === 404)) return resolve({ ok: false, error: err });
+            if (Date.now() - startedAt >= timeoutMs) return resolve({ ok: false, timedOut: true, error: err });
+            timer = setTimeout(tick, intervalMs);
+          },
+        );
+      }
+      tick();
+    });
+    promise.stop = function () { stopped = true; if (timer) clearTimeout(timer); };
+    return promise;
+  }
+  // GET /delivery/dates?zone= → [{id?, day, date, cutoffAtIso, locked, full}] (bölge başına 60 s önbellek).
+  const deliveryDatesCache = {};
+  function loadDeliveryDates(zoneSlug, weeks) {
+    const zone = zoneSlug || "urla";
+    const key = zone + ":" + (weeks || 4);
+    const hit = deliveryDatesCache[key];
+    if (hit && Date.now() - hit.at < 60000) return Promise.resolve(hit.dates);
+    return api("/delivery/dates?zone=" + encodeURIComponent(zone) + (weeks ? "&weeks=" + weeks : "")).then((dates) => {
+      const list = Array.isArray(dates) ? dates : [];
+      deliveryDatesCache[key] = { at: Date.now(), dates: list };
+      return list;
+    });
+  }
+  // Checkout'ta onay gerektiren belgeler: sayfaya gömülü __BAGDAM_CHECKOUT__.legal (WebController) ya da GET /legal.
+  function loadLegalRequiresAck() {
+    const embedded = typeof window.__BAGDAM_CHECKOUT__ === "object" && window.__BAGDAM_CHECKOUT__ && window.__BAGDAM_CHECKOUT__.legal;
+    if (Array.isArray(embedded)) return Promise.resolve(embedded);
+    return api("/legal").then((docs) =>
+      (Array.isArray(docs) ? docs : [])
+        .filter((d) => d && d.requiresAck)
+        .map((d) => ({ slug: d.slug, kind: d.kind, title: d.title, version: d.version })),
+    );
+  }
+  // Satın alınmış abonelik (GET /me/subscription) → bootstrap sub alanına yazılır; getSub()/hasPurchasedSub() onu okur.
+  // F8'de minimal gösterim için (uyelik/sepet); bootstrap.sub sunucudan F9'da gelir. Oturum yoksa null.
+  function loadSubscription() {
+    if (!isLoggedIn()) return Promise.resolve(null);
+    return api("/me/subscription").then((sub) => {
+      if (typeof window.__BAGDAM__ !== "object" || !window.__BAGDAM__) window.__BAGDAM__ = {};
+      window.__BAGDAM__.sub = sub && typeof sub === "object" ? sub : null;
+      updateBadge();
+      return window.__BAGDAM__.sub;
+    });
+  }
+  // Saklı kartlar (PaymentMethod): GET /me/cards · DELETE /me/cards/:id · POST /me/cards/add-session (PayTR'de 501: kart ilk ödemede saklanır).
+  function listCards() {
+    return api("/me/cards").then((cards) => (Array.isArray(cards) ? cards : (cards && Array.isArray(cards.items) ? cards.items : [])));
+  }
+  function removeCard(id) {
+    return api("/me/cards/" + encodeURIComponent(id), { method: "DELETE" });
+  }
+  function cardAddSession() {
+    return api("/me/cards/add-session", { method: "POST", body: {} });
+  }
+  // Siparişler: GET /me/orders → {items:[OrderSummary], total} · GET /me/orders/:orderNo → Order (satırlar dahil).
+  function listOrders() {
+    return api("/me/orders").then((res) => (res && Array.isArray(res.items) ? res.items : (Array.isArray(res) ? res : [])));
+  }
+  function getOrder(orderNo) {
+    return api("/me/orders/" + encodeURIComponent(orderNo));
+  }
+  // Aktif aboneye: sepetteki tekil satırları bu haftaki kutuya taşı (POST /me/subscription/cycles/current/merge-cart).
+  function mergeCartIntoBox() {
+    const lines = checkoutLines();
+    if (!lines.length) return Promise.resolve(null);
+    return api("/me/subscription/cycles/current/merge-cart", { method: "POST", body: { lines: lines } }).then((sub) => {
+      if (typeof window.__BAGDAM__ !== "object" || !window.__BAGDAM__) window.__BAGDAM__ = {};
+      if (sub && typeof sub === "object") window.__BAGDAM__.sub = sub;
+      setCart([]);
+      return sub;
+    });
+  }
+
   // Wires the shared login/signup auth-gate markup (#checkoutAuth + its tabs
   // and forms — same ids on every page that uses it) to show `gatedElId`
   // only once logged in. Returns the refresh function so the page can
@@ -1152,15 +1292,8 @@ const BahcedenCart = (function () {
     return refresh;
   }
 
-  // ---- Saved card (üyelik.html) ----
-  const CARD_KEY = "bahceden_card";
-
-  function getCard() {
-    return readJSON(CARD_KEY, null);
-  }
-  function setCard(card) {
-    writeJSON(CARD_KEY, card);
-  }
+  // F8 checkout: saklı kart (bahceden_card, getCard/setCard) kalktı — kart verisi hiçbir zaman istemcide tutulmaz;
+  // PSP token'ı PaymentMethod'da (GET /me/cards). Kart ilk ödemede (PayTR iFrame, store_card) saklanır.
 
   function freshProducts() {
     if (typeof PRODUCTS === "undefined") return [];
@@ -1526,9 +1659,12 @@ const BahcedenCart = (function () {
     getSub, setSub, subSetTier, subTier, subSwapItem, subToggleSkip, subCancel, subSetItemPref,
     subSetFreq, subSetDeliveryDay, subSetType, subDeliveryFee,
     subExtraOptions, subExtraPrice, subExtrasTotal, subAddExtra, subRemoveExtra,
-    getAddress, setAddress, loadAddress, loadZones, getZones, zoneName, zoneSlugFor, getOrders, addOrder, nextDeliveryDate,
+    getAddress, setAddress, loadAddress, loadZones, getZones, zoneName, zoneSlugFor,
     // F6 auth: api() sözleşmesi + oturum (me/isLoggedIn bootstrap'tan; logout; getMember/setMember/setLoggedIn kalktı)
-    api, me, isLoggedIn, hasPurchasedSub, setSessionUser, logout, getResetToken, wireAuthGate, getCard, setCard,
+    api, me, isLoggedIn, hasPurchasedSub, setSessionUser, logout, getResetToken, wireAuthGate,
+    // F8 checkout: getOrders/addOrder/nextDeliveryDate/getCard/setCard kalktı; yerine sunucu uçları
+    clearSubDraft, buildCheckoutPayload, hasCheckoutItems, quoteCheckout, submitCheckout, orderStatus, pollOrderStatus,
+    loadDeliveryDates, loadLegalRequiresAck, loadSubscription, listCards, removeCard, cardAddSession, listOrders, getOrder, mergeCartIntoBox,
     freshProducts, nextCutoff, formatCountdown, lockedDeliveryDay, lockedDayNote,
   };
 })();

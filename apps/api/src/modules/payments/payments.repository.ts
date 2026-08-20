@@ -23,8 +23,16 @@ export const PAYMENT_WITH_ORDER_INCLUDE = {
 } satisfies Prisma.PaymentInclude;
 export type PaymentWithOrderRecord = Prisma.PaymentGetPayload<{ include: typeof PAYMENT_WITH_ORDER_INCLUDE }>;
 
+/** PaymentMethod + sahibi (F8: PayTR kayıtlı kart tahsilatında e-posta/ad zorunlu). */
+export const PAYMENT_METHOD_WITH_USER_INCLUDE = {
+  user: { select: { id: true, email: true, name: true } },
+} satisfies Prisma.PaymentMethodInclude;
+export type PaymentMethodWithUserRecord = Prisma.PaymentMethodGetPayload<{ include: typeof PAYMENT_METHOD_WITH_USER_INCLUDE }>;
+
 export type PaymentCreateData = Prisma.PaymentUncheckedCreateInput;
 export type PaymentUpdateData = Prisma.PaymentUncheckedUpdateInput;
+export type PaymentMethodCreateData = Prisma.PaymentMethodUncheckedCreateInput;
+export type PaymentMethodUpdateData = Prisma.PaymentMethodUncheckedUpdateInput;
 export type RefundCreateData = Prisma.RefundUncheckedCreateInput;
 export type RefundUpdateData = Prisma.RefundUncheckedUpdateInput;
 export type WebhookEventCreateData = Prisma.WebhookEventUncheckedCreateInput;
@@ -32,11 +40,16 @@ export type WebhookEventUpdateData = Prisma.WebhookEventUncheckedUpdateInput;
 
 /**
  * PaymentsRepository — Payment / Refund / WebhookEvent / PaymentMethod; Prisma YALNIZ burada (ADR-0002).
- * Zaman: ham SQL yok; tüm anlar çağıranın verdiği Date (ADR-0004). Durum geçişleri servis katmanında (state machine).
+ * Zaman: ham SQL'de now() yok; tüm anlar çağıranın verdiği Date (ADR-0004). Durum geçişleri servis katmanında (state machine).
  */
 @Injectable()
 export class PaymentsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Verilen `tx` varsa onun içinde, yoksa yeni interaktif işlemde çalıştırır (F8 callback yerleşimi). */
+  transaction<T>(fn: (tx: DbClient) => Promise<T>, tx?: DbClient): Promise<T> {
+    return tx ? fn(tx) : this.prisma.$transaction((db) => fn(db));
+  }
 
   // ── Payment ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -54,6 +67,29 @@ export class PaymentsRepository {
 
   findPaymentByConversationId(conversationId: string, tx?: DbClient): Promise<PaymentRecord | null> {
     return (tx ?? this.prisma).payment.findUnique({ where: { conversationId } });
+  }
+
+  /**
+   * PayTR `merchant_oid` / `callback_id` → Payment (F8). Sıra: tam conversationId → providerPaymentId → providerToken →
+   * conversationId'nin alfanümerik indirgenmişi (`cyc_<id>_2` → `cyc<id>2`; `regexp_replace`, ham SQL — now() yok).
+   * Birden fazla aday (teorik çakışma) → null (çağıran loglar; yanlış ödeme kapatılmaz).
+   */
+  async findPaymentByMerchantOid(merchantOid: string, tx?: DbClient): Promise<PaymentRecord | null> {
+    const db = tx ?? this.prisma;
+    const exact = await db.payment.findUnique({ where: { conversationId: merchantOid } });
+    if (exact) return exact;
+    const byRef = await db.payment.findMany({
+      where: { OR: [{ providerPaymentId: merchantOid }, { providerToken: merchantOid }] },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
+    });
+    if (byRef.length === 1) return byRef[0];
+    if (byRef.length > 1) return null;
+    const rows = await db.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`SELECT "id" FROM "payments" WHERE regexp_replace("conversationId", '[^A-Za-z0-9]', '', 'g') = ${merchantOid} ORDER BY "createdAt" DESC LIMIT 2`,
+    );
+    if (rows.length !== 1) return null;
+    return db.payment.findUnique({ where: { id: rows[0].id } });
   }
 
   findPaymentByLinkToken(linkToken: string, tx?: DbClient): Promise<PaymentWithOrderRecord | null> {
@@ -84,6 +120,76 @@ export class PaymentsRepository {
 
   findPaymentMethodById(id: string, tx?: DbClient): Promise<PaymentMethodRecord | null> {
     return (tx ?? this.prisma).paymentMethod.findUnique({ where: { id } });
+  }
+
+  findPaymentMethodWithUser(id: string, tx?: DbClient): Promise<PaymentMethodWithUserRecord | null> {
+    return (tx ?? this.prisma).paymentMethod.findUnique({ where: { id }, include: PAYMENT_METHOD_WITH_USER_INCLUDE });
+  }
+
+  /** Aynı kullanıcı + sağlayıcı + kart token'ı (PayTR ctoken) — silinmemiş satır (callback'te ikinci kez gelen kart yeniden yazılmaz). */
+  findPaymentMethodByToken(userId: string, provider: PaymentProviderEnum, providerCardToken: string, tx?: DbClient): Promise<PaymentMethodRecord | null> {
+    return (tx ?? this.prisma).paymentMethod.findFirst({
+      where: { userId, provider, providerCardToken, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  createPaymentMethod(data: PaymentMethodCreateData, tx?: DbClient): Promise<PaymentMethodRecord> {
+    return (tx ?? this.prisma).paymentMethod.create({ data });
+  }
+
+  updatePaymentMethod(id: string, data: PaymentMethodUpdateData, tx?: DbClient): Promise<PaymentMethodRecord> {
+    return (tx ?? this.prisma).paymentMethod.update({ where: { id }, data });
+  }
+
+  /** Kullanıcının diğer kartlarını varsayılan olmaktan çıkarır (yeni kart varsayılan). */
+  async clearDefaultPaymentMethods(userId: string, exceptId: string, tx?: DbClient): Promise<number> {
+    const r = await (tx ?? this.prisma).paymentMethod.updateMany({ where: { userId, isDefault: true, NOT: { id: exceptId } }, data: { isDefault: false } });
+    return r.count;
+  }
+
+  // ── F8 (B) — checkout / reconcile / me-cards ─────────────────────────────────────────────────────────────────────
+
+  /** conversationId → Payment + sipariş özeti (CheckoutCompletionService). */
+  findPaymentWithOrderByConversationId(conversationId: string, tx?: DbClient): Promise<PaymentWithOrderRecord | null> {
+    return (tx ?? this.prisma).payment.findUnique({ where: { conversationId }, include: PAYMENT_WITH_ORDER_INCLUDE });
+  }
+
+  /**
+   * `payments:reconcile`: verilen türlerde, hâlâ açık (PENDING | REQUIRES_3DS) ve `createdAt <= olderThan` ödemeler
+   * (sipariş özeti ile) — eski → yeni, en çok `take`.
+   */
+  findStaleOpenPayments(
+    kinds: readonly ('CHECKOUT' | 'CYCLE_CHARGE' | 'DELTA' | 'RETRY' | 'LINK')[],
+    statuses: readonly PaymentStatus[],
+    olderThan: Date,
+    take: number,
+    tx?: DbClient,
+  ): Promise<PaymentWithOrderRecord[]> {
+    return (tx ?? this.prisma).payment.findMany({
+      where: { kind: { in: [...kinds] }, status: { in: [...statuses] }, createdAt: { lte: olderThan } },
+      orderBy: { createdAt: 'asc' },
+      take,
+      include: PAYMENT_WITH_ORDER_INCLUDE,
+    });
+  }
+
+  /** Kullanıcının aktif (silinmemiş) saklı kartları — varsayılan önce, sonra yeni → eski (`GET /me/cards`). */
+  findActivePaymentMethodsForUser(userId: string, tx?: DbClient): Promise<PaymentMethodRecord[]> {
+    return (tx ?? this.prisma).paymentMethod.findMany({
+      where: { userId, isActive: true, deletedAt: null },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  /** Kullanıcının aktif saklı kartı (sahiplik denetimiyle). */
+  findActivePaymentMethodForUser(id: string, userId: string, tx?: DbClient): Promise<PaymentMethodRecord | null> {
+    return (tx ?? this.prisma).paymentMethod.findFirst({ where: { id, userId, isActive: true, deletedAt: null } });
+  }
+
+  /** `DELETE /me/cards/:id` → isActive=false (+ deletedAt); satır kalır (Payment/Subscription FK'leri). */
+  deactivatePaymentMethod(id: string, now: Date, tx?: DbClient): Promise<PaymentMethodRecord> {
+    return (tx ?? this.prisma).paymentMethod.update({ where: { id }, data: { isActive: false, isDefault: false, deletedAt: now } });
   }
 
   // ── Refund ────────────────────────────────────────────────────────────────────────────────────────────────────────

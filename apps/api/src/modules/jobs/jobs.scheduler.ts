@@ -45,6 +45,11 @@ export class JobsScheduler {
     return this.fire('reminders:cutoff');
   }
 
+  @Cron('*/15 * * * *', { name: 'payments:reconcile', timeZone: TZ })
+  paymentsReconcile(): Promise<void> {
+    return this.fire('payments:reconcile');
+  }
+
   private async fire(name: string): Promise<void> {
     try {
       await this.jobs.runOnce(name, new Date());

@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { JOB_NAME_VALUES, type JobInfo, type JobName, type JobRunResult } from '@bagdam/shared';
 import { randomUUID } from 'crypto';
 import { RequestContext } from '../../common/request-context';
+import { CheckoutCompletionService } from '../checkout/checkout-completion.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { CyclesService } from '../subscriptions/services/cycles.service';
 import { JobsRepository, type CronLogRecord } from './jobs.repository';
@@ -54,6 +55,7 @@ export class JobsService {
     private readonly repo: JobsRepository,
     private readonly delivery: DeliveryService,
     private readonly cycles: CyclesService,
+    private readonly checkout: CheckoutCompletionService,
   ) {
     const defs: JobDefinition[] = [
       {
@@ -108,6 +110,15 @@ export class JobsService {
         run: async (now) => {
           const r = await this.cycles.remindCutoffs(now);
           return { itemsProcessed: r.itemsProcessed, errors: r.errors, details: { ...r } };
+        },
+      },
+      {
+        name: 'payments:reconcile',
+        cron: '*/15 * * * *',
+        description: 'F8: açık kalmış checkout ödemeleri — 30 dk sonra sağlayıcı sorgusu (SUCCEEDED/FAILED), 24 s sonra EXPIRED + Order CANCELLED + DD iade (+ abonelik PENDING→CANCELLED); ödemesiz eski siparişler iptal.',
+        run: async (now) => {
+          const r = await this.checkout.reconcile(now);
+          return { itemsProcessed: r.checked + r.staleOrdersCancelled, errors: r.errors, details: { ...r } };
         },
       },
     ];

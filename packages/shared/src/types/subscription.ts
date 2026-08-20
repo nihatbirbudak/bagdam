@@ -389,7 +389,8 @@ export type JobName =
   | 'cycles:lock-and-charge'
   | 'cycles:expire-payment-links'
   | 'payments:retry'
-  | 'reminders:cutoff';
+  | 'reminders:cutoff'
+  | 'payments:reconcile'; // F8: PENDING kalmış checkout ödemeleri (sağlayıcı sorgusu / 24 s EXPIRED + Order CANCELLED + DD iade)
 export const JOB_NAME_VALUES: readonly JobName[] = [
   'delivery-dates:generate',
   'cycles:ensure',
@@ -397,6 +398,7 @@ export const JOB_NAME_VALUES: readonly JobName[] = [
   'cycles:expire-payment-links',
   'payments:retry',
   'reminders:cutoff',
+  'payments:reconcile',
 ];
 
 /** Bir job koşusunun sonucu (CronLog satırıyla aynı alanlar). */

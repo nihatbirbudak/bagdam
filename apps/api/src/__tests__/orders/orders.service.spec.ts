@@ -235,7 +235,7 @@ describe('OrdersService — createFromQuote · transition · cancel · createFor
     expect(detail.addressSnapshot).toEqual(fx.address);
     await expectHttpError(t.orders.getForUser('clbaskasiclbaskasiclbaska', firstOrderNo), NotFoundException, 'ORDER_NOT_FOUND');
     const status = await t.orders.getStatusForUser(fx.userId, firstOrderNo);
-    expect(status).toEqual({ orderNo: firstOrderNo, status: 'DELIVERED', paymentStatus: null, subscriptionId: null });
+    expect(status).toEqual({ orderNo: firstOrderNo, status: 'DELIVERED', paymentStatus: null, paidAt: expect.any(String), subscriptionId: null, subscriptionStatus: null });
   });
 
   describe('cycle siparişleri (createForCycle · createDeltaForCycle)', () => {

@@ -103,11 +103,16 @@ export class SubscriptionsDepsAdapter implements SubscriptionsDeps {
     const extras = cycle.items
       .filter(isExtraItem)
       .map((i) => ({ unitPrice: i.unitPrice !== null ? money(i.unitPrice) : money(i.product.price), factor: Number(i.qty.toString()) }));
+    // F8 KARAR (SİSTEM-DURUMU F7 notu): cycle#1 (checkout Order'ı bağlı) → kargo checkout Order.shippingFee'de tahsil edildi,
+    // prepaidAmount kargo HARİÇ (kutu + ekstralar − indirim) → kesimde DELTA'da kargo yok (tek seferlik kutu dahil).
+    const checkoutPaidCycle = cycle.cycleNo === 1 && cycle.orderId !== null;
     return this.pricingService.cycleCharge({
       boxPrice: money(sub.tier.price),
       extras,
       isOneTime: sub.isOneTime,
-      zone: { fee: money(sub.zone.fee), freeThreshold: sub.zone.freeThreshold !== null ? money(sub.zone.freeThreshold) : null },
+      zone: checkoutPaidCycle
+        ? { fee: 0, freeThreshold: null }
+        : { fee: money(sub.zone.fee), freeThreshold: sub.zone.freeThreshold !== null ? money(sub.zone.freeThreshold) : null },
       firstBoxesLeft: sub.discountBoxesLeft,
       retentionPct: sub.nextBoxDiscountPct,
       prepaidAmount: money(cycle.prepaidAmount),

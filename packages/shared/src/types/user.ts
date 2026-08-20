@@ -1,6 +1,7 @@
 // ── Kullanıcı / adres / kimlik DTO'ları ──────────────────────────────────────
 import type { ConsentKind, UserRole } from '../enums';
 import type { Id, IsoDateTime } from './common';
+import type { OrderSummary } from './order';
 
 /** User — parola/refresh/reset alanları ASLA DTO'ya çıkmaz. */
 export interface User {
@@ -278,7 +279,9 @@ export interface AdminCustomerDetail extends AdminCustomerListItem {
   address: MeAddress | null;
   consents: AdminCustomerConsent[];
   audit: AdminCustomerAuditItem[];
-  orders: unknown[];
+  /** F8: müşterinin son siparişleri (OrderSummary; en yeni üstte, en çok ME_ORDERS_LIMIT) — tamamı `GET /admin/orders?q=<e-posta>`. */
+  orders: OrderSummary[];
+  /** F9: abonelik özeti (şimdilik null). */
   subscription: null;
 }
 

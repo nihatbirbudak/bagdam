@@ -13,7 +13,9 @@ import { PrismaModule } from './common/prisma.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { CheckoutModule } from './modules/checkout/checkout.module';
 import { ContentModule } from './modules/content/content.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
@@ -67,12 +69,14 @@ new Logger('AppModule').log(
     ContentModule, // F5: site-content/posts/legal/consents (+ /admin/*) + sitemap.xml/robots.txt; WebModule ContentService'i kullanır
     SettingsModule, // F5: /api/v1/admin/settings (registry şemalı gruplar, sırlar AES-256-GCM); DeliveryModule Setting'i buradan okur
     DeliveryModule, // F5: /api/v1/delivery/* (public) + /admin/delivery/* (bölge CRUD, tarih üretimi); bootstrap cache'i düşürür · F7: DeliveryDatesService (atomik rezerv/iade, findOrCreateFor/nextFor, isLocked) — OrdersModule ORDERS_DEPS ve abonelik motoru bunu kullanır
-    PricingModule, // F7: PricingService (quote / cycleCharge — shared computeQuote + Setting commerce.* kuralları + DeliveryZone kargo + kullanıcı bağlamı); checkout (F8), manuel checkout ve abonelik motoru kullanır
+    CouponsModule, // F8: Coupon/CouponRedemption — CouponsService.validate (PricingService kupon uygulaması) + /admin/coupons CRUD
+    PricingModule, // F7: PricingService (quote / cycleCharge — shared computeQuote + Setting commerce.* kuralları + DeliveryZone kargo + kullanıcı bağlamı + F8 kupon); checkout (F8), manuel checkout ve abonelik motoru kullanır
     PaymentsModule, // F7: PaymentProvider (ManualProvider; PayTR F8 — ADR-0019) + ChargeStrategy (MIT / PAYMENT_LINK) + PaymentsService (Payment/Refund/WebhookEvent) + GET /api/v1/pay/:linkToken (JSON; ödeme sayfası F8)
     OrdersModule, // F7/B2: /api/v1/orders/* (müşteri iptal/durum) + /admin/orders (ekran 17) + OrdersService (F8 checkout, motor cycle Order'ları); ORDERS_DEPS = DeliveryDatesService
     WholesaleModule, // F5: POST /api/v1/wholesale-leads (3/dk/IP) + /admin/wholesale-leads
     SubscriptionsModule, // F7: /api/v1/me/subscription* + /admin/subscriptions|cycles|ops/* (motor; SUBSCRIPTIONS_DEPS = SubscriptionsDepsAdapter → Pricing/Payments/Orders/Delivery) + POST /admin/subscriptions (manuel checkout)
-    JobsModule, // F7: cron kayıt defteri + CronLog + @Cron (yalnız scheduler instance) + GET/POST /admin/jobs (run {now?} yalnız geliştirme/test)
+    CheckoutModule, // F8: POST /checkout/quote (@Public) + POST /checkout ($transaction: doğrula → DD rezerv → Order [+ Subscription PENDING + cycle#1] → Payment → sağlayıcı init) + CheckoutCompletionService (ödeme sonucu → PAID/ACTIVE/kupon/e-posta; payments:reconcile)
+    JobsModule, // F7: cron kayıt defteri + CronLog + @Cron (yalnız scheduler instance) + GET/POST /admin/jobs (run {now?} yalnız geliştirme/test) · F8: payments:reconcile
     WebModule,
   ],
   providers: [

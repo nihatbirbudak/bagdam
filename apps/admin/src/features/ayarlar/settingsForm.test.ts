@@ -4,6 +4,7 @@ import {
   isSettingsDraftDirty,
   normalizeSettingsGroup,
   normalizeSettingsGroups,
+  paymentModeWarnings,
   selectOptionsFor,
   toSettingsBody,
   toSettingsDraft,
@@ -104,5 +105,39 @@ describe('settingsForm — taslak ↔ gövde', () => {
     expect(isSettingsDraftDirty(MAIL_FIELDS, base, { ...base, host: 'x' })).toBe(true);
     expect(isSettingsDraftDirty(MAIL_FIELDS, base, { ...base, pass: 'yeni' })).toBe(true);
     expect(isSettingsDraftDirty(MAIL_FIELDS, base, { ...base, pass: '' })).toBe(false);
+  });
+});
+
+describe('settingsForm — Ödeme (ADR-0019 PayTR)', () => {
+  const PAYTR_FIELDS: AdminSettingField[] = [
+    { key: 'provider', label: 'Sağlayıcı', type: 'select', value: 'paytr' },
+    { key: 'paytrMerchantId', label: 'Mağaza no', type: 'text', value: '123456' },
+    { key: 'paytrMerchantKey', label: 'Key', type: 'secret', value: '••••••', hasValue: true },
+    { key: 'paytrMerchantSalt', label: 'Salt', type: 'secret', value: '', hasValue: false },
+    { key: 'paytrTestMode', label: 'Test modu', type: 'boolean', value: true },
+    { key: 'storedCardEnabled', label: 'Kayıtlı kart', type: 'boolean', value: false },
+    { key: 'enabled', label: 'Açık', type: 'boolean', value: true },
+  ];
+
+  it('sağlayıcı seçenekleri: paytr + manual (sunucu options vermezse); registry etiketleri paytr alanları için', () => {
+    expect(selectOptionsFor('payment', { key: 'provider', label: 'Sağlayıcı', type: 'select' }).map((o) => o.value)).toEqual(['paytr', 'manual']);
+    const g = normalizeSettingsGroup({ group: 'payment', fields: [{ key: 'paytrMerchantSalt', type: 'secret', value: '••••••', hasValue: true }, { key: 'paytrTestMode', type: 'boolean', value: true }] });
+    expect(g?.fields.map((f) => f.label)).toEqual(['PayTR merchant salt', 'PayTR test modu']);
+  });
+
+  it('uyarılar: test modu + eksik salt + kayıtlı kart kapalı; manuel sağlayıcı; ödeme kapalı; registry PayTR alanı yok', () => {
+    const codes = paymentModeWarnings({ fields: PAYTR_FIELDS }).map((w) => w.code);
+    expect(codes).toEqual(['PAYTR_TEST_MODE', 'PAYTR_CREDENTIALS_MISSING', 'STORED_CARD_OFF']);
+    expect(paymentModeWarnings({ fields: PAYTR_FIELDS }).find((w) => w.code === 'PAYTR_CREDENTIALS_MISSING')?.message).toContain('paytrMerchantSalt');
+
+    const live = PAYTR_FIELDS.map((f) => (f.key === 'paytrTestMode' ? { ...f, value: false } : f.key === 'paytrMerchantSalt' ? { ...f, value: '••••••', hasValue: true } : f.key === 'storedCardEnabled' ? { ...f, value: true } : f));
+    expect(paymentModeWarnings({ fields: live })).toEqual([]);
+
+    const manual = PAYTR_FIELDS.map((f) => (f.key === 'provider' ? { ...f, value: 'manual' } : f.key === 'enabled' ? { ...f, value: false } : f));
+    expect(paymentModeWarnings({ fields: manual }).map((w) => w.code)).toEqual(['MANUAL_PROVIDER', 'PAYMENTS_DISABLED']);
+
+    const legacy = [{ key: 'provider', label: 'Sağlayıcı', type: 'select', value: 'iyzico' } as AdminSettingField, { key: 'iyzicoApiKey', label: 'x', type: 'secret', hasValue: false } as AdminSettingField];
+    expect(paymentModeWarnings({ fields: legacy }).map((w) => w.code)).toEqual(['REGISTRY_NO_PAYTR', 'IYZICO_P2']);
+    expect(paymentModeWarnings(null)).toEqual([]);
   });
 });

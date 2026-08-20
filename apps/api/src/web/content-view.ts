@@ -143,6 +143,44 @@ export function buildLegalArticles(docs: readonly LegalDocLike[]): LegalArticleV
     }));
 }
 
+// ── Checkout (sepet.hbs) — F8: `window.__BAGDAM_CHECKOUT__` ───────────────────
+
+/** DeliveryService.listPublicZones() öğesi (DeliveryZonePublic ile aynı alanlar). */
+export interface DeliveryZoneLike {
+  id: string;
+  slug: string;
+  name: string;
+  fee: number;
+  freeThreshold: number | null;
+}
+
+/** Checkout'ta açık onay gerektiren belge (ADR-0003 istisna 3) — ham metin (JSON'a gider, sayfa JS'i kaçışlar). */
+export interface CheckoutLegalView {
+  slug: string;
+  kind: string;
+  title: string;
+  version: number;
+}
+
+export interface CheckoutBootstrapView {
+  legal: CheckoutLegalView[];
+  zones: DeliveryZoneLike[];
+}
+
+/**
+ * sepet.hbs `__BAGDAM_CHECKOUT__`: requiresAck belgeler (PREINFO / DISTANCE_SALES / SUBSCRIPTION_CONTRACT / KVKK — sayfa JS'i
+ * checkout'ta geçerli türleri ve abonelik koşulunu seçer; sortOrder sırası) + aktif teslimat bölgeleri (ilçe select).
+ */
+export function buildCheckoutBootstrap(docs: readonly LegalDocLike[], zones: readonly DeliveryZoneLike[]): CheckoutBootstrapView {
+  return {
+    legal: docs
+      .filter((d) => d.requiresAck)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((d) => ({ slug: d.slug, kind: d.kind, title: d.title, version: d.version })),
+    zones: zones.map((z) => ({ id: z.id, slug: z.slug, name: z.name, fee: z.fee, freeThreshold: z.freeThreshold })),
+  };
+}
+
 // ── Günlük yazıları (gunluk.hbs + index.hbs "son yazılar") ─────────────────────
 
 export interface PostLike {

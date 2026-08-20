@@ -6,7 +6,7 @@ import { APP_ROOT } from '../../config/paths';
  * MailModule sabitleri (F6, ADR-0014). Şablonlar SiteContent'te: anahtar `mail.<slug>` → `{subject, html}` (Handlebars);
  * kaynak liste site-content.registry.ts (grup `mail`) + seed database/seeds/content/site-content.json.
  */
-export const MAIL_TEMPLATE_SLUGS: readonly MailTemplateSlug[] = ['welcome', 'verify', 'reset', 'password-changed', 'wholesale-lead', 'test'];
+export const MAIL_TEMPLATE_SLUGS: readonly MailTemplateSlug[] = ['welcome', 'verify', 'reset', 'password-changed', 'wholesale-lead', 'test', 'order-paid'];
 
 /** SiteContent anahtar öneki: `mail.welcome` … */
 export const MAIL_SITE_CONTENT_PREFIX = 'mail.';

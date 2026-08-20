@@ -7,6 +7,7 @@ import {
   roundMoney,
   type Money,
   type PaymentLinkInfo,
+  type ProviderStoredCard,
   type WebhookRecordResult,
 } from '@bagdam/shared';
 import { Prisma, type PaymentKind, type PaymentProvider as PaymentProviderEnum, type PaymentStatus } from '@prisma/client';
@@ -72,24 +73,79 @@ export interface RecordWebhookInput {
   signatureValid: boolean;
 }
 
+// ── F8: ödeme sonucu dinleyicisi (callback/reconcile → sipariş/abonelik yan etkileri; döngüsel modül bağımlılığı olmadan) ───────
+
+/** `settle*` başarı bağlamı — sağlayıcı callback'inden (PayTR `merchant_oid` = Payment.conversationId) ya da reconcile'dan. */
+export interface PaymentSettleSuccess {
+  status: 'SUCCEEDED';
+  providerPaymentId?: string | null;
+  rawResponse?: unknown;
+  paidAt?: Date;
+  /** Sağlayıcının döndürdüğü saklı kart (PayTR utoken/ctoken) → PaymentMethod upsert (CheckoutCompletionService). */
+  storedCard?: ProviderStoredCard | null;
+  /** Olayın kaynağı (log/SubscriptionEvent aktörü): 'PSP' (callback) · 'SYSTEM' (reconcile) · 'USER'. */
+  actor?: 'PSP' | 'SYSTEM' | 'USER' | 'ADMIN';
+}
+
+export interface PaymentSettleFailure {
+  status: 'FAILED';
+  failureCode: string;
+  failureMessage?: string | null;
+  rawResponse?: unknown;
+  actor?: 'PSP' | 'SYSTEM' | 'USER' | 'ADMIN';
+}
+
+export type PaymentSettleInput = PaymentSettleSuccess | PaymentSettleFailure;
+
+/** `settleByConversationId` sonucu: Payment + (varsa) dinleyicinin uyguladığı sipariş sonucu. */
+export interface PaymentSettleResult {
+  payment: PaymentRecord;
+  /** Payment zaten bu durumdaydı (çift callback) — dinleyici yine çağrılır (idempotent yan etkiler). */
+  alreadySettled: boolean;
+  /** Dinleyici sonucu (CheckoutCompletionService: orderId/orderNo/orderStatus); kayıtlı dinleyici yoksa null. */
+  outcome: PaymentOutcomeResult | null;
+}
+
+export interface PaymentOutcomeResult {
+  orderId: string;
+  orderNo: number;
+  orderStatus: string;
+  subscriptionId: string | null;
+}
+
+/**
+ * Ödeme sonucu dinleyicisi — PaymentsModule'ü import EDEN üst modül (CheckoutModule → CheckoutCompletionService) kendini
+ * `PaymentsService.registerOutcomeListener` ile kaydeder; sağlayıcı callback'leri (PayTR) ve `payments:reconcile`
+ * `settleByConversationId` çağırır → Payment işaretlenir → dinleyici Order PAID/PAYMENT_FAILED + abonelik + kupon + e-posta yan etkilerini uygular.
+ * Böylece PaymentsModule OrdersModule/SubscriptionsModule'e bağımlı olmaz (döngü yok).
+ */
+export interface PaymentOutcomeListener {
+  onSucceeded(payment: PaymentRecord, ctx: PaymentSettleSuccess): Promise<PaymentOutcomeResult | null>;
+  onFailed(payment: PaymentRecord, ctx: PaymentSettleFailure): Promise<PaymentOutcomeResult | null>;
+}
+
 function prismaCode(err: unknown): string | null {
   return err instanceof Prisma.PrismaClientKnownRequestError ? err.code : null;
 }
 
 /**
- * PaymentsService — Payment / Refund / WebhookEvent yaşam döngüsü (state-machines §4; ADR-0006/0010).
+ * PaymentsService — Payment / Refund / WebhookEvent yaşam döngüsü (state-machines §4; ADR-0006/0010/0019).
  *  - Payment satırı yazmanın TEK yolu: `recordPayment` (conversationId idempotency) → `markSucceeded/markFailed/markExpired/markRequires3ds`
  *    (her biri `assertPaymentTransition`; geçersiz → 409 `INVALID_TRANSITION`).
- *  - Order/cycle/abonelik geçişleri BURADA DEĞİL (OrdersService / CyclesService — çağıran orkestre eder; §8).
+ *  - Order/cycle/abonelik geçişleri BURADA DEĞİL (OrdersService / CyclesService / CheckoutCompletionService — çağıran orkestre eder; §8).
+ *    F8: `settleByConversationId(merchant_oid, sonuç)` Payment'ı işaretler ve kayıtlı `PaymentOutcomeListener`'a (CheckoutCompletionService)
+ *    devreder — PayTR callback'i (A) ve `payments:reconcile` bunu çağırır.
  *  - `refund`: sağlayıcı iadesi + Refund satırı + Payment PARTIAL_REFUNDED/REFUNDED.
  *  - `recordWebhookEvent`: `@@unique(provider,eventType,providerRef)` → ikinci teslim `duplicate:true` + `IGNORED` (satır eklenmez);
  *    `markWebhookProcessed/Failed`.
  *  - `expireLinksDue(now)`: kind LINK, açık (PENDING|REQUIRES_3DS), `linkExpiresAt <= now` → EXPIRED (cycle tarafı `cycles:expire-payment-links`).
- *  - `getPaymentLinkInfo(token, now)`: public `GET /pay/:linkToken` JSON'u.
+ *  - `findStaleOpenCheckoutPayments(olderThan)`: `payments:reconcile` adayları. `getPaymentLinkInfo(token, now)`: public `GET /pay/:linkToken`.
+ *  - F8 saklı kart: `listCardsForUser` / `deactivateCard` (`/me/cards`), `upsertStoredCard` (callback utoken).
  */
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
+  private outcomeListener: PaymentOutcomeListener | null = null;
 
   constructor(
     private readonly repo: PaymentsRepository,
@@ -136,6 +192,10 @@ export class PaymentsService {
 
   findByConversationId(conversationId: string, tx?: DbClient): Promise<PaymentRecord | null> {
     return this.repo.findPaymentByConversationId(conversationId, tx);
+  }
+
+  findWithOrderByConversationId(conversationId: string, tx?: DbClient): Promise<PaymentWithOrderRecord | null> {
+    return this.repo.findPaymentWithOrderByConversationId(conversationId, tx);
   }
 
   findByLinkToken(linkToken: string, tx?: DbClient): Promise<PaymentWithOrderRecord | null> {
@@ -211,6 +271,104 @@ export class PaymentsService {
     for (const p of due) out.push(await this.markExpired(p.id, tx));
     if (out.length > 0) this.logger.log(`expireLinksDue: ${out.length} ödeme linki süresi doldu`);
     return out;
+  }
+
+  /** F8 `payments:reconcile` adayları: CHECKOUT (+ LINK) türünde, hâlâ açık, `createdAt <= olderThan`. */
+  findStaleOpenCheckoutPayments(olderThan: Date, take = 200, tx?: DbClient): Promise<PaymentWithOrderRecord[]> {
+    return this.repo.findStaleOpenPayments(['CHECKOUT'], PAYMENT_OPEN_STATES, olderThan, take, tx);
+  }
+
+  // ── F8: sonuç uzlaştırma (callback / reconcile → dinleyici) ───────────────────────────────────────────────────────
+
+  /** CheckoutModule (CheckoutCompletionService) kendini kaydeder; ikinci kayıt öncekini ezer (tek dinleyici). */
+  registerOutcomeListener(listener: PaymentOutcomeListener | null): void {
+    this.outcomeListener = listener;
+  }
+
+  hasOutcomeListener(): boolean {
+    return this.outcomeListener !== null;
+  }
+
+  /**
+   * Sağlayıcı sonucu → Payment (SUCCEEDED | FAILED) + kayıtlı dinleyici (Order PAID/PAYMENT_FAILED + abonelik + kupon + e-posta).
+   * `conversationId` = PayTR `merchant_oid`. Bilinmeyen → 404 `PAYMENT_NOT_FOUND`. Çift teslim: Payment zaten SUCCEEDED ise
+   * `alreadySettled:true` — dinleyici yine çağrılır (idempotent; Order zaten PAID ise dokunmaz). FAILED/EXPIRED bir ödemeye
+   * sonradan "başarılı" gelirse 409 `INVALID_TRANSITION` (terminal; para hareketi varsa ops iade eder — log).
+   */
+  async settleByConversationId(conversationId: string, input: PaymentSettleInput): Promise<PaymentSettleResult> {
+    const existing = await this.repo.findPaymentByConversationId(conversationId);
+    if (!existing) throw new NotFoundException({ message: `Ödeme bulunamadı: ${conversationId}`, error: 'PAYMENT_NOT_FOUND' });
+    return this.settlePayment(existing, input);
+  }
+
+  /** `settleByConversationId`'nin Payment kaydıyla çalışan hâli (reconcile). */
+  async settlePayment(existing: PaymentRecord, input: PaymentSettleInput): Promise<PaymentSettleResult> {
+    if (input.status === 'SUCCEEDED') {
+      const alreadySettled = existing.status === 'SUCCEEDED';
+      if (!alreadySettled && existing.status !== 'PENDING' && existing.status !== 'REQUIRES_3DS') {
+        this.logger.error(`settle: ${existing.conversationId} ${existing.status} iken SUCCEEDED geldi — terminal durum, el ile incelenmeli`);
+      }
+      const payment = alreadySettled
+        ? existing
+        : await this.markSucceeded(existing.id, { providerPaymentId: input.providerPaymentId ?? null, rawResponse: input.rawResponse, paidAt: input.paidAt });
+      const outcome = this.outcomeListener ? await this.outcomeListener.onSucceeded(payment, input) : null;
+      if (!this.outcomeListener) this.logger.warn(`settle: ödeme sonucu dinleyicisi yok — sipariş yan etkileri uygulanmadı (${existing.conversationId})`);
+      return { payment, alreadySettled, outcome };
+    }
+    const alreadySettled = existing.status === 'FAILED';
+    let payment = existing;
+    if (!alreadySettled) {
+      if (existing.status === 'SUCCEEDED' || existing.status === 'REFUNDED' || existing.status === 'PARTIAL_REFUNDED') {
+        // Başarılı ödemeye sonradan "başarısız" gelmesi: yok say (PayTR çift/gecikmiş bildirim) — log
+        this.logger.warn(`settle: ${existing.conversationId} ${existing.status} iken FAILED geldi — yok sayıldı`);
+        return { payment: existing, alreadySettled: true, outcome: null };
+      }
+      payment = await this.markFailed(existing.id, { failureCode: input.failureCode, failureMessage: input.failureMessage ?? null, rawResponse: input.rawResponse });
+    }
+    const outcome = this.outcomeListener ? await this.outcomeListener.onFailed(payment, input) : null;
+    return { payment, alreadySettled, outcome };
+  }
+
+  // ── F8: saklı kartlar (/me/cards + callback utoken) ───────────────────────────────────────────────────────────────
+
+  listCardsForUser(userId: string): Promise<PaymentMethodRecord[]> {
+    return this.repo.findActivePaymentMethodsForUser(userId);
+  }
+
+  /** `DELETE /me/cards/:id` — sahip değilse/aktif değilse 404; isActive=false + deletedAt (satır kalır: Payment/Subscription FK). */
+  async deactivateCard(userId: string, cardId: string, now: Date = new Date()): Promise<PaymentMethodRecord> {
+    const card = await this.repo.findActivePaymentMethodForUser(cardId, userId);
+    if (!card) throw new NotFoundException({ message: 'Kart bulunamadı', error: 'CARD_NOT_FOUND' });
+    const updated = await this.repo.deactivatePaymentMethod(card.id, now);
+    this.logger.log(`Saklı kart pasifleştirildi: ${card.id} (uid:${userId}, ****${card.last4})`);
+    return updated;
+  }
+
+  /**
+   * Sağlayıcının döndürdüğü saklı kart → PaymentMethod (upsert: aynı kullanıcı+sağlayıcı+kart token'ı varsa tazelenir, yoksa yeni;
+   * yeni/tazelenen kart varsayılan olur, diğerleri isDefault=false).
+   */
+  async upsertStoredCard(userId: string, provider: PaymentProviderEnum, card: ProviderStoredCard, tx?: DbClient): Promise<PaymentMethodRecord> {
+    const providerCardToken = card.providerCardToken.slice(0, 120);
+    const data = {
+      providerCustomerKey: card.providerCustomerKey.slice(0, 120),
+      bin: card.bin ? card.bin.slice(0, 8) : null,
+      last4: (card.last4 || '').slice(-4).padStart(4, '*'),
+      brand: card.brand ? card.brand.slice(0, 30) : null,
+      holderName: card.holderName ? card.holderName.slice(0, 120) : null,
+      expMonth: card.expMonth,
+      expYear: card.expYear,
+      isDefault: true,
+      isActive: true,
+      deletedAt: null,
+    };
+    const existing = await this.repo.findPaymentMethodByToken(userId, provider, providerCardToken, tx);
+    const row = existing
+      ? await this.repo.updatePaymentMethod(existing.id, data, tx)
+      : await this.repo.createPaymentMethod({ userId, provider, providerCardToken, ...data }, tx);
+    await this.repo.clearDefaultPaymentMethods(userId, row.id, tx);
+    this.logger.log(`Saklı kart ${existing ? 'tazelendi' : 'kaydedildi'}: ${row.id} (uid:${userId}, ****${row.last4})`);
+    return row;
   }
 
   // ── Refund ────────────────────────────────────────────────────────────────────────────────────────────────────────

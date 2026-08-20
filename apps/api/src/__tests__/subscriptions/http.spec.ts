@@ -147,7 +147,7 @@ describe('HTTP — /me/subscription* · /admin/subscriptions|cycles|ops|jobs', (
     const jobs = await app.call('GET', '/api/v1/admin/jobs', { jar: admin });
     expect(jobs.status).toBe(200);
     const jobList = await bodyOf<JsonBody[]>(jobs);
-    expect(jobList.map((j) => j.name).sort()).toEqual(['cycles:ensure', 'cycles:expire-payment-links', 'cycles:lock-and-charge', 'delivery-dates:generate', 'payments:retry', 'reminders:cutoff']);
+    expect(jobList.map((j) => j.name).sort()).toEqual(['cycles:ensure', 'cycles:expire-payment-links', 'cycles:lock-and-charge', 'delivery-dates:generate', 'payments:reconcile', 'payments:retry', 'reminders:cutoff']);
     const run = await app.call('POST', '/api/v1/admin/jobs/cycles:ensure/run', { jar: admin });
     expect(run.status).toBe(200);
     const runBody = await bodyOf<JsonBody>(run);

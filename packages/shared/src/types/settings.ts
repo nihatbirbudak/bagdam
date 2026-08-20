@@ -117,13 +117,6 @@ export const COMMERCE_SETTINGS_DEFAULTS: Readonly<CommerceSettings> = {
   subscriberFreeShipping: true,
 };
 
-/** Setting `payment.iyzico` (gizli anahtarlar .env / panelden; burada yalnız bayraklar). */
-export interface PaymentIyzicoSettings {
-  enabled: boolean;
-  /** iyzico saklı karttan NON3D (merchant-initiated) yetkisi yazılı teyit edildi mi (F11 kararı). */
-  nonThreeDsGranted: boolean;
-}
-
 /** Setting `cookies.*`. */
 export interface CookieSettings {
   analyticsEnabled: boolean;
@@ -248,19 +241,33 @@ export interface SmsSettings {
   header: string;
 }
 
-export type PaymentProviderSetting = 'iyzico' | 'manual';
-export const PAYMENT_PROVIDER_SETTING_VALUES: readonly PaymentProviderSetting[] = ['iyzico', 'manual'];
+/** Setting `payment.provider` — ADR-0019: PayTR birincil, manuel geliştirme/test; iyzico P2 (registry'de yok). */
+export type PaymentProviderSetting = 'paytr' | 'manual';
+export const PAYMENT_PROVIDER_SETTING_VALUES: readonly PaymentProviderSetting[] = ['paytr', 'manual'];
 
+/**
+ * Setting `payment.*` (ADR-0019 PayTR). Sırlar (merchantKey/merchantSalt) DB'de şifreli; `.env PAYTR_*` yedek
+ * (apps/api PayTrConfigService: Setting dolu → Setting, boş → env). Prod'da Setting boşsa env zorunlu.
+ */
 export interface PaymentSettings {
   provider: PaymentProviderSetting;
-  /** secret */
-  iyzicoApiKey: string;
-  /** secret */
-  iyzicoSecretKey: string;
-  iyzicoBaseUrl: string;
-  /** iyzico saklı karttan NON3D (merchant-initiated) yetkisi yazılı teyit edildi mi (F11 kararı). */
+  /** PayTR mağaza no (merchant_id). */
+  paytrMerchantId: string;
+  /** secret — PayTR merchant_key (HMAC anahtarı). */
+  paytrMerchantKey: string;
+  /** secret — PayTR merchant_salt. */
+  paytrMerchantSalt: string;
+  /** PayTR test modu (test_mode=1; canlı mağazada test işlemi). Lansmanda kapatılır (F11 checklist). */
+  paytrTestMode: boolean;
+  /** PayTR bildirim (callback) IP allowlist — virgülle ayrılmış; boşsa IP kontrolü yok (yalnız hash). */
+  paytrCallbackAllowedIps: string;
+  /** PayTR kayıtlı kart / tekrarlayan tahsilat (utoken/ctoken, non_3d) onayı alındı mı → MERCHANT_INITIATED mümkün; yoksa PAYMENT_LINK. */
+  storedCardEnabled: boolean;
+  /** Saklı karttan NON3D (merchant-initiated) yetkisi yazılı teyit edildi mi (F11 kararı). */
   nonThreeDsGranted: boolean;
-  /** Ödeme alma açık mı (kapalıysa checkout F8'de bakım metni). */
+  /** Azami taksit (1 = taksit yok → no_installment=1). */
+  maxInstallment: number;
+  /** Ödeme alma açık mı (kapalıysa checkout bakım metni). */
   enabled: boolean;
 }
 
@@ -296,10 +303,14 @@ export const SMS_SETTINGS_DEFAULTS: Readonly<SmsSettings> = {
 
 export const PAYMENT_SETTINGS_DEFAULTS: Readonly<PaymentSettings> = {
   provider: 'manual',
-  iyzicoApiKey: '',
-  iyzicoSecretKey: '',
-  iyzicoBaseUrl: 'https://sandbox-api.iyzipay.com',
+  paytrMerchantId: '',
+  paytrMerchantKey: '',
+  paytrMerchantSalt: '',
+  paytrTestMode: true,
+  paytrCallbackAllowedIps: '',
+  storedCardEnabled: false,
   nonThreeDsGranted: false,
+  maxInstallment: 1,
   enabled: false,
 };
 
@@ -385,12 +396,17 @@ const SMS_FIELDS: readonly SettingFieldMeta[] = [
   { key: 'header', label: 'Mesaj başlığı', type: 'text', default: SMS_SETTINGS_DEFAULTS.header },
 ];
 
+/** `payment.*` alanları — ADR-0019 PayTR (iFrame API + callback + Link API + Kayıtlı Kart API); iyzico P2. */
 const PAYMENT_FIELDS: readonly SettingFieldMeta[] = [
-  { key: 'provider', label: 'Sağlayıcı', type: 'select', options: [{ value: 'iyzico', label: 'iyzico' }, { value: 'manual', label: 'Manuel (geliştirme/test)' }], required: true, default: PAYMENT_SETTINGS_DEFAULTS.provider },
-  { key: 'iyzicoApiKey', label: 'iyzico API anahtarı', type: 'secret', help: 'Şifreli saklanır; boş bırakılırsa değişmez.' },
-  { key: 'iyzicoSecretKey', label: 'iyzico gizli anahtarı', type: 'secret', help: 'Şifreli saklanır; boş bırakılırsa değişmez.' },
-  { key: 'iyzicoBaseUrl', label: 'iyzico temel URL', type: 'text', default: PAYMENT_SETTINGS_DEFAULTS.iyzicoBaseUrl, help: 'Sandbox: https://sandbox-api.iyzipay.com · Prod: https://api.iyzipay.com' },
-  { key: 'nonThreeDsGranted', label: 'NON3D (saklı karttan) yetkisi alındı', type: 'boolean', default: PAYMENT_SETTINGS_DEFAULTS.nonThreeDsGranted },
+  { key: 'provider', label: 'Sağlayıcı', type: 'select', options: [{ value: 'paytr', label: 'PayTR' }, { value: 'manual', label: 'Manuel (geliştirme/test)' }], required: true, default: PAYMENT_SETTINGS_DEFAULTS.provider, help: 'Manuel sağlayıcı gerçek tahsilat yapmaz; canlıda PayTR seçilmelidir (F11 checklist).' },
+  { key: 'paytrMerchantId', label: 'PayTR mağaza no (merchant_id)', type: 'text', default: PAYMENT_SETTINGS_DEFAULTS.paytrMerchantId, help: 'PayTR paneli › Destek & Kurulum › Entegrasyon Bilgileri. Boşsa .env PAYTR_MERCHANT_ID.' },
+  { key: 'paytrMerchantKey', label: 'PayTR merchant_key', type: 'secret', help: 'Şifreli saklanır; boş bırakılırsa değişmez. Boşsa .env PAYTR_MERCHANT_KEY.' },
+  { key: 'paytrMerchantSalt', label: 'PayTR merchant_salt', type: 'secret', help: 'Şifreli saklanır; boş bırakılırsa değişmez. Boşsa .env PAYTR_MERCHANT_SALT.' },
+  { key: 'paytrTestMode', label: 'PayTR test modu', type: 'boolean', default: PAYMENT_SETTINGS_DEFAULTS.paytrTestMode, help: 'Açıkken işlemler test_mode=1 ile gider (gerçek tahsilat yok). Lansmanda KAPATILMALI — panelde uyarı gösterilir.' },
+  { key: 'paytrCallbackAllowedIps', label: 'PayTR bildirim IP allowlist', type: 'text', default: PAYMENT_SETTINGS_DEFAULTS.paytrCallbackAllowedIps, help: 'Virgülle ayrılmış IP listesi (PayTR bildirim sunucuları). Boşsa yalnız hash doğrulaması yapılır.' },
+  { key: 'storedCardEnabled', label: 'Kayıtlı kart / tekrarlayan tahsilat açık', type: 'boolean', default: PAYMENT_SETTINGS_DEFAULTS.storedCardEnabled, help: 'PayTR kayıtlı kart (utoken/ctoken) onayı alındıysa aç → saklı karttan tahsilat (MERCHANT_INITIATED). Kapalıyken abonelik tahsilatı ödeme linkiyle (PAYMENT_LINK).' },
+  { key: 'nonThreeDsGranted', label: 'NON3D (saklı karttan) yetkisi alındı', type: 'boolean', default: PAYMENT_SETTINGS_DEFAULTS.nonThreeDsGranted, help: 'PayTR non_3d onayı yazılı teyit edildi mi (F11 kararı: commerce.chargeStrategy).' },
+  { key: 'maxInstallment', label: 'Azami taksit', type: 'number', integer: true, min: 1, max: 12, required: true, default: PAYMENT_SETTINGS_DEFAULTS.maxInstallment, help: '1 = taksit yok (no_installment=1). 2–12 taksit seçeneği açar.' },
   { key: 'enabled', label: 'Ödeme alma açık', type: 'boolean', default: PAYMENT_SETTINGS_DEFAULTS.enabled },
 ];
 
@@ -407,7 +423,7 @@ export const SETTINGS_REGISTRY: readonly SettingGroupMeta[] = [
   { group: 'cookies', label: 'Çerezler', fields: COOKIES_FIELDS },
   { group: 'mail', label: 'E-posta', description: 'SMTP/sağlayıcı bilgileri; parola şifreli saklanır. Test gönderimi F6.', fields: MAIL_FIELDS },
   { group: 'sms', label: 'SMS', fields: SMS_FIELDS },
-  { group: 'payment', label: 'Ödeme', description: 'iyzico anahtarları şifreli saklanır.', fields: PAYMENT_FIELDS },
+  { group: 'payment', label: 'Ödeme', description: 'PayTR mağaza bilgileri (merchant_key/salt şifreli saklanır), test modu, bildirim IP listesi, kayıtlı kart onayı (ADR-0019).', fields: PAYMENT_FIELDS },
 ];
 
 export function isSettingGroupName(value: unknown): value is SettingGroupName {

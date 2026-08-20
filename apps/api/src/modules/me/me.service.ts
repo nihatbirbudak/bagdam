@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import type { MeAddress, MeConsent, MeOrderListResponse, Order } from '@bagdam/shared';
+import type { MeAddress, MeConsent, MeOrderListResponse, Order, PaymentMethod } from '@bagdam/shared';
 import { IysStatus, Prisma } from '@prisma/client';
 import { DEFAULT_CONSENT_SOURCE } from '../content/content.constants';
 import { OrdersService } from '../orders/orders.service';
+import { PaymentsService } from '../payments/payments.service';
 import type { UpsertAddressDto } from './dto/address.dto';
 import type { MeConsentDto } from './dto/consent.dto';
-import { latestConsentPerKind, toMeAddress, toMeConsent } from './me.mapper';
+import { latestConsentPerKind, toMeAddress, toMeConsent, toPaymentMethodDto } from './me.mapper';
 import { MeRepository, type AddressWriteInput } from './me.repository';
 
 /** Pazarlama onayı için varsayılan belge (LegalDocument slug; yayındaki sürüm bağlanır, yoksa null). */
@@ -20,7 +21,7 @@ export interface MeRequestContext {
 /**
  * MeService — oturumdaki müşterinin hesabı (BACKEND-PLANI §3 me satırı): tek adres (upsert, aktif bölge doğrulaması),
  * onaylar (tür başına son durum; pazarlama izni değişikliği → yeni Consent satırı + iysStatus PENDING + User.marketingOptIn),
- * siparişler/kartlar F8'e kadar boş zarf.
+ * siparişler (OrdersService), saklı kartlar (F8: PaymentsService — liste/pasifleştirme; ekleme checkout iFrame'inde).
  */
 @Injectable()
 export class MeService {
@@ -29,6 +30,7 @@ export class MeService {
   constructor(
     private readonly repo: MeRepository,
     private readonly orders: OrdersService,
+    private readonly payments: PaymentsService,
   ) {}
 
   // ── Adres ───────────────────────────────────────────────────────────────────
@@ -94,11 +96,16 @@ export class MeService {
     return this.orders.getForUser(userId, orderNo);
   }
 
-  // ── F8 yer tutucuları ───────────────────────────────────────────────────────
+  // ── Saklı kartlar (F8) ──────────────────────────────────────────────────────
 
-  /** `GET /me/cards` — F8'de PaymentMethod'dan dolar. */
-  listCards(): unknown[] {
-    return [];
+  /** `GET /me/cards` — aktif PaymentMethod satırları (PSP token özeti). */
+  async listCards(userId: string): Promise<PaymentMethod[]> {
+    return (await this.payments.listCardsForUser(userId)).map(toPaymentMethodDto);
+  }
+
+  /** `DELETE /me/cards/:id` — isActive=false; sahip değilse 404 CARD_NOT_FOUND. */
+  async deleteCard(userId: string, cardId: string): Promise<PaymentMethod> {
+    return toPaymentMethodDto(await this.payments.deactivateCard(userId, cardId));
   }
 
   // ── Yardımcılar ─────────────────────────────────────────────────────────────

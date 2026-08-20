@@ -103,13 +103,18 @@ export interface OrderSummary {
   createdAt: IsoDateTime;
 }
 
-/** `GET /orders/:orderNo/status` — sepet.html `?siparis=` sonucu. */
+/** `GET /orders/:orderNo/status` — sepet.html `?siparis=` sonucu (F8: sepet.html 2 s polling; `paidAt` + `subscriptionStatus` eklendi). */
 export interface OrderStatusResponse {
   orderNo: number;
   status: OrderStatus;
+  /** En son ödeme kaydının durumu (yoksa null). */
   paymentStatus: PaymentStatus | null;
-  /** Abonelik siparişiyse aboneliğin durumu (uyelik yönlendirmesi için). */
+  /** Ödeme anı (Order.paidAt); ödenmediyse null. */
+  paidAt: IsoDateTime | null;
+  /** Abonelik siparişiyse aboneliğin id'si (uyelik yönlendirmesi için). */
   subscriptionId: Id | null;
+  /** Abonelik siparişiyse aboneliğin durumu (PENDING → ödeme bekleniyor, ACTIVE → aktifleşti); değilse null. */
+  subscriptionStatus: string | null;
 }
 
 /** Admin `PATCH /admin/orders/:id/status`. */
@@ -185,6 +190,23 @@ export interface Refund {
 export interface RefundRequest {
   amount: Money;
   reason?: string;
+}
+
+/**
+ * Admin `POST /admin/payments/:id/refund` yanıtı (F8) — PaymentsService.refund sonucu (`ok:false` = sağlayıcı reddetti, Refund FAILED).
+ * Tam iadede (Payment REFUNDED) sipariş PAID / DELIVERED / DELIVERY_FAILED ise otomatik REFUNDED'a geçer (`orderTransitioned`);
+ * izin vermeyen durumda (PREPARING / OUT_FOR_DELIVERY vb.) `orderStatus` eski kalır, panelden değiştirilir.
+ */
+export interface AdminRefundResult {
+  ok: boolean;
+  refund: Refund;
+  payment: Payment;
+  /** Bu ödeme için şimdiye kadar başarıyla iade edilen toplam (bu iade dahil). */
+  refundedTotal: Money;
+  orderId: Id;
+  orderNo: number | null;
+  orderStatus: OrderStatus | string | null;
+  orderTransitioned: boolean;
 }
 
 export interface WebhookEvent {

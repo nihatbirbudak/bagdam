@@ -185,18 +185,19 @@ describe('PaymentsModule — ManualProvider · ChargeStrategy (MIT / LINK) · Pa
     expect(manual.verifyWebhook('{}', 'yanlış').valid).toBe(false);
   });
 
-  it('PaymentProviderFactory: aktif manual; get(iyzico) → 503 PAYMENT_PROVIDER_UNAVAILABLE (F8); getByEnum(MANUAL) → ManualProvider', async () => {
+  it('PaymentProviderFactory: aktif manual; get(iyzico) → 503 PAYMENT_PROVIDER_UNAVAILABLE (P2); getByEnum(MANUAL) → ManualProvider; PAYTR kayıtlı (F8)', async () => {
     expect(await factory.resolveName()).toBe('manual');
     expect((await factory.getActive()).name).toBe('manual');
     expect(factory.getByEnum('MANUAL')).toBe(manual);
     expect(() => factory.get('iyzico')).toThrow(/etkin değil/);
     try {
-      factory.getByEnum('PAYTR');
+      factory.getByEnum('IYZICO');
       throw new Error('fırlatmalıydı');
     } catch (err) {
       expect((err as { getResponse(): unknown }).getResponse()).toMatchObject({ error: 'PAYMENT_PROVIDER_UNAVAILABLE' });
     }
-    expect(factory.listProviders()).toEqual(['manual']);
+    expect(factory.getByEnum('PAYTR').name).toBe('paytr');
+    expect(factory.listProviders()).toEqual(['manual', 'paytr']);
   });
 
   // ── MIT charge ────────────────────────────────────────────────────────────────────────────────────────────────────

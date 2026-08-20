@@ -5,17 +5,23 @@ import type { OrderListFilter, Tx } from './orders.types';
 
 // ── Include şekilleri (tek yerde; mapper bunlara göre tiplenir) ──────────────
 
-/** Detay: satırlar (ekleniş sırası ≈ id), ödemeler (yeni → eski), teslimat tarihi (kesim/durum), bölge, satır sayısı. */
+/**
+ * Detay: satırlar (ekleniş sırası ≈ id), ödemeler (yeni → eski), teslimat tarihi (kesim/durum), bölge, satır sayısı,
+ * F8: abonelik durumu (`GET /orders/:orderNo/status`), checkout onayları + belge (sipariş onayı e-postası).
+ */
 export const ORDER_DETAIL_INCLUDE = {
   lines: { orderBy: { id: 'asc' } },
-  payments: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+  payments: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], include: { refunds: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] } } },
   deliveryDate: { select: { id: true, cutoffAt: true, status: true, date: true } },
   zone: { select: { id: true, name: true, slug: true } },
+  subscription: { select: { id: true, status: true, isOneTime: true } },
+  consents: { orderBy: { createdAt: 'asc' }, include: { document: { select: { slug: true, version: true, title: true, kind: true } } } },
   _count: { select: { lines: true } },
 } satisfies Prisma.OrderInclude;
 export type OrderRecord = Prisma.OrderGetPayload<{ include: typeof ORDER_DETAIL_INCLUDE }>;
 export type OrderLineRecord = OrderLine;
 export type OrderPaymentRecord = OrderRecord['payments'][number];
+export type OrderConsentRecord = OrderRecord['consents'][number];
 
 /** Liste/CSV satırı: bölge adı + satır sayısı (satırların kendisi çekilmez). */
 export const ORDER_SUMMARY_INCLUDE = {
@@ -147,6 +153,42 @@ export class OrdersRepository {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take,
       include: ORDER_SUMMARY_INCLUDE,
+    });
+  }
+
+  /**
+   * F8 `payments:reconcile`: ödemesi tamamlanmamış eski checkout siparişleri — PENDING_PAYMENT | PAYMENT_FAILED, `createdAt <= olderThan`,
+   * hiç SUCCEEDED ödemesi yok (abonelik motorunun cycle#n siparişleri dahil edilmez: yalnız CHECKOUT türünde ödemesi olanlar ya da hiç ödemesi olmayanlar).
+   */
+  findStaleUnpaidOrders(olderThan: Date, take: number, tx?: Tx): Promise<OrderRecord[]> {
+    return this.db(tx).order.findMany({
+      where: {
+        deletedAt: null,
+        status: { in: ['PENDING_PAYMENT', 'PAYMENT_FAILED'] },
+        createdAt: { lte: olderThan },
+        payments: { none: { status: { in: ['SUCCEEDED', 'PARTIAL_REFUNDED', 'REFUNDED'] } } },
+        OR: [{ payments: { none: {} } }, { payments: { some: { kind: 'CHECKOUT' } } }],
+      },
+      orderBy: { createdAt: 'asc' },
+      take,
+      include: ORDER_DETAIL_INCLUDE,
+    });
+  }
+
+  /**
+   * F8 checkout: kullanıcının ödemesi tamamlanmamış checkout siparişleri (PENDING_PAYMENT | PAYMENT_FAILED, abonelikli) —
+   * "devam eden ödeme" kontrolü / eski taslağın iptali için.
+   */
+  findOpenCheckoutOrdersForUser(userId: string, tx?: Tx): Promise<OrderRecord[]> {
+    return this.db(tx).order.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+        status: { in: ['PENDING_PAYMENT', 'PAYMENT_FAILED'] },
+        payments: { some: { kind: 'CHECKOUT' } },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: ORDER_DETAIL_INCLUDE,
     });
   }
 

@@ -15,6 +15,7 @@ import {
   type PaymentKind,
   type PaymentProvider,
   type PaymentStatus,
+  type Refund,
 } from '@bagdam/shared';
 import type { Prisma } from '@prisma/client';
 import { CSV_BOM, CSV_EOL, CSV_SEPARATOR, ORDER_CSV_COLUMNS, type OrderCsvColumn } from './orders.constants';
@@ -47,6 +48,20 @@ export function toOrderLineDto(row: OrderLineRecord): OrderLine {
 }
 
 /** Payment → shared DTO (linkToken ASLA çıkmaz; rawResponse yok). */
+/** Refund satırı → shared DTO (admin sipariş detayı: ödeme altındaki iadeler; F8). */
+export function toRefundDto(row: OrderPaymentRecord['refunds'][number]): Refund {
+  return {
+    id: row.id,
+    paymentId: row.paymentId,
+    amount: toMoney(row.amount),
+    reason: row.reason,
+    providerRefundId: row.providerRefundId,
+    status: row.status as PaymentStatus,
+    requestedBy: row.requestedBy,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 export function toPaymentDto(row: OrderPaymentRecord): Payment {
   return {
     id: row.id,
@@ -66,6 +81,7 @@ export function toPaymentDto(row: OrderPaymentRecord): Payment {
     failureMessage: row.failureMessage,
     paidAt: iso(row.paidAt),
     createdAt: row.createdAt.toISOString(),
+    refunds: (row.refunds ?? []).map(toRefundDto),
   };
 }
 
@@ -134,14 +150,16 @@ export function toOrderSummary(row: OrderSummaryRecord): OrderSummary {
   };
 }
 
-/** `GET /orders/:orderNo/status` — sepet.html `?siparis=` sonucu; paymentStatus = en son ödeme kaydı. */
+/** `GET /orders/:orderNo/status` — sepet.html `?siparis=` sonucu (F8 polling); paymentStatus = en son ödeme kaydı; abonelik durumu varsa. */
 export function toOrderStatusResponse(row: OrderRecord): OrderStatusResponse {
   const latest = row.payments[0];
   return {
     orderNo: row.orderNo,
     status: row.status as OrderStatus,
     paymentStatus: latest ? (latest.status as PaymentStatus) : null,
+    paidAt: iso(row.paidAt),
     subscriptionId: row.subscriptionId,
+    subscriptionStatus: row.subscription?.status ?? null,
   };
 }
 

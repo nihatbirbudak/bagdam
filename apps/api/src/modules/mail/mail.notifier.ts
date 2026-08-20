@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { NotifierEvent } from '@bagdam/shared';
+import { DELIVERY_DAY_LABELS, formatMoneyTr, type DeliveryDay, type NotifierEvent } from '@bagdam/shared';
 import { SettingsService } from '../settings/settings.service';
 import { formatIstanbul } from './mail-templates.render';
 import { maskEmail } from './mail.constants';
@@ -10,6 +10,7 @@ import type { Notifier, NotifierPayloads } from './notifier.interface';
  * MailNotifier — Notifier'ın e-posta uygulaması: olay → `mail.<slug>` şablonu + alıcı + değişkenler.
  *  - customer.*          → kullanıcıya (entityId = userId: aynı şablon+kullanıcı satırı yeniden gönderimde güncellenir)
  *  - wholesale.new-lead  → yöneticiye: Setting `site.contactEmail` (yoksa .env SMTP_FROM); ikisi de yoksa atlanır + log
+ *  - order.paid          → müşteriye (entityId = orderId): sipariş özeti + yasal belge kopyası bağlantıları (F8; para alanları tr-TR metin)
  * `notify` asla fırlatmaz (MailService zaten yutar; beklenmeyen hata burada da loglanır).
  */
 @Injectable()
@@ -77,6 +78,34 @@ export class MailNotifier implements Notifier {
         this.logger.log(`Toptan talebi bildirimi: ${p.lead.id} → ${maskEmail(to)}`);
         return;
       }
+      case 'order.paid': {
+        const p = payload as NotifierPayloads['order.paid'];
+        const o = p.order;
+        const money = (n: number): string => formatMoneyTr(n);
+        await this.mail.send({
+          to: o.customerEmail,
+          templateSlug: 'order-paid',
+          entityId: o.id,
+          vars: {
+            order: {
+              ...o,
+              paidAtText: formatIstanbul(o.paidAt),
+              deliveryOnText: formatTrDate(o.deliveryOn),
+              deliveryDayLabel: (DELIVERY_DAY_LABELS as Record<string, string>)[o.deliveryDay as DeliveryDay] ?? o.deliveryDay,
+              subtotalText: money(o.subtotal),
+              discountTotalText: money(o.discountTotal),
+              shippingFeeText: money(o.shippingFee),
+              vatTotalText: money(o.vatTotal),
+              grandTotalText: money(o.grandTotal),
+              hasDiscount: o.discountTotal > 0,
+              hasShipping: o.shippingFee > 0,
+              lines: o.lines.map((l) => ({ ...l, qtyText: formatQty(l.qty, l.unit, l.kind), lineTotalText: money(l.lineTotal) })),
+            },
+          },
+        });
+        this.logger.log(`Sipariş onayı e-postası: #${o.orderNo} → ${maskEmail(o.customerEmail)}`);
+        return;
+      }
       default:
         this.logger.warn(`Bilinmeyen bildirim olayı: ${String(event)}`);
     }
@@ -90,4 +119,18 @@ export class MailNotifier implements Notifier {
     const from = (process.env.SMTP_FROM ?? '').trim();
     return from || null;
   }
+}
+
+/** YYYY-MM-DD → "02.03.2027" (takvim günü; TZ'siz). Biçimsizse olduğu gibi. */
+export function formatTrDate(isoDate: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : isoDate;
+}
+
+/** Satır miktarı metni: BOX "1 kutu"; birim yoksa "2 adet"; birim varsa "2 × demet" / "0,25 × kg". */
+export function formatQty(qty: number, unit: string | null, kind: string): string {
+  const n = Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 1000) / 1000).replace('.', ',');
+  if (kind === 'BOX') return '1 kutu';
+  if (!unit) return `${n} adet`;
+  return `${n} × ${unit}`;
 }

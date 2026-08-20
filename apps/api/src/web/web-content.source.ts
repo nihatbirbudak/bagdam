@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogService } from '../modules/catalog/catalog.service';
 import { ContentService } from '../modules/content/content.service';
-import type { CategoryLike, LegalDocLike, PostLike, SiteContentRowLike } from './content-view';
+import { DeliveryService } from '../modules/delivery/delivery.service';
+import type { CategoryLike, DeliveryZoneLike, LegalDocLike, PostLike, SiteContentRowLike } from './content-view';
 
 /**
  * WebController'ın içerik verisi kaynağı (F5) — arayüz sabit, uygulama ContentService + CatalogService üzerinden
@@ -10,6 +11,7 @@ import type { CategoryLike, LegalDocLike, PostLike, SiteContentRowLike } from '.
  * - getLegalCurrent()     → ContentService.getCurrentLegalDocuments() (≡ GET /api/v1/legal: isCurrent, showInNav dahil, gövdeli)
  * - getPublishedPosts()   → ContentService.getPublishedPosts() (tamamı; index ilk 3'ü alır)
  * - getCategories()       → CatalogService.listActiveCategories() (sekmeler + panel notları; Category.panelNote tek sahip [B11])
+ * - getDeliveryZones()    → DeliveryService.listPublicZones() (F8: sepet.hbs `__BAGDAM_CHECKOUT__.zones` — ilçe select; ≡ GET /delivery/zones)
  * Admin yazımları ContentAdminService/CatalogAdminService cache düşürmesiyle bir sonraki render'da görünür.
  */
 export interface WebContentSource {
@@ -17,6 +19,7 @@ export interface WebContentSource {
   getLegalCurrent(): Promise<LegalDocLike[]>;
   getPublishedPosts(): Promise<PostLike[]>;
   getCategories(): Promise<CategoryLike[]>;
+  getDeliveryZones(): Promise<DeliveryZoneLike[]>;
 }
 
 export const WEB_CONTENT_SOURCE = Symbol('WEB_CONTENT_SOURCE');
@@ -29,6 +32,7 @@ export class ContentSourceAdapter implements WebContentSource {
   constructor(
     private readonly content: ContentService,
     private readonly catalog: CatalogService,
+    private readonly delivery: DeliveryService,
   ) {}
 
   async getSiteContentRows(): Promise<SiteContentRowLike[]> {
@@ -69,5 +73,11 @@ export class ContentSourceAdapter implements WebContentSource {
   async getCategories(): Promise<CategoryLike[]> {
     const rows = await this.catalog.listActiveCategories();
     return rows.map((c) => ({ slug: c.slug, label: c.label, panelNote: c.panelNote }));
+  }
+
+  /** F8: aktif bölgeler (GET /delivery/zones ile aynı kaynak) — sepet.hbs checkout bootstrap'ı. */
+  async getDeliveryZones(): Promise<DeliveryZoneLike[]> {
+    const zones = await this.delivery.listPublicZones();
+    return zones.map((z) => ({ id: z.id, slug: z.slug, name: z.name, fee: z.fee, freeThreshold: z.freeThreshold }));
   }
 }

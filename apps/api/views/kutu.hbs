@@ -517,6 +517,9 @@
         const s = BahcedenCart.getSub();
         s.active = true;
         BahcedenCart.setSub(s);
+        // F8 checkout: "aboneliği başlat" → sepet (checkout); kutu taslağı (bahceden_sub) orada sipariş yüküne (box) dönüşür,
+        // ödeme alınınca taslak temizlenir. "sepete ekle" (tek seferlik) prototipteki gibi sayfada kalır ("sepette").
+        if (isSub) { window.location.href = "sepet.html"; return; }
         renderEditor();
       });
     }

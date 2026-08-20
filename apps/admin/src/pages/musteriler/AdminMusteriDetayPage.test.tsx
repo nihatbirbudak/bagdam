@@ -22,6 +22,7 @@ const DETAIL = {
   orders: { items: [], total: 0 },
 };
 const ANON = { ...DETAIL, email: 'anon+u1@anon.local', name: null, phone: null, isActive: false, anonymizedAt: '2026-08-20T12:00:00.000Z', address: null };
+const ORDER_ROW = { id: 'o1', orderNo: 1001, kind: 'SINGLE', status: 'PAID', customerName: 'Ayşe Yılmaz', customerEmail: 'ayse@example.com', deliveryDay: 'SALI', deliveryOn: '2026-08-25', grandTotal: 250, lineCount: 2, paidAt: '2026-08-20T10:00:00.000Z', createdAt: '2026-08-20T09:00:00.000Z' };
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -69,6 +70,7 @@ describe('AdminMusteriDetayPage', () => {
           : [];
         return Promise.resolve(jsonResponse({ items, total: items.length, page: 1, limit: 10 }));
       }
+      if (url.startsWith('/api/v1/admin/orders')) return Promise.resolve(jsonResponse({ items: [ORDER_ROW], total: 1, page: 1, limit: 10 }));
       return Promise.resolve(jsonResponse({ statusCode: 404, message: 'Kaynak bulunamadı' }, 404));
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -78,7 +80,7 @@ describe('AdminMusteriDetayPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('profil, adres, onaylar ve audit özeti (ADMIN: /admin/audit-logs?entityId) görünür', async () => {
+  it('profil, adres, onaylar, audit özeti (ADMIN: /admin/audit-logs?entityId) ve siparişler (/admin/orders?q=e-posta) görünür', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByLabelText('Ad Soyad')).toHaveValue('Ayşe Yılmaz'));
     expect(screen.getByLabelText('E-posta')).toHaveValue('ayse@example.com');
@@ -88,7 +90,9 @@ describe('AdminMusteriDetayPage', () => {
     expect(screen.getByText('KVKK Aydınlatma v1')).toBeInTheDocument();
     expect(screen.getByText('Reddedildi')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('auth:REGISTER')).toBeInTheDocument());
-    expect(screen.getByText(/F8'de/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('link', { name: '#1001' })).toHaveAttribute('href', '/siparisler/o1'));
+    expect(fetchMock.mock.calls.map((c) => String((c as [string])[0])).some((u) => u.startsWith('/api/v1/admin/orders?') && u.includes('q=ayse%40example.com'))).toBe(true);
+    expect(screen.getByText('Ödendi')).toBeInTheDocument();
   });
 
   it('ad değişince Kaydet → PATCH yalnız değişen alanla', async () => {

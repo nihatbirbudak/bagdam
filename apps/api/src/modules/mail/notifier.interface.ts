@@ -15,6 +15,55 @@ export interface NotifierPayloads {
   'customer.reset': { user: NotifierUser; resetUrl: string; expiresMinutes: number };
   'customer.password-changed': { user: NotifierUser; changedAt: Date };
   'wholesale.new-lead': { lead: NotifierLead };
+  /** F8: sipariş ödendi (OrdersService PAID yan etkisi) → `mail.order-paid` (sipariş özeti + yasal belge kopyası bağlantıları). */
+  'order.paid': { order: NotifierOrder };
+}
+
+/** F8 sipariş onayı e-postasının satırı. */
+export interface NotifierOrderLine {
+  kind: string;
+  name: string;
+  qty: number;
+  unit: string | null;
+  pref: string | null;
+  lineTotal: number;
+}
+
+/** F8 sipariş onayı e-postasındaki yasal belge bağlantısı (onaylanan sürüm). */
+export interface NotifierLegalDoc {
+  slug: string;
+  version: number;
+  title: string;
+  url: string;
+}
+
+/** F8 `order.paid` yükü — para alanları TL (number); MailNotifier tr-TR metne çevirir. */
+export interface NotifierOrder {
+  id: string;
+  orderNo: number;
+  kind: string;
+  status: string;
+  customerEmail: string;
+  customerName: string;
+  customerPhone: string;
+  /** YYYY-MM-DD */
+  deliveryOn: string;
+  deliveryDay: string;
+  addressLine: string;
+  zoneName: string;
+  lines: NotifierOrderLine[];
+  subtotal: number;
+  discountTotal: number;
+  shippingFee: number;
+  vatTotal: number;
+  grandTotal: number;
+  couponCode: string | null;
+  isSubscription: boolean;
+  isOneTimeBox: boolean;
+  paidAt: Date;
+  legalDocuments: NotifierLegalDoc[];
+  /** Müşteri sipariş sayfası (uyelik.html). */
+  orderUrl: string;
 }
 
 export interface NotifierUser {

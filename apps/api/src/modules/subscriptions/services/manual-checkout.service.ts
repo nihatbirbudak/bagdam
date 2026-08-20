@@ -106,8 +106,9 @@ export class ManualCheckoutService {
         ...extraProducts.map((e) => ({ kind: OrderLineKind.EXTRA, unitPrice: money(e.product.price), qty: e.factor, vatRate: e.product.vatRate, productId: e.product.id, name: e.product.name })),
       ];
       const quote = await this.pricing.quote({ lines, zoneId, userId: user.id, isSubscriptionCheckout: !isOneTime });
-      // Peşin tutar = kutu siparişinin tamamı (kargo dahil: tek seferlikte kilit anındaki quote kargoyu da içerir → due 0)
-      const prepaidAmount = quote.grandTotal;
+      // Peşin tutar (F8 KARAR): kutu + ekstralar − indirim, KARGO HARİÇ — kargo Order.shippingFee'de tahsil edilir;
+      // kesimde cycle#1 için kargo yeniden hesaplanmaz (SubscriptionsDepsAdapter.cycleCharge) → DELTA'da kargo yok
+      const prepaidAmount = quote.prepaidAmount ?? quote.grandTotal;
 
       // ── 4. Subscription PENDING + cycle#1 ──────────────────────────────────
       const { subscription, cycle } = await this.subscriptions.createFromCheckout(

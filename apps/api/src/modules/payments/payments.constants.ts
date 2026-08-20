@@ -35,3 +35,8 @@ export function buildPayLinkUrl(linkToken: string): string {
   const base = (process.env.WEB_URL ?? 'http://127.0.0.1:4010').trim().replace(/\/+$/, '');
   return `${base}${PAY_LINK_PATH}/${linkToken}`;
 }
+
+/** `lnk_<cycleId>_<attemptNo>` ayrıştırma (F8 PayTR callback → cycle CHARGED; cuid alfanümerik). */
+export const LINK_CONVERSATION_RE = /^lnk_([A-Za-z0-9]+)_(\d+)$/;
+/** `cyc_<cycleId>_<attemptNo>` ayrıştırma. */
+export const CYCLE_CONVERSATION_RE = /^cyc_([A-Za-z0-9]+)_(\d+)$/;

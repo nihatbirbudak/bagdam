@@ -54,6 +54,8 @@ export interface OrderTransitionContext {
    * (subscriptionId boş) varsayılan iade VAR; `false` ile kapatılır (çift iade olmasın — state-machines §11).
    */
   releaseDeliveryDate?: boolean;
+  /** F8: PAID geçişinde Notifier `order.paid` e-postası (varsayılan açık; yalnız checkout siparişlerinde gönderilir). `false` ile kapatılır. */
+  notify?: boolean;
 }
 
 /** Cycle referansı — id ya da {id}; servis gerekli ilişkileri kendisi yükler (C'nin include şekline bağımlı değil). */

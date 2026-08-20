@@ -1,4 +1,5 @@
-import type { AdminCustomerConsent, ConsentKind, MeAddress, MeConsent } from '@bagdam/shared';
+import type { AdminCustomerConsent, ConsentKind, MeAddress, MeConsent, PaymentMethod, PaymentProvider } from '@bagdam/shared';
+import type { PaymentMethodRecord } from '../payments/payments.repository';
 import type { AddressRecord, ConsentRecord } from './me.repository';
 
 /** Address (+zone) → `GET/PUT /me/address` DTO'su. */
@@ -42,6 +43,23 @@ export function toAdminConsent(row: ConsentRecord): AdminCustomerConsent {
     documentVersion: row.document?.version ?? null,
     source: row.source,
     iysStatus: row.iysStatus,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** PaymentMethod → `GET /me/cards` DTO'su (yalnız PSP token özeti: bin/last4/brand/son kullanma; token'lar ASLA çıkmaz). */
+export function toPaymentMethodDto(row: PaymentMethodRecord): PaymentMethod {
+  return {
+    id: row.id,
+    provider: row.provider as PaymentProvider,
+    bin: row.bin,
+    last4: row.last4,
+    brand: row.brand,
+    holderName: row.holderName,
+    expMonth: row.expMonth,
+    expYear: row.expYear,
+    isDefault: row.isDefault,
+    isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
   };
 }

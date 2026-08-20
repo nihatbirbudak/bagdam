@@ -142,8 +142,9 @@ describe('Settings admin HTTP — /api/v1/admin/settings (registry · maske · �
     expect(ok.status).toBe(200);
     const payment = ok.body as AdminSettingGroup;
     expect(payment.group).toBe('payment');
-    expect(field(payment, 'iyzicoApiKey').isSecret).toBe(true);
-    expect(field(payment, 'provider').options?.map((o) => o.value)).toEqual(['iyzico', 'manual']);
+    expect(field(payment, 'paytrMerchantKey').isSecret).toBe(true);
+    expect(field(payment, 'paytrMerchantSalt').isSecret).toBe(true);
+    expect(field(payment, 'provider').options?.map((o) => o.value)).toEqual(['paytr', 'manual']);
 
     const nope = await api('GET', '/admin/settings/nope');
     expect(nope.status).toBe(404);
@@ -294,6 +295,8 @@ describe('Settings admin HTTP — /api/v1/admin/settings (registry · maske · �
     expect(typeof cookies.marketingEnabled).toBe('boolean');
     const payment = await settings.getPayment();
     expect(typeof payment.enabled).toBe('boolean');
-    expect(payment.iyzicoBaseUrl).toMatch(/^https:\/\//);
+    expect(typeof payment.paytrTestMode).toBe('boolean');
+    expect(typeof payment.storedCardEnabled).toBe('boolean');
+    expect(Number.isInteger(payment.maxInstallment)).toBe(true);
   });
 });

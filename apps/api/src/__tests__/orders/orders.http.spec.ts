@@ -124,10 +124,10 @@ describe('Orders HTTP — /me/orders · /orders/:orderNo · /admin/orders (F7/B2
     expect((await t.call('GET', `${ME}/orders/999999999`, { jar: customerJar })).status).toBe(404);
   });
 
-  it('GET /orders/:orderNo/status → {orderNo,status,paymentStatus:null,subscriptionId:null}', async () => {
+  it('GET /orders/:orderNo/status → {orderNo,status,paymentStatus:null,paidAt,subscriptionId:null,subscriptionStatus:null} (F8 alanları)', async () => {
     const res = await t.call('GET', `${ORDERS}/${o2.orderNo}/status`, { jar: customerJar });
     expect(res.status).toBe(200);
-    expect((await res.json()) as OrderStatusResponse).toEqual({ orderNo: o2.orderNo, status: 'PAID', paymentStatus: null, subscriptionId: null });
+    expect((await res.json()) as OrderStatusResponse).toEqual({ orderNo: o2.orderNo, status: 'PAID', paymentStatus: null, paidAt: expect.any(String), subscriptionId: null, subscriptionStatus: null });
     expect((await t.call('GET', `${ORDERS}/${o2.orderNo}/status`)).status).toBe(401);
   });
 

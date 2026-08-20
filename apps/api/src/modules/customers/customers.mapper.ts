@@ -1,4 +1,4 @@
-import type { AdminCustomerAuditItem, AdminCustomerConsent, AdminCustomerDetail, AdminCustomerListItem, MeAddress, UserRole } from '@bagdam/shared';
+import type { AdminCustomerAuditItem, AdminCustomerConsent, AdminCustomerDetail, AdminCustomerListItem, MeAddress, OrderSummary, UserRole } from '@bagdam/shared';
 import type { AuditLog } from '@prisma/client';
 import type { UserRecord } from './customers.repository';
 
@@ -29,6 +29,7 @@ export function toCustomerDetail(
   address: MeAddress | null,
   consents: AdminCustomerConsent[],
   audit: AdminCustomerAuditItem[],
+  orders: OrderSummary[] = [],
 ): AdminCustomerDetail {
   return {
     ...toCustomerListItem(row),
@@ -37,7 +38,7 @@ export function toCustomerDetail(
     address,
     consents,
     audit,
-    orders: [],
+    orders, // F8: OrdersService.listForUser (OrderSummary, en yeni üstte)
     subscription: null,
   };
 }

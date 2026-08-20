@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { toAdminConsent, toMeAddress } from '../me/me.mapper';
 import { MeRepository } from '../me/me.repository';
+import { OrdersService } from '../orders/orders.service';
 import { toCustomerAuditItem, toCustomerDetail, toCustomerListItem } from './customers.mapper';
 import { CustomersRepository, type CustomerPatchInput, type UserRecord } from './customers.repository';
 import type { CustomerPatchDto } from './dto/customer-patch.dto';
@@ -22,7 +23,7 @@ export interface CustomerPatchResult {
 
 /**
  * CustomersService — ekran 16 Müşteriler (BACKEND-PLANI §3 customers satırı, §4 ekran 16):
- *  - liste (arama/rol/sayfalama), detay (profil + adres + onaylar + audit özeti; sipariş/abonelik F8/F9),
+ *  - liste (arama/rol/sayfalama), detay (profil + adres + onaylar + audit özeti + siparişler (F8: OrdersService.listForUser); abonelik F9),
  *  - PATCH isActive/name/phone (isActive=false → refresh hash null: oturumlar düşer; kendi hesabını kapatamaz),
  *  - anonimleştir (KVKK, ADR-0015): yalnız CUSTOMER, bir kez; e-posta anon+id@anon.local, ad/telefon/adres silinir,
  *    parola rastgele, oturumlar düşer, isActive false, anonymizedAt. Consent satırları (hukuki kanıt) kalır — PII kullanıcı satırındaydı.
@@ -34,6 +35,7 @@ export class CustomersService {
   constructor(
     private readonly repo: CustomersRepository,
     private readonly meRepo: MeRepository,
+    private readonly orders: OrdersService,
   ) {}
 
   async list(query: CustomerQueryDto): Promise<AdminCustomerList> {
@@ -45,12 +47,13 @@ export class CustomersService {
 
   async get(id: string): Promise<AdminCustomerDetail> {
     const user = await this.require(id);
-    const [address, consents, audit] = await Promise.all([
+    const [address, consents, audit, orders] = await Promise.all([
       this.meRepo.findDefaultAddress(id),
       this.meRepo.findConsents(id),
       this.repo.findAuditSummary(id),
+      this.orders.listForUser(id), // F8: siparişler (OrderSummary, en yeni üstte)
     ]);
-    return toCustomerDetail(user, address ? toMeAddress(address) : null, consents.map(toAdminConsent), audit.map(toCustomerAuditItem));
+    return toCustomerDetail(user, address ? toMeAddress(address) : null, consents.map(toAdminConsent), audit.map(toCustomerAuditItem), orders.items);
   }
 
   async patch(id: string, dto: CustomerPatchDto, actorId: string | undefined): Promise<CustomerPatchResult> {

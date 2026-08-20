@@ -37,6 +37,9 @@ const F5_LIVE_PATHS = [
 /** F6'da gerçek sayfaya bağlanan ekranlar (BACKEND-PLANI §4 ekran 16 + Sistem › E-posta günlüğü). */
 const F6_LIVE_PATHS = ['/musteriler', '/sistem/e-posta-gunlugu'];
 
+/** F8'de gerçek sayfaya bağlanan ekranlar (BACKEND-PLANI §4 ekran 17 Siparişler + 23 Kuponlar). */
+const F8_LIVE_PATHS = ['/siparisler', '/kuponlar'];
+
 describe('adminNavConfig (Bağdam menüsü)', () => {
   it('tüm yollar benzersiz ve / ile başlar', () => {
     const leaves = getAllNavLeaves();
@@ -51,7 +54,7 @@ describe('adminNavConfig (Bağdam menüsü)', () => {
     }
   });
 
-  it('F4 (2–8), F5 (9–15) ve F6 (16 + e-posta günlüğü) ekranları gerçek sayfaya bağlı: comingSoon=false; diğerleri yer tutucu', () => {
+  it('F4 (2–8), F5 (9–15), F6 (16 + e-posta günlüğü) ve F8 (17 + 23) ekranları gerçek sayfaya bağlı: comingSoon=false; diğerleri yer tutucu', () => {
     for (const leaf of getAllNavLeaves()) {
       if (F4_LIVE_PATHS.includes(leaf.to)) {
         expect(leaf.phase, leaf.to).toBe('F4');
@@ -61,6 +64,9 @@ describe('adminNavConfig (Bağdam menüsü)', () => {
         expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(false);
       } else if (F6_LIVE_PATHS.includes(leaf.to)) {
         expect(leaf.phase, leaf.to).toBe('F6');
+        expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(false);
+      } else if (F8_LIVE_PATHS.includes(leaf.to)) {
+        expect(leaf.phase, leaf.to).toBe('F8');
         expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(false);
       } else {
         expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(true);
@@ -73,13 +79,15 @@ describe('adminNavConfig (Bağdam menüsü)', () => {
     expect(f5.map((l) => l.to).sort()).toEqual([...F5_LIVE_PATHS].sort());
     const f6 = getAllNavLeaves().filter((l) => l.phase === 'F6');
     expect(f6.map((l) => l.to).sort()).toEqual([...F6_LIVE_PATHS].sort());
+    const f8 = getAllNavLeaves().filter((l) => l.phase === 'F8');
+    expect(f8.map((l) => l.to).sort()).toEqual([...F8_LIVE_PATHS].sort());
   });
 
   it('BACKEND-PLANI §4 ekranları menüde', () => {
     const labels = getAllNavLeaves().map((l) => l.label);
     for (const expected of [
       'Özet', 'Ürünler', 'Kategoriler', 'Üreticiler', 'Kutular', 'Haftanın Kutusu', 'Medya',
-      'Site İçerikleri', 'Promo / Footer / İletişim', 'Günlük', 'Yasal Metinler', 'Toptan Talepleri', 'Müşteriler', 'Siparişler',
+      'Site İçerikleri', 'Promo / Footer / İletişim', 'Günlük', 'Yasal Metinler', 'Toptan Talepleri', 'Müşteriler', 'Siparişler', 'Kuponlar',
       'Abonelikler', 'Teslimat Günü', 'Ödeme Problemleri', 'Bölgeler', 'Teslimat Tarihleri',
       'E-posta', 'Ödeme', 'SEO', 'Genel', 'Sistem Durumu', 'E-posta Günlüğü',
     ]) {
@@ -104,6 +112,8 @@ describe('adminNavConfig (Bağdam menüsü)', () => {
     expect(getAdminPageLabel('/musteriler')).toBe('Müşteriler');
     expect(getAdminPageLabel('/musteriler/abc123')).toBe('Müşteriler');
     expect(getAdminPageLabel('/sistem/e-posta-gunlugu')).toBe('E-posta Günlüğü');
+    expect(getAdminPageLabel('/siparisler/abc')).toBe('Siparişler');
+    expect(findAdminNavGroup('/kuponlar')?.label).toBe('Satış');
     expect(findAdminNavGroup('/sistem/e-posta-gunlugu')?.label).toBe('Sistem');
     expect(getAdminPageLabel('/olmayan')).toBe('Yönetim');
     expect(findAdminNavLeaf('/olmayan')).toBeUndefined();

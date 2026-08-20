@@ -386,6 +386,12 @@ export const SITE_CONTENT_REGISTRY: readonly SiteContentRegistryEntry[] = [
   ...mailTemplateEntry('password-changed', 'E-posta — parola değişti', 'Değişkenler: {{user.*}} {{brand.*}} {{changedAt}}'),
   ...mailTemplateEntry('wholesale-lead', 'E-posta — yeni toptan talebi (yöneticiye)', 'Değişkenler: {{lead.email}} {{lead.businessName}} {{lead.phone}} {{lead.note}} {{lead.createdAt}} {{{adminUrl}}}'),
   ...mailTemplateEntry('test', 'E-posta — test gönderimi (Ayarlar › E-posta)', 'Değişkenler: {{sentAt}} {{brand.*}}'),
+  // F8: sipariş onayı — OrdersService PAID yan etkisi (Notifier 'order.paid'); yasal belge kopyası bağlantıları (onaylanan sürümler)
+  ...mailTemplateEntry(
+    'order-paid',
+    'E-posta — sipariş onayı (ödeme alındı)',
+    'Değişkenler: {{order.orderNo}} {{order.customerName}} {{order.paidAtText}} {{order.deliveryOnText}} {{order.deliveryDayLabel}} {{order.addressLine}} {{order.zoneName}} {{#each order.lines}}{{name}} {{qtyText}} {{lineTotalText}}{{/each}} {{order.subtotalText}} {{#if order.hasDiscount}}{{order.discountTotalText}}{{/if}} {{order.shippingFeeText}} {{order.vatTotalText}} {{order.grandTotalText}} {{order.couponCode}} {{#if order.isSubscription}}…{{/if}} {{#each order.legalDocuments}}{{title}} {{{url}}}{{/each}} {{{order.orderUrl}}} {{brand.*}}',
+  ),
 ];
 
 /**

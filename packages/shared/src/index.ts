@@ -22,6 +22,7 @@ export * from './types/pricing';
 export * from './types/admin'; // F4: admin panel DTO'ları (katalog CRUD + medya)
 export * from './types/mail'; // F6: MailModule (şablon slug'ları, Notifier olayları, MailLog admin DTO'ları)
 export * from './types/payment'; // F7: PaymentProvider / ChargeStrategy sözleşmesi (apps/api modules/payments)
+export * from './types/checkout'; // F8: checkout quote/checkout DTO'ları (apps/api modules/checkout)
 
 // Durum makineleri (Order / Subscription / Cycle / Payment / Cancellation) — docs/state-machines.md ile aynı
 export * from './state-machines';

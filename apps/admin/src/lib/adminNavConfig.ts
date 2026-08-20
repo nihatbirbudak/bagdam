@@ -9,7 +9,7 @@ export type AdminNavLeaf = {
   label: string;
   to: string;
   phase?: AdminPhase;
-  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: 1–8, F5: 9–15, F6: 16 + e-posta günlüğü bağlı). */
+  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: 1–8, F5: 9–15, F6: 16 + e-posta günlüğü, F8: 17 Siparişler + 23 Kuponlar bağlı). */
   comingSoon?: boolean;
   /** Yer tutucu sayfada gösterilen kısa kapsam notu (BACKEND-PLANI §4). */
   hint?: string;
@@ -94,9 +94,10 @@ export const adminNavItems: AdminNavItem[] = [
         to: '/musteriler',
         phase: 'F6',
         comingSoon: false,
-        hint: 'Liste (arama, rol, son giriş, e-posta doğrulama), detay (profil, adres, onaylar, audit özeti; siparişler F8), düzenle, KVKK anonimleştir.',
+        hint: 'Liste (arama, rol, son giriş, e-posta doğrulama), detay (profil, adres, onaylar, audit özeti, siparişler), düzenle, KVKK anonimleştir.',
       },
-      { label: 'Siparişler', to: '/siparisler', phase: 'F8', comingSoon: true, hint: 'Durum geçişleri, iade, fatura no/PDF, kurumsal fatura alanları.' },
+      { label: 'Siparişler', to: '/siparisler', phase: 'F8', comingSoon: false, hint: 'Liste (durum/tür/tarih/arama, CSV), detay: satırlar, ödemeler, iade, durum geçişleri, notlar, fatura no/PDF, kurumsal fatura alanları.' },
+      { label: 'Kuponlar', to: '/kuponlar', phase: 'F8', comingSoon: false, hint: 'İndirim kuponları: oluştur/düzenle, aktif-pasif, kullanımlar (CouponRedemption).' },
       { label: 'Abonelikler', to: '/abonelikler', phase: 'F9', comingSoon: true, hint: 'Abonelik, cycle, cycle içerikleri, olaylar, iptaller; tek seferlik kutular da burada.' },
       { label: 'Ödeme Problemleri', to: '/odeme-problemleri', phase: 'F9', comingSoon: true, hint: "UNPAID / AWAITING_PAYMENT cycle'lar: link gönder, yeniden çek." },
     ],
@@ -114,7 +115,7 @@ export const adminNavItems: AdminNavItem[] = [
       { label: 'Bölgeler', to: '/ayarlar/bolgeler', phase: 'F5', comingSoon: false, hint: 'Teslimat bölgeleri: ücret / eşik / kapasite; teslimat tarihleri önizleme.' },
       { label: 'Teslimat Tarihleri', to: '/ayarlar/teslimat-tarihleri', phase: 'F9', comingSoon: true, hint: 'Doluluk, günü kapat.' },
       { label: 'E-posta', to: '/ayarlar/e-posta', phase: 'F5', comingSoon: false, hint: 'E-posta ve SMS sağlayıcı ayarları (şifreli); test gönderimi.' },
-      { label: 'Ödeme', to: '/ayarlar/odeme', phase: 'F5', comingSoon: false, hint: 'iyzico anahtarları (şifreli), tahsilat stratejisi.' },
+      { label: 'Ödeme', to: '/ayarlar/odeme', phase: 'F5', comingSoon: false, hint: 'PayTR mağaza bilgileri (şifreli), test modu, callback IP listesi, kayıtlı kart (ADR-0019).' },
       { label: 'SEO', to: '/ayarlar/seo', phase: 'F5', comingSoon: false, hint: 'Sayfa başlıkları/açıklama, OG görseli; sitemap/robots API’den.' },
     ],
   },

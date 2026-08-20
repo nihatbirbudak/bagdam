@@ -10,6 +10,8 @@ import { AdminPageHeader } from '../../features/components/AdminPageHeader';
 import { BoolBadge } from '../../features/components/StatusBadge';
 import { ErrorBlock, InlineNotice, LoadingBlock } from '../../features/components/StateBlocks';
 import { customersApi } from '../../features/musteriler/api';
+import { ordersApi } from '../../features/siparisler/api';
+import { OrderStatusBadge } from '../../features/siparisler/OrderBadges';
 import { CustomerStateBadge, RoleBadge } from '../../features/musteriler/CustomerBadges';
 import {
   customerDisplayName,
@@ -21,11 +23,11 @@ import {
   type CustomerProfileDraft,
 } from '../../features/musteriler/customers';
 import { errorMessage, extractFieldErrors } from '../../lib/api';
-import type { AdminCustomerAuditEntry, AdminCustomerDetail } from '../../lib/apiTypes';
+import type { AdminCustomerAuditEntry, AdminCustomerDetail, OrderSummary } from '../../lib/apiTypes';
 import { btn } from '../../lib/buttonStyles';
 import { td, tdText, th } from '../../lib/tableStyles';
 import { toast } from '../../lib/toast';
-import { cn, formatDateTime } from '../../lib/utils';
+import { cn, formatDate, formatDateTime, formatTry } from '../../lib/utils';
 
 const LIST_PATH = '/musteriler';
 const EMPTY_DRAFT: CustomerProfileDraft = { name: '', phone: '', isActive: true };
@@ -94,8 +96,81 @@ function mergeAudit(lists: (AdminCustomerAuditEntry[] | null)[], limit = 10): Ad
 }
 
 /**
+ * F8 — Müşterinin siparişleri: `GET /admin/orders?q=<e-posta>&limit=10` (q e-posta/ad/telefon içerir arar; Order.customerEmail
+ * snapshot'ı = User.email). Anonimleştirilmiş müşteride e-posta değiştiğinden sorgu atılmaz. Tümü için Siparişler filtreli bağlantı.
+ */
+function CustomerOrdersCard({ customer }: { customer: AdminCustomerDetail }) {
+  const anonymized = isCustomerAnonymized(customer);
+  const email = customer.email;
+  const [rows, setRows] = useState<OrderSummary[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (anonymized) {
+      setRows([]);
+      return;
+    }
+    let cancelled = false;
+    setRows(null);
+    setError(null);
+    ordersApi
+      .list({ q: email, page: 1, limit: 10 })
+      .then((res) => {
+        if (cancelled) return;
+        setRows(res.items);
+        setTotal(res.total);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setRows([]);
+        setError(errorMessage(e, 'Siparişler alınamadı'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [email, anonymized]);
+
+  const listHref = `/siparisler?q=${encodeURIComponent(email)}`;
+  return (
+    <Card title="Siparişler" icon={ShoppingBag}>
+      {anonymized ? (
+        <p className="text-sm text-brand-500">Anonimleştirilmiş müşteri — siparişler e-posta ile eşlenemez; Siparişler ekranında sipariş no ile aranabilir.</p>
+      ) : rows === null ? (
+        <p className="text-sm text-brand-500">Yükleniyor…</p>
+      ) : error ? (
+        <p className="text-sm text-accent-dark" role="alert">{error}</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-brand-500">Henüz sipariş yok.</p>
+      ) : (
+        <>
+          <ul className="divide-y divide-brand-100">
+            {rows.map((o) => (
+              <li key={o.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                <span className="min-w-0">
+                  <Link to={`/siparisler/${o.id}`} className="font-semibold text-brand-900 hover:text-accent">#{o.orderNo}</Link>
+                  <span className="block text-[11px] text-brand-500">{formatDate(o.deliveryOn)} · {formatDateTime(o.createdAt)}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <OrderStatusBadge status={o.status} />
+                  <span className="tabular-nums text-brand-800">{formatTry(o.grandTotal)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-brand-500">
+            {total > rows.length ? `${rows.length} / ${total} sipariş gösteriliyor. ` : `${total} sipariş. `}
+            <Link to={listHref} className="text-accent hover:underline">Tümünü Siparişler'de aç</Link>
+          </p>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/**
  * Ekran 16 — Müşteri detayı: profil (ad/telefon/aktif → PATCH), adres (salt okunur), onaylar, audit özeti,
- * siparişler (F8'de dolar), KVKK anonimleştir (geri alınamaz).
+ * siparişler (F8: /admin/orders?q=e-posta), KVKK anonimleştir (geri alınamaz).
  */
 export function AdminMusteriDetayPage() {
   const { id } = useParams<{ id: string }>();
@@ -377,12 +452,7 @@ export function AdminMusteriDetayPage() {
             )}
           </Card>
 
-          <Card title="Siparişler" icon={ShoppingBag}>
-            <p className="text-sm text-brand-500">
-              {customer.orders.total > 0 ? `${customer.orders.total} sipariş. ` : 'Sipariş yok. '}
-              Sipariş geçmişi F8'de (checkout + iyzico) bağlanır.
-            </p>
-          </Card>
+          <CustomerOrdersCard customer={customer} />
 
           <Card title="Audit özeti" icon={History}>
             {auditRows.length === 0 ? (

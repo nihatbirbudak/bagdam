@@ -164,6 +164,12 @@
     return !!subDraft && JSON.stringify(subDraft) !== JSON.stringify(BahcedenCart.getSub());
   }
 
+  // F8 checkout: satın alınmış abonelik artık localStorage'da değil — BahcedenCart.loadSubscription() (GET /me/subscription)
+  // bootstrap sub alanını doldurur, getSub() onu okur. Kartın mutasyonları (gün/ekstra/atla/iptal/onay) F9'da API'ye bağlanır;
+  // o güne kadar sunucu kaynaklı kartta bu düğmeler pasif + kısa not (ADR-0003 istisna 7 kapsamı).
+  function isServerSub() {
+    return BahcedenCart.isLoggedIn() && !!(window.__BAGDAM__ && window.__BAGDAM__.sub);
+  }
   function renderSub() {
     const savedSub = BahcedenCart.getSub();
     const sub = subDraft || savedSub;
@@ -316,6 +322,18 @@
       (skipConfirmOpen ? skipConfirmHtml : "") +
       (cancelFlowOpen ? cancelFlowHtml : '<p class="cancel-note"><a href="#" id="cancelSubLink">aboneliği iptal et</a></p>');
 
+    // F8 checkout: sunucu kaynaklı abonelikte değişiklik düğmeleri F9'a kadar pasif; yalnız görüntüleme.
+    if (isServerSub()) {
+      subCard.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+      const cancelLink = document.getElementById("cancelSubLink");
+      if (cancelLink) cancelLink.addEventListener("click", (e) => e.preventDefault());
+      const note = document.createElement("p");
+      note.className = "cancel-note";
+      note.textContent = "Abonelik değişiklikleri (gün, ekstra, atlama, iptal) çok yakında bu sayfadan yapılabilecek — şimdilik mutlu müşteri hattımızdan ulaşabilirsin.";
+      subCard.appendChild(note);
+      return;
+    }
+
     // Ekstra silme ve gün değişikliği taslağa yazılır — onay bekler.
     subCard.querySelectorAll("[data-extra-idx]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -435,42 +453,81 @@
       }
     }
   }
-  renderSub();
+  // Abonelik kartı: önce sunucudaki satın alınmış abonelik (varsa) yüklenir, sonra çizilir.
+  function loadAndRenderSub() {
+    if (!BahcedenCart.isLoggedIn()) { renderSub(); return; }
+    BahcedenCart.loadSubscription().catch(() => null).then(renderSub);
+  }
+  loadAndRenderSub();
 
-  // ---- Önceki siparişler — sepet.html her tamamlanan ödemede bir kayıt
-  // düşer; burada en yenisi üstte listelenir. Teslimat henüz gelmediyse
-  // (kayıt 2 günden yeniyse) "hazırlanıyor" görünür.
+  // ---- Önceki siparişler — F8 checkout: GET /me/orders (OrderSummary; en yeni üstte). Satırlar "detay" ile
+  // GET /me/orders/:orderNo'dan açılır. bahceden_orders localStorage kaydı kalktı. ----
+  const ORDER_STATUS_TEXT = {
+    PENDING_PAYMENT: ["ÖDEME BEKLİYOR", true], PAID: ["HAZIRLANIYOR", true], PREPARING: ["HAZIRLANIYOR", true],
+    OUT_FOR_DELIVERY: ["YOLDA", true], DELIVERED: ["TESLİM EDİLDİ", false], DELIVERY_FAILED: ["TESLİM EDİLEMEDİ", true],
+    CANCELLED: ["İPTAL EDİLDİ", false], REFUNDED: ["İADE EDİLDİ", false], PAYMENT_FAILED: ["ÖDEME BAŞARISIZ", true],
+  };
+  const ORDER_KIND_TEXT = { SUBSCRIPTION: "ABONELİK · ", BOX_ONE_TIME: "TEK SEFERLİK KUTU · ", SINGLE: "" };
+  function orderDateParts(iso) {
+    const d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return { date: "—", time: "" };
+    return {
+      date: d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }),
+      time: d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+    };
+  }
+  function deliveryOnLabel(isoDate, dayId) {
+    const d = isoDate ? new Date(isoDate + "T00:00:00") : null;
+    if (d && !isNaN(d.getTime())) return d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }) + ", " + d.toLocaleDateString("tr-TR", { weekday: "long" });
+    return (DELIVERY_DAYS.find((x) => x.id === dayId) || {}).label || "—";
+  }
+  function orderRowHtml(o) {
+    const st = ORDER_STATUS_TEXT[o.status] || [escText(o.status || ""), true];
+    const created = orderDateParts(o.createdAt);
+    const kindLabel = ORDER_KIND_TEXT[o.kind] || "";
+    return (
+      '<div class="order-row" data-order-no="' + escAttr(o.orderNo) + '">' +
+        '<div class="order-row-head">' +
+          '<span class="mono order-no">' + kindLabel + "SİPARİŞ #" + escText(o.orderNo) + "</span>" +
+          '<span class="order-status mono' + (st[1] ? " pending" : "") + '">' + st[0] + "</span>" +
+        "</div>" +
+        '<p class="order-meta mono">Sipariş: ' + created.date + (created.time ? " · " + created.time : "") + "</p>" +
+        '<p class="order-meta mono">Teslimat: ' + deliveryOnLabel(o.deliveryOn, o.deliveryDay) + "</p>" +
+        '<p class="order-lines" data-order-lines>' + (o.lineCount ? o.lineCount + " satır · " : "") + '<a href="#" data-order-detail>detayı gör</a></p>' +
+        '<p class="order-total mono">' + money(o.grandTotal) + " TL</p>" +
+      "</div>"
+    );
+  }
   function renderOrders() {
     const listEl = document.getElementById("ordersList");
-    const orders = BahcedenCart.getOrders();
-    if (!orders.length) {
-      listEl.innerHTML = '<p class="account-empty">Henüz tamamlanmış bir siparişin yok.</p>';
-      return;
-    }
-    listEl.innerHTML = orders.map((o) => {
-      const d = new Date(o.date);
-      const orderDateStr = d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
-      const orderTimeStr = d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-      // Teslimat: tarih + gün adı. Eski kayıtlarda tarih yoksa gün adıyla yetinilir.
-      const delivD = o.deliveryDate ? new Date(o.deliveryDate) : null;
-      const delivStr = delivD
-        ? delivD.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }) + ", " + delivD.toLocaleDateString("tr-TR", { weekday: "long" })
-        : ((DELIVERY_DAYS.find((x) => x.id === o.deliveryDay) || {}).label || "—");
-      const typeLabel = o.type === "subscription" ? "ABONELİK · " : (o.type === "onetime" ? "TEK SEFERLİK KUTU · " : "");
-      const pending = delivD ? Date.now() < delivD.getTime() : Date.now() - o.date < 2 * 86400000;
-      return (
-        '<div class="order-row">' +
-          '<div class="order-row-head">' +
-            '<span class="mono order-no">' + typeLabel + "SİPARİŞ #" + (o.no || "—") + "</span>" +
-            '<span class="order-status mono' + (pending ? " pending" : "") + '">' + (pending ? "HAZIRLANIYOR" : "TESLİM EDİLDİ") + "</span>" +
-          "</div>" +
-          '<p class="order-meta mono">Sipariş: ' + orderDateStr + " · " + orderTimeStr + "</p>" +
-          '<p class="order-meta mono">Teslimat: ' + delivStr + "</p>" +
-          '<p class="order-lines">' + o.lines.join(" · ") + "</p>" +
-          '<p class="order-total mono">' + money(o.total) + " TL</p>" +
-        "</div>"
-      );
-    }).join("");
+    if (!BahcedenCart.isLoggedIn()) { listEl.innerHTML = ""; return; }
+    listEl.innerHTML = '<p class="account-empty">Siparişlerin yükleniyor…</p>';
+    BahcedenCart.listOrders().then((orders) => {
+      if (!orders.length) {
+        listEl.innerHTML = '<p class="account-empty">Henüz tamamlanmış bir siparişin yok.</p>';
+        return;
+      }
+      listEl.innerHTML = orders.map(orderRowHtml).join("");
+      listEl.querySelectorAll("[data-order-detail]").forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          const row = a.closest(".order-row");
+          const linesEl = row.querySelector("[data-order-lines]");
+          linesEl.textContent = "yükleniyor…";
+          BahcedenCart.getOrder(row.getAttribute("data-order-no"))
+            .then((order) => {
+              const lines = (order && order.lines) || [];
+              linesEl.textContent = lines.map((l) => {
+                const qty = l.kind === "PRODUCT" ? " × " + l.qty : "";
+                return l.name + qty + (l.pref ? " (" + l.pref + ")" : "");
+              }).join(" · ") || "—";
+            })
+            .catch((err) => { linesEl.textContent = (err && err.message) || "Detay alınamadı."; });
+        });
+      });
+    }).catch((err) => {
+      listEl.innerHTML = '<p class="account-empty">' + escText((err && err.message) || "Siparişler yüklenemedi.") + "</p>";
+    });
   }
   renderOrders();
 
@@ -557,48 +614,60 @@
   }
   loadAndRenderAddress();
 
-  // ---- Payment method — same saved-card store sepet.html reads/writes ----
+  // ---- Payment method — F8 checkout: saklı kartlar sunucudan (GET /me/cards → PaymentMethod: yalnız PSP token özeti,
+  // kart verisi bizde yok). Kart formu kalktı: kart ilk ödemede (PayTR iFrame) saklanır; "yeni kart ekle" →
+  // POST /me/cards/add-session (PayTR'de 501 → mesaj). Kaldır → DELETE /me/cards/:id. ----
   const paymentCard = document.getElementById("paymentCard");
+  let paymentCards = [];
 
-  function renderPaymentSaved(card) {
+  function renderPaymentList() {
+    const rows = paymentCards.map((c) =>
+      '<p class="account-empty">•••• •••• •••• ' + escText(c.last4 || "") +
+        (c.brand ? " — " + escText(c.brand) : "") + (c.holderName ? " — " + escText(c.holderName) : "") +
+        (c.expMonth && c.expYear ? ' <span class="mono">(' + String(c.expMonth).padStart(2, "0") + "/" + String(c.expYear).slice(-2) + ")</span>" : "") +
+        (c.isDefault ? ' <span class="mono">· varsayılan</span>' : "") +
+        ' <a href="#" class="cart-remove mono" data-remove-card="' + escAttr(c.id) + '">kaldır</a>' +
+      "</p>"
+    ).join("");
     paymentCard.innerHTML =
-      '<p class="account-empty">•••• •••• •••• ' + card.number.slice(-4) + " — " + card.name + "</p>" +
-      '<button class="btn" type="button" id="editCardBtn">kartı değiştir</button>';
-    document.getElementById("editCardBtn").addEventListener("click", () => renderPaymentForm(card));
-  }
-
-  function renderPaymentForm(card) {
-    card = card || {};
-    paymentCard.innerHTML =
-      '<form class="account-form" id="cardForm">' +
-        '<label>Kart Üzerindeki İsim<input type="text" id="cardFormName" placeholder="Ad Soyad" value="' + (card.name || "") + '" required></label>' +
-        '<label>Kart Numarası<input type="text" id="cardFormNumber" placeholder="0000 0000 0000 0000" inputmode="numeric" maxlength="19" value="' + (card.number || "") + '" required></label>' +
-        '<div class="form-row">' +
-          '<label>Son Kullanma<input type="text" id="cardFormExpiry" placeholder="AA/YY" maxlength="5" value="' + (card.expiry || "") + '" required></label>' +
-          '<label>CVC<input type="text" id="cardFormCvc" placeholder="123" inputmode="numeric" maxlength="4" value="' + (card.cvc || "") + '" required></label>' +
-        "</div>" +
-        '<button class="cta" type="submit">kartı kaydet</button>' +
-      "</form>";
-    document.getElementById("cardForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const saved = {
-        name: document.getElementById("cardFormName").value.trim(),
-        number: document.getElementById("cardFormNumber").value.trim(),
-        expiry: document.getElementById("cardFormExpiry").value.trim(),
-        cvc: document.getElementById("cardFormCvc").value.trim(),
-      };
-      BahcedenCart.setCard(saved);
-      renderPaymentSaved(saved);
+      (rows || '<p class="account-empty">Kayıtlı kartın yok — kartın ilk ödemende güvenle saklanır (kart bilgileri bizde tutulmaz).</p>') +
+      '<p class="checkout-auth-msg mono" id="cardMsg" hidden></p>' +
+      '<button class="btn" type="button" id="addCardBtn">yeni kart ekle</button>';
+    const msgEl = document.getElementById("cardMsg");
+    function showCardMsg(text, ok) { msgEl.textContent = text || ""; msgEl.hidden = !text; msgEl.style.color = ok ? "var(--olive-deep)" : ""; }
+    paymentCard.querySelectorAll("[data-remove-card]").forEach((a) => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        const id = a.getAttribute("data-remove-card");
+        BahcedenCart.removeCard(id)
+          .then(() => { paymentCards = paymentCards.filter((c) => c.id !== id); renderPaymentList(); })
+          .catch((err) => showCardMsg((err && err.message) || "Kart kaldırılamadı."));
+      });
+    });
+    document.getElementById("addCardBtn").addEventListener("click", () => {
+      const btn = document.getElementById("addCardBtn");
+      btn.disabled = true;
+      BahcedenCart.cardAddSession()
+        .then((res) => {
+          btn.disabled = false;
+          if (res && res.redirectUrl) { window.location.href = res.redirectUrl; return; }
+          showCardMsg((res && res.message) || "Kart ekleme ekranı açılamadı.", true);
+        })
+        .catch((err) => {
+          btn.disabled = false;
+          // 501 (PayTR'de ayrı kart ekleme yok — kart ilk ödemede saklanır) ve 404 (uç yok): teknik zarf yerine sabit not.
+          const noSession = !!err && (err.status === 501 || err.status === 404);
+          showCardMsg(noSession ? "Kart ekleme için ayrı bir ekran yok — kartın bir sonraki ödemende güvenle saklanır." : ((err && err.message) || "Kart eklenemedi."), noSession);
+        });
     });
   }
 
   function renderPayment() {
-    const existingCard = BahcedenCart.getCard();
-    if (existingCard) {
-      renderPaymentSaved(existingCard);
-    } else {
-      renderPaymentForm();
-    }
+    if (!BahcedenCart.isLoggedIn()) { paymentCard.innerHTML = ""; return; }
+    paymentCard.innerHTML = '<p class="account-empty">Kartların yükleniyor…</p>';
+    BahcedenCart.listCards()
+      .then((cards) => { paymentCards = (cards || []).filter((c) => c && c.isActive !== false); renderPaymentList(); })
+      .catch((err) => { paymentCard.innerHTML = '<p class="account-empty">' + escText((err && err.message) || "Kartlar yüklenemedi.") + "</p>"; });
   }
   renderPayment();
 
@@ -608,7 +677,8 @@
     subDraft = null;
     skipConfirmOpen = false;
     cancelFlowOpen = false;
-    renderSub();
+    if (!BahcedenCart.isLoggedIn() && window.__BAGDAM__) window.__BAGDAM__.sub = null; // F8 checkout: çıkışta sunucu aboneliği görünmez
+    loadAndRenderSub();
     renderOrders();
     loadAndRenderAddress();
     renderPayment();

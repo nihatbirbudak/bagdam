@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import {
+  PROVIDER_FEATURE_DISABLED,
   roundMoney,
   type ChargeStrategy as ChargeStrategyKind,
   type ChargeStrategyDecision,
@@ -11,8 +12,9 @@ import type { PaymentKind, PaymentMethod, Prisma } from '@prisma/client';
 import { SettingsService } from '../../settings/settings.service';
 import { buildPayLinkUrl, cycleConversationId, generateLinkToken, linkConversationId } from '../payments.constants';
 import { decimalToMoney } from '../payments.mapper';
-import type { DbClient, PaymentRecord } from '../payments.repository';
+import { PaymentsRepository, type DbClient, type PaymentRecord } from '../payments.repository';
 import { PaymentsService } from '../payments.service';
+import type { StoredCardRef } from '../providers/payment-provider.interface';
 import { PaymentProviderFactory } from '../providers/payment-provider.factory';
 
 /** Tahsilatın bağlandığı cycle (Payment'ta FK yok; conversationId `cyc_<cycleId>_<n>` ile izlenir). */
@@ -31,7 +33,7 @@ export interface OrderRef {
 
 /** Saklı kart kaydı (PaymentMethod) — MIT için gereken alanlar (+ aktiflik bilgisi varsa). */
 export type StoredCardRecord = Pick<PaymentMethod, 'id' | 'provider' | 'providerCustomerKey' | 'providerCardToken' | 'last4'> &
-  Partial<Pick<PaymentMethod, 'isActive' | 'deletedAt'>>;
+  Partial<Pick<PaymentMethod, 'isActive' | 'deletedAt' | 'holderName'>>;
 
 export interface MitChargeOptions {
   /** CYCLE_CHARGE (varsayılan) · DELTA (cycle#1 ekstraları) · RETRY (dunning). */
@@ -57,11 +59,22 @@ export interface PaymentLinkOptions {
 export type MitChargeResult = MitChargeOutcome & { payment: PaymentRecord };
 export type PaymentLinkIssueResult = PaymentLinkIssue & { payment: PaymentRecord };
 
+/** Sağlayıcı istisnası → failureCode: 503 PROVIDER_FEATURE_DISABLED (kayıtlı kart onayı yok) ayrı kodlanır; diğerleri PROVIDER_ERROR. */
+function providerFailureCode(err: unknown): string {
+  if (err instanceof HttpException) {
+    const body = err.getResponse() as { error?: string };
+    if (body?.error === PROVIDER_FEATURE_DISABLED) return PROVIDER_FEATURE_DISABLED;
+  }
+  return 'PROVIDER_ERROR';
+}
+
 /**
  * MerchantInitiatedCharge — saklı karttan NON3D tahsilat (ADR-0006 MERCHANT_INITIATED; state-machines §8 adım 6, §9).
  * `charge(cycle, order, paymentMethod, opts)`: Payment(kind CYCLE_CHARGE|DELTA|RETRY, isMerchantInitiated, is3ds=false, attemptNo,
  * conversationId `cyc_<cycleId>_<attemptNo>`) → kartın sağlayıcısı `chargeStoredCard` → Payment SUCCEEDED | FAILED.
- * Cycle/Order/abonelik geçişleri ve SubscriptionEvent ÇAĞIRANIN (CyclesService). Sağlayıcı istisnası → FAILED `PROVIDER_ERROR` (fırlatmaz).
+ * Cycle/Order/abonelik geçişleri ve SubscriptionEvent ÇAĞIRANIN (CyclesService). Sağlayıcı istisnası → FAILED `PROVIDER_ERROR`
+ * (PayTR kayıtlı kart onayı kapalıysa `PROVIDER_FEATURE_DISABLED`; fırlatmaz). F8: PayTR'nin istediği kart sahibi e-postası/adı
+ * PaymentMethod.user'dan doldurulur (`StoredCardRef.email/holderName`).
  * Tutar ≤ 0 → sağlayıcıya gidilmez, Payment doğrudan SUCCEEDED (tutar 0 kaydı; normalde çağıran `due<=0`'da buraya gelmez).
  */
 @Injectable()
@@ -72,6 +85,7 @@ export class MerchantInitiatedCharge {
   constructor(
     private readonly payments: PaymentsService,
     private readonly providers: PaymentProviderFactory,
+    private readonly repo: PaymentsRepository,
   ) {}
 
   async charge(cycle: CycleRef, order: OrderRef, paymentMethod: StoredCardRecord, opts: MitChargeOptions = {}): Promise<MitChargeResult> {
@@ -102,11 +116,7 @@ export class MerchantInitiatedCharge {
     }
 
     try {
-      const res = await provider.chargeStoredCard(
-        { id: paymentMethod.id, providerCustomerKey: paymentMethod.providerCustomerKey, providerCardToken: paymentMethod.providerCardToken, last4: paymentMethod.last4 },
-        amount,
-        conversationId,
-      );
+      const res = await provider.chargeStoredCard(await this.cardRef(paymentMethod, opts.tx), amount, conversationId);
       if (res.ok) {
         const done = await this.payments.markSucceeded(payment.id, { providerPaymentId: res.providerPaymentId, rawResponse: res.raw, paidAt: now }, opts.tx);
         this.logger.log(`MIT tahsilat OK: cycle ${cycle.id} order ${order.id} ${amount} TL (${conversationId})`);
@@ -121,10 +131,23 @@ export class MerchantInitiatedCharge {
       return this.outcome('FAILED', failed, amount);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`MIT tahsilat sağlayıcı hatası: cycle ${cycle.id} — ${message}`);
-      const failed = await this.payments.markFailed(payment.id, { failureCode: 'PROVIDER_ERROR', failureMessage: message }, opts.tx);
+      const failureCode = providerFailureCode(err);
+      this.logger.error(`MIT tahsilat sağlayıcı hatası (${failureCode}): cycle ${cycle.id} — ${message}`);
+      const failed = await this.payments.markFailed(payment.id, { failureCode, failureMessage: message }, opts.tx);
       return this.outcome('FAILED', failed, amount);
     }
+  }
+
+  /** StoredCardRef: PaymentMethod + sahibi (e-posta/ad) — PayTR kayıtlı kart ödemesinde zorunlu; okunamazsa yalnız token'lar. */
+  private async cardRef(pm: StoredCardRecord, tx?: DbClient): Promise<StoredCardRef> {
+    const base: StoredCardRef = { id: pm.id, providerCustomerKey: pm.providerCustomerKey, providerCardToken: pm.providerCardToken, last4: pm.last4, holderName: pm.holderName ?? null };
+    try {
+      const full = await this.repo.findPaymentMethodWithUser(pm.id, tx);
+      if (full) return { ...base, email: full.user.email, holderName: full.holderName ?? full.user.name ?? null };
+    } catch (err) {
+      this.logger.warn(`PaymentMethod sahibi okunamadı (${pm.id}): ${(err as Error).message}`);
+    }
+    return base;
   }
 
   private outcome(status: 'SUCCEEDED' | 'FAILED', payment: PaymentRecord, amount: Money): MitChargeResult {
@@ -146,6 +169,8 @@ export class MerchantInitiatedCharge {
  * `issue(cycle, order, opts)`: Payment(kind LINK, is3ds, linkToken 32 hex rastgele, linkExpiresAt = now + Setting `commerce.paymentLinkHours`,
  * conversationId `lnk_<cycleId>_<attemptNo>`) → `{status:'AWAITING_PAYMENT', linkToken, linkUrl, linkExpiresAt}`.
  * cycle AWAITING_PAYMENT + paymentDueAt + e-posta ÇAĞIRANIN. Süre dolunca `PaymentsService.expireLinksDue(now)` / `markExpired`.
+ * F8: `GET /pay/:linkToken` sayfası (B/C) aktif sağlayıcı PayTR ise `PayTrProvider.createPaymentLink` ile PayTR linkine yönlendirir/gömer;
+ * callback_id = conversationId'nin alfanümerik hâli → callback bu Payment'ı bulur (PaymentsRepository.findPaymentByMerchantOid).
  */
 @Injectable()
 export class PaymentLinkCharge {
@@ -210,7 +235,10 @@ export type ResolvedChargeStrategy = ChargeStrategyDecision &
 
 /**
  * ChargeStrategyResolver — abonelik başına strateji (Subscription.chargeStrategy = Setting kopyası, ADR-0006).
- * MERCHANT_INITIATED ama saklı kart yok/pasif → PAYMENT_LINK'e düşer (`fallbackReason: 'NO_STORED_CARD'`; state-machines §14 #10, karar: evet + log).
+ *  - `for(sub)` (sync, F7): MERCHANT_INITIATED ama saklı kart yok/pasif → PAYMENT_LINK (`NO_STORED_CARD`; state-machines §14 #10).
+ *  - `resolve(sub)` (F8, async): ek olarak aktif sağlayıcı PayTR ve Setting `payment.storedCardEnabled=false` → PAYMENT_LINK
+ *    (`STORED_CARD_DISABLED`, ADR-0019: kayıtlı kart onayı gelene kadar abonelik tahsilatı ödeme linkiyle).
+ *  - `resolveDefault()` (F8): yeni abonelik için Setting `commerce.chargeStrategy` + aynı PayTR kuralı → B checkout `createFromCheckout.chargeStrategy`.
  */
 @Injectable()
 export class ChargeStrategyResolver {
@@ -219,6 +247,8 @@ export class ChargeStrategyResolver {
   constructor(
     private readonly mit: MerchantInitiatedCharge,
     private readonly link: PaymentLinkCharge,
+    private readonly settings: SettingsService,
+    private readonly providers: PaymentProviderFactory,
   ) {}
 
   for(subscription: SubscriptionChargeContext): ResolvedChargeStrategy {
@@ -230,5 +260,37 @@ export class ChargeStrategyResolver {
       return { kind: 'PAYMENT_LINK', fallbackReason: 'NO_STORED_CARD', strategy: this.link };
     }
     return { kind: 'PAYMENT_LINK', fallbackReason: null, strategy: this.link };
+  }
+
+  /** `for()` + sağlayıcı yeteneği (PayTR kayıtlı kart onayı). */
+  async resolve(subscription: SubscriptionChargeContext): Promise<ResolvedChargeStrategy> {
+    const base = this.for(subscription);
+    if (base.kind !== 'MERCHANT_INITIATED') return base;
+    if (await this.storedCardsUnavailable()) {
+      this.logger.warn('MERCHANT_INITIATED istendi ama PayTR kayıtlı kart onayı kapalı (payment.storedCardEnabled=false) → PAYMENT_LINK');
+      return { kind: 'PAYMENT_LINK', fallbackReason: 'STORED_CARD_DISABLED', strategy: this.link };
+    }
+    return base;
+  }
+
+  /** Yeni abonelik için varsayılan strateji (Setting commerce.chargeStrategy; PayTR onayı yoksa PAYMENT_LINK). */
+  async resolveDefault(): Promise<ChargeStrategyDecision> {
+    const commerce = await this.settings.getCommerce();
+    if (commerce.chargeStrategy === 'MERCHANT_INITIATED' && (await this.storedCardsUnavailable())) {
+      return { kind: 'PAYMENT_LINK', fallbackReason: 'STORED_CARD_DISABLED' };
+    }
+    return { kind: commerce.chargeStrategy, fallbackReason: null };
+  }
+
+  /** Aktif sağlayıcı paytr ve Setting payment.storedCardEnabled kapalı mı. */
+  private async storedCardsUnavailable(): Promise<boolean> {
+    try {
+      if ((await this.providers.resolveName()) !== 'paytr') return false;
+      const payment = await this.settings.getPayment();
+      return payment.storedCardEnabled !== true;
+    } catch (err) {
+      this.logger.warn(`Kayıtlı kart yeteneği okunamadı: ${(err as Error).message}`);
+      return false;
+    }
   }
 }

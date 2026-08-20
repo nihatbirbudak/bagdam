@@ -144,16 +144,37 @@
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="1.5"/><path d="M2 9.5h20"/></svg>
               Kredi Kartı / Banka Kartı
             </div>
-            <label>Kart Üzerindeki İsim<input type="text" id="cardName" placeholder="Ad Soyad" required></label>
-            <label>Kart Numarası<input type="text" id="cardNumber" placeholder="0000 0000 0000 0000" inputmode="numeric" maxlength="19" required></label>
-            <div class="form-row">
-              <label>Son Kullanma<input type="text" id="cardExpiry" placeholder="AA/YY" inputmode="numeric" maxlength="5" required></label>
-              <label>CVC<input type="text" id="cardCvc" placeholder="123" inputmode="numeric" maxlength="4" required></label>
-            </div>
+            <!-- F8 — ADR-0003 istisna 1: prototipteki 4 alanlı kart formu yerine PayTR iFrame konteyneri (aynı kutu içinde);
+                 kart verisi hiçbir zaman bize gelmez (ADR-0019). Saklı kartlar (PaymentMethod) varsa üstte seçilir. Yalnız bu blok; styles.css'e dokunulmaz. -->
+            <style>
+              .checkout-payment-frame{ border:1px solid var(--line-strong); background:var(--bg); }
+              .checkout-payment-frame.is-empty{ display:flex; align-items:center; justify-content:center; min-height:96px; padding:18px 14px; font-size:12px; color:var(--ink-soft); text-align:center; line-height:1.5; }
+              .checkout-payment-frame iframe{ display:block; width:100%; min-height:460px; border:0; }
+              .checkout-payment-frame .checkout-payment-test{ padding:18px 14px; font-size:12px; color:var(--olive-deep); line-height:1.5; }
+              #savedCards .toggle{ text-transform:none; letter-spacing:0; }
+              .checkout-form.coupon-row{ margin-top:22px; }
+              .coupon-field{ display:flex; gap:8px; }
+              .coupon-field input{ flex:1 1 auto; min-width:0; }
+              .coupon-field .btn{ flex:none; white-space:nowrap; padding:12px 16px; }
+              .coupon-msg.ok{ color:var(--olive-deep); }
+              /* Mobil adım akışı: onay kutuları + sipariş mesajı yalnız ödeme adımında (styles.css #checkoutComplete kuralıyla aynı). */
+              @media (max-width:900px){
+                #checkoutLegal, #checkoutMsg{ display:none; }
+                .checkout-sections:has(#paymentSection:not(.step-hidden)) #checkoutLegal:not([hidden]){ display:flex; }
+                .checkout-sections:has(#paymentSection:not(.step-hidden)) #checkoutMsg:not([hidden]){ display:block; }
+              }
+            </style>
+            <div class="toggle-list small" id="savedCards" hidden><!-- filled by JS --></div>
+            <div class="checkout-payment-frame is-empty" id="paymentFrame">Güvenli ödeme ekranı "siparişi tamamla"ya bastıktan sonra burada açılır — kart bilgilerin PayTR'de girilir, bizde saklanmaz.</div>
+            <p class="checkout-auth-msg mono" id="paymentMsg" hidden></p>
           </div>
         </section>
 
-        <button class="cta wide" id="checkoutComplete" type="button">siparişi tamamla</button>
+        <!-- F8 — ADR-0003 istisna 3: checkout belge onayı (requiresAck: ön bilgilendirme, mesafeli satış, abonelikte abonelik sözleşmesi)
+             + buton metni "siparişi tamamla — ödeme yükümlülüğü doğurur". Yalnız bu blok. -->
+        <div class="checkout-form" id="checkoutLegal" hidden><!-- filled by JS --></div>
+        <button class="cta wide" id="checkoutComplete" type="button">siparişi tamamla — ödeme yükümlülüğü doğurur</button>
+        <p class="checkout-auth-msg mono" id="checkoutMsg" hidden></p>
         <p class="checkout-success mono" id="checkoutSuccess" hidden>Siparişin alındı — teşekkürler!</p>
       </div>
     </div>
@@ -167,10 +188,37 @@
 {{> site_footer}}
 
 {{> bootstrap}}
+<script>window.__BAGDAM_CHECKOUT__ = {{{checkoutJson}}};</script>
 <script>
 (function () {
-  function money(n) { return n.toLocaleString("tr-TR"); }
+  // F8 checkout: PayTR ok/fail dönüş sayfası (sepet.html?siparis=<no>&odeme=ok|hata) ödeme iFrame'inin İÇİNDE
+  // yüklenirse üst pencereye çıkar; çıkamazsa üst pencereye haber verir (aşağıdaki "message" dinleyicisi).
+  try {
+    if (window.top !== window.self && /[?&]siparis=/.test(window.location.search)) {
+      try { window.top.location.href = window.location.href; } catch (e) { /* üst pencere yönlendirmeyi engelledi */ }
+      try { window.parent.postMessage({ bagdamCheckout: window.location.search }, window.location.origin); } catch (e2) { /* yok say */ }
+    }
+  } catch (e) { /* yok say */ }
+
+  function money(n) { return Number(n || 0).toLocaleString("tr-TR", { maximumFractionDigits: 2 }); }
+  function escText(v) { return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function escAttr(v) { return escText(v).replace(/"/g, "&quot;"); }
   var stepsEl = null, stepBtns = null, stepPanels = null; // mobil adım sekmeleri (aşağıda kurulur)
+
+  // ---- F8 checkout durumu (aşağıdaki bölümler okur/yazar; ilk refreshSections() çağrısından önce tanımlı olmalı) ----
+  let deliveryDates = [];        // GET /delivery/dates?zone= (sıralı)
+  let deliveryDatesZone = null;  // yüklü listenin bölgesi
+  let deliveryDatesError = null;
+  let selectedDate = null;       // {day, date, cutoffAtIso, locked, full[, id]} — checkout deliveryOn (id varsa deliveryDateId)
+  let legalDocs = [];            // requiresAck belgeler [{slug, kind, title, version}]
+  const legalChecked = {};       // slug → onaylandı mı (yeniden çizimde korunur)
+  let quote = null;              // POST /checkout/quote sonucu (PricingResult + couponStatus)
+  let quoteError = null;
+  let quoteSeq = 0;
+  let quoteTimer = null;
+  let lastQuoteKey = null;
+  let couponCode = "";
+  let poller = null;             // pollOrderStatus promise'i (stop())
 
   // ---- Auth gate: shared login/signup wiring lives in cart.js so
   // sepet.html and uyelik.html don't each carry their own copy. Giriş/üyelik
@@ -183,6 +231,7 @@
     if (!formsReady) return;
     // F6 auth: giriş sayfa yenilemesiyle gelir; buraya çıkış / oturum düşmesi (ve ileride anlık giriş) düşer.
     if (loggedIn) { loadProfileIntoForms(); return; }
+    stopPolling();
     fillFormsFromStore();
     render();
   });
@@ -195,44 +244,79 @@
   const custDistrict = document.getElementById("custDistrict");
   const custZip = document.getElementById("custZip");
 
+  // F8 checkout: ilçe seçenekleri bölge listesinden (GET /delivery/zones; sepet.hbs'e gömülü kopya ile hızlı başlar) —
+  // değer bölge ADI (F6 sözleşmesi: district ↔ zoneSlug çevirisi cart.js'te).
+  function fillDistrictOptions() {
+    const zones = BahcedenCart.getZones();
+    if (!zones || !zones.length) return;
+    const current = custDistrict.value;
+    custDistrict.innerHTML = '<option value="">Seç</option>' + zones.map((z) => '<option value="' + escAttr(z.name) + '">' + escText(z.name) + "</option>").join("");
+    if (current && zones.some((z) => z.name === current)) custDistrict.value = current;
+  }
+
   function fillFormsFromStore() {
     // F6 auth: adres sunucu önbelleğinden (BahcedenCart.loadAddress → getAddress), e-posta oturumdan (bahceden_address kalktı).
     const a = BahcedenCart.getAddress() || {};
     const user = BahcedenCart.me();
     custName.value = a.name || "";
+    // F8 checkout: e-posta = hesabın e-postası (Order.customerEmail = User.email) — değiştirilemez.
     custEmail.value = (user && user.email) || "";
+    custEmail.readOnly = !!user;
     custPhone.value = a.phone || "";
     custAddress.value = a.line || "";
     custDistrict.value = a.district || "";
     custZip.value = a.zip || "";
-    const c = BahcedenCart.getCard() || {};
-    cardName.value = c.name || "";
-    cardNumber.value = c.number || "";
-    cardExpiry.value = c.expiry || "";
-    cardCvc.value = c.cvc || "";
+    addressDirty = false;
   }
   // F6 auth: bölgeler + adres sunucudan; hata olursa boş form (elle doldurulur, sepet akışı kesilmez).
+  // F8 checkout: ardından saklı kartlar, onay gerektiren belgeler, satın alınmış abonelik (GET /me/subscription — minimal, F9 tam)
+  // ve teslimat tarihleri yüklenir; ?siparis= dönüşü varsa sipariş durumu izlenir.
   function loadProfileIntoForms() {
     BahcedenCart.loadZones()
-      .then(() => BahcedenCart.loadAddress())
+      .then(() => { fillDistrictOptions(); return BahcedenCart.loadAddress(); })
       .catch(() => null)
-      .then(() => { fillFormsFromStore(); render(); });
+      .then(() => { fillFormsFromStore(); return BahcedenCart.loadSubscription().catch(() => null); })
+      .then(() => {
+        render();
+        loadDatesForZone();
+        loadCards();
+        loadLegal();
+        handleReturnFromPayment();
+      });
   }
   // F6 auth: adres PUT /me/address ile sunucuya (tek adres) — yalnız oturumlu ve zorunlu alanlar tamamken;
   // alan değişimlerinde (change) kısa gecikmeyle, her tuşta değil.
   let saveAddressTimer = null;
+  let addressDirty = false; // F8 checkout: son sunucu kaydından beri form değişti mi (checkout öncesi zorunlu PUT)
+  function addressFromForm() {
+    return {
+      name: custName.value.trim(),
+      phone: custPhone.value.trim(),
+      line: custAddress.value.trim(),
+      district: custDistrict.value,
+      zip: custZip.value.trim(),
+    };
+  }
   function saveCustomerForm() {
     if (!BahcedenCart.isLoggedIn() || !customerComplete()) return;
     clearTimeout(saveAddressTimer);
     saveAddressTimer = setTimeout(() => {
-      BahcedenCart.setAddress({
-        name: custName.value.trim(),
-        phone: custPhone.value.trim(),
-        line: custAddress.value.trim(),
-        district: custDistrict.value,
-        zip: custZip.value.trim(),
-      }).catch(() => { /* sepet akışını kesmez; üyelik sayfasından yeniden kaydedilebilir */ });
+      const snapshot = addressFromForm();
+      BahcedenCart.setAddress(snapshot)
+        .then(() => { if (JSON.stringify(snapshot) === JSON.stringify(addressFromForm())) addressDirty = false; })
+        .catch(() => { /* sepet akışını kesmez; siparişte yeniden denenir */ });
     }, 400);
+  }
+  // F8 checkout: sipariş öncesi adresin sunucuda ve güncel olduğundan emin ol → addressId.
+  function ensureAddressSaved() {
+    const cached = BahcedenCart.getAddress();
+    if (cached && cached.id && !addressDirty) return Promise.resolve(cached.id);
+    clearTimeout(saveAddressTimer);
+    return BahcedenCart.setAddress(addressFromForm()).then((saved) => {
+      addressDirty = false;
+      if (!saved || !saved.id) throw { message: "Adres kaydedilemedi — lütfen tekrar dene." };
+      return saved.id;
+    });
   }
   // Delivery and Payment stay collapsed to just their title until every
   // required customer field is filled — same "one step unlocks the next"
@@ -256,44 +340,104 @@
     );
   }
 
-  // ---- Payment — same saved-card store üyelik.html reads/writes, but only
-  // for subscriptions. A one-time card shouldn't silently become the saved
-  // default payment method on the account. ----
-  const cardName = document.getElementById("cardName");
-  const cardNumber = document.getElementById("cardNumber");
-  const cardExpiry = document.getElementById("cardExpiry");
-  const cardCvc = document.getElementById("cardCvc");
+  // ---- Payment — F8 checkout: kart formu yok; ödeme PayTR iFrame'inde (ya da saklı kartla) alınır.
+  // "Ödeme tamam" = sipariş PAID (GET /orders/:no/status). ----
+  const savedCardsEl = document.getElementById("savedCards");
+  const paymentFrameEl = document.getElementById("paymentFrame");
+  const paymentMsgEl = document.getElementById("paymentMsg");
+  const checkoutMsgEl = document.getElementById("checkoutMsg");
+  const legalEl = document.getElementById("checkoutLegal");
+  const PAYMENT_FRAME_EMPTY_TEXT = paymentFrameEl.textContent;
+  const checkoutState = { busy: false, orderNo: null, awaiting: false, paid: false, provider: null, subscription: false };
+  let cards = [];
+  let paymentMethodId = null;
   fillFormsFromStore();
   formsReady = true;
   function paymentComplete() {
-    return !!(
-      cardName.value.trim() &&
-      cardNumber.value.trim() &&
-      cardExpiry.value.trim() &&
-      cardCvc.value.trim()
-    );
+    return checkoutState.paid;
   }
-  function saveCardForm() {
-    const sub = BahcedenCart.getSub();
-    const isSubscription = sub.active && sub.type === "subscription";
-    if (!isSubscription) return;
-    BahcedenCart.setCard({
-      name: cardName.value.trim(),
-      number: cardNumber.value.trim(),
-      expiry: cardExpiry.value.trim(),
-      cvc: cardCvc.value.trim(),
+  function showMsg(el, text, ok) {
+    if (!el) return;
+    el.textContent = text || "";
+    el.hidden = !text;
+    el.style.color = ok ? "var(--olive-deep)" : "";
+  }
+  function loadCards() {
+    if (!BahcedenCart.isLoggedIn()) { cards = []; renderCards(); return; }
+    BahcedenCart.listCards()
+      .then((list) => { cards = (list || []).filter((c) => c && c.isActive !== false); renderCards(); })
+      .catch(() => { cards = []; renderCards(); });
+  }
+  function renderCards() {
+    if (!cards.length) { savedCardsEl.hidden = true; savedCardsEl.innerHTML = ""; paymentMethodId = null; return; }
+    if (paymentMethodId && !cards.some((c) => c.id === paymentMethodId)) paymentMethodId = null;
+    savedCardsEl.hidden = false;
+    savedCardsEl.innerHTML =
+      cards.map((c) =>
+        '<button class="toggle' + (paymentMethodId === c.id ? " active" : "") + '" type="button" data-card-id="' + escAttr(c.id) + '">' +
+          "•••• " + escText(c.last4 || "") + (c.brand ? " · " + escText(c.brand) : "") + (c.isDefault ? " (varsayılan)" : "") +
+        "</button>"
+      ).join("") +
+      '<button class="toggle' + (!paymentMethodId ? " active" : "") + '" type="button" data-card-id="">yeni kart</button>';
+    savedCardsEl.querySelectorAll("[data-card-id]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (checkoutState.awaiting || checkoutState.paid) return;
+        paymentMethodId = btn.getAttribute("data-card-id") || null;
+        renderCards();
+      });
     });
   }
-  cardNumber.addEventListener("input", () => {
-    cardNumber.value = cardNumber.value.replace(/\D/g, "").slice(0, 16).replace(/(\d{4})(?=\d)/g, "$1 ");
-  });
-  cardExpiry.addEventListener("input", () => {
-    const digits = cardExpiry.value.replace(/\D/g, "").slice(0, 4);
-    cardExpiry.value = digits.length >= 3 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
-  });
-  [cardName, cardNumber, cardExpiry, cardCvc].forEach((el) => {
-    el.addEventListener("input", () => { saveCardForm(); refreshSections(); });
-  });
+  // Ödeme ekranı: redirectUrl/token → iFrame (PayTR iframeResizer varsa yükseklik kendiliğinden), checkoutFormContent → HTML gömülür.
+  function showPaymentFrame(payment) {
+    payment = payment || {};
+    paymentFrameEl.classList.remove("is-empty");
+    paymentFrameEl.innerHTML = "";
+    const url = payment.redirectUrl || (payment.token ? "https://www.paytr.com/odeme/guvenli/" + encodeURIComponent(payment.token) : null);
+    if (url) {
+      const frame = document.createElement("iframe");
+      frame.id = "paytriframe";
+      frame.src = url;
+      frame.setAttribute("frameborder", "0");
+      frame.setAttribute("scrolling", "no");
+      frame.setAttribute("title", "Güvenli ödeme");
+      paymentFrameEl.appendChild(frame);
+      loadIframeResizer();
+    } else if (payment.checkoutFormContent) {
+      injectHtml(paymentFrameEl, payment.checkoutFormContent);
+      loadIframeResizer();
+    } else {
+      paymentFrameEl.innerHTML = '<p class="checkout-payment-test">Ödeme onayı bekleniyor…</p>';
+    }
+  }
+  function showPaymentTestNote(text) {
+    paymentFrameEl.classList.remove("is-empty");
+    paymentFrameEl.innerHTML = '<p class="checkout-payment-test">' + escText(text) + "</p>";
+  }
+  function resetPaymentFrame() {
+    paymentFrameEl.classList.add("is-empty");
+    paymentFrameEl.textContent = PAYMENT_FRAME_EMPTY_TEXT;
+  }
+  // innerHTML script çalıştırmaz — sağlayıcı içeriği script içeriyorsa yeniden oluşturulur.
+  function injectHtml(container, html) {
+    container.innerHTML = html;
+    container.querySelectorAll("script").forEach((old) => {
+      const s = document.createElement("script");
+      Array.from(old.attributes).forEach((a) => s.setAttribute(a.name, a.value));
+      s.text = old.text;
+      old.parentNode.replaceChild(s, old);
+    });
+  }
+  // PayTR iFrame yükseklik eşleyici (resmî script) — yüklenemezse CSS min-height ile kalır.
+  function loadIframeResizer() {
+    function apply() { try { if (window.iFrameResize) window.iFrameResize({}, "#paytriframe"); } catch (e) { /* yok say */ } }
+    if (window.iFrameResize) { apply(); return; }
+    if (document.getElementById("paytr-iframe-resizer")) return;
+    const s = document.createElement("script");
+    s.id = "paytr-iframe-resizer";
+    s.src = "https://www.paytr.com/js/iframeResizer.min.js";
+    s.onload = apply;
+    document.head.appendChild(s);
+  }
 
   // ---- Section headers: a left-side circle fills in green once that
   // section's own data is complete; a right-side arrow lets the visitor
@@ -322,12 +466,13 @@
   }
   function refreshSections() {
     const customerOk = customerComplete();
-    const deliveryOk = !!BahcedenCart.getSub().deliveryDay;
+    const deliveryOk = !!selectedDate;
     const paymentOk = paymentComplete();
     if (!sectionState.customer.manual) sectionState.customer.collapsed = customerOk;
     renderSectionState("customer", customerOk, false);
     renderSectionState("delivery", deliveryOk, !customerOk);
     renderSectionState("payment", paymentOk, !customerOk);
+    renderLegal();
     if (typeof refreshSteps === "function") refreshSteps(); // mobil adım sekmeleri
   }
   Object.keys(sectionEls).forEach((key) => {
@@ -339,41 +484,189 @@
   });
 
   [custName, custEmail, custPhone, custAddress, custZip].forEach((el) => {
-    el.addEventListener("input", refreshSections);
+    el.addEventListener("input", () => { addressDirty = true; refreshSections(); });
     el.addEventListener("change", saveCustomerForm); // F6 auth: odak çıkınca sunucuya
   });
-  custDistrict.addEventListener("change", () => { saveCustomerForm(); refreshSections(); });
+  custDistrict.addEventListener("change", () => {
+    addressDirty = true;
+    saveCustomerForm();
+    refreshSections();
+    // F8 checkout: ilçe = teslimat bölgesi → tarihler ve kargo yeniden
+    selectedDate = null;
+    loadDatesForZone();
+    requestQuote();
+  });
   refreshSections();
 
-  // ---- Delivery day (order-level — same lock rule as the box editor) ----
+  // ---- Delivery day (order-level) — F8 checkout: seçenekler GET /delivery/dates?zone= (DeliveryDate; locked/full olan
+  // gün pasif). Gün düğmeleri prototiptekiyle aynı (DELIVERY_DAYS); her gün için o güne ait en yakın açık tarih seçilir,
+  // bu haftanın kesimi geçtiyse not sonraki haftayı söyler. Seçim sub.deliveryDay'e de yazılır (kutu yükü) ----
   const deliveryDayToggle = document.getElementById("checkoutDeliveryDay");
   const shippingNoteEl = document.getElementById("checkoutShippingNote");
+  const dayNoteEl = document.getElementById("checkoutDayNote");
 
-  function renderDeliveryDay(deliveryFee) {
+  function currentZoneSlug() {
+    if (custDistrict.value) return BahcedenCart.zoneSlugFor(custDistrict.value);
+    const a = BahcedenCart.getAddress();
+    if (a && a.zoneSlug) return a.zoneSlug;
+    const zones = BahcedenCart.getZones();
+    return (zones && zones[0] && zones[0].slug) || "urla";
+  }
+  function availableDateFor(dayId) {
+    return deliveryDates.find((d) => d.day === dayId && !d.locked && !d.full) || null;
+  }
+  function reconcileSelectedDate() {
+    const dayId = selectedDate ? selectedDate.day : BahcedenCart.getSub().deliveryDay;
+    selectedDate = dayId ? availableDateFor(dayId) : null;
+  }
+  function loadDatesForZone() {
+    if (!BahcedenCart.isLoggedIn()) return Promise.resolve([]);
+    const zone = currentZoneSlug();
+    return BahcedenCart.loadDeliveryDates(zone)
+      .then((list) => {
+        deliveryDatesZone = zone;
+        deliveryDatesError = null;
+        deliveryDates = (list || []).slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      })
+      .catch((err) => { deliveryDatesZone = zone; deliveryDates = []; deliveryDatesError = err; })
+      .then(() => { reconcileSelectedDate(); renderDeliveryDay(); refreshSections(); return deliveryDates; });
+  }
+  function dateLabel(isoDate) {
+    const d = new Date(isoDate + "T00:00:00");
+    return isNaN(d.getTime()) ? isoDate : d.toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
+  }
+  function dayLabel(dayId) {
+    const d = DELIVERY_DAYS.find((x) => x.id === dayId);
+    return d ? d.label : dayId;
+  }
+  function renderDeliveryDay() {
     const sub = BahcedenCart.getSub();
-    // Kesimi geçmiş gün de seçilebilir — sadece bu haftaya yetişmez;
-    // seçildiyse altındaki not teslimatın sonraki haftaya kaldığını söyler.
+    const activeDay = selectedDate ? selectedDate.day : null;
     deliveryDayToggle.innerHTML = DELIVERY_DAYS.map((d) => {
-      const isActive = sub.deliveryDay === d.id;
-      return '<button class="toggle' + (isActive ? " active" : "") + '" type="button" data-day="' + d.id + '">' + d.label + "</button>";
+      const available = !!availableDateFor(d.id);
+      const isActive = activeDay === d.id;
+      return '<button class="toggle' + (isActive ? " active" : "") + '" type="button" data-day="' + d.id + '"' + (available ? "" : " disabled") + ">" + d.label + "</button>";
     }).join("");
-    deliveryDayToggle.querySelectorAll(".toggle").forEach((btn) => {
+    deliveryDayToggle.querySelectorAll(".toggle:not([disabled])").forEach((btn) => {
       btn.addEventListener("click", () => {
-        BahcedenCart.subSetDeliveryDay(btn.getAttribute("data-day"));
+        if (checkoutState.awaiting || checkoutState.paid) return;
+        const dayId = btn.getAttribute("data-day");
+        selectedDate = availableDateFor(dayId);
+        BahcedenCart.subSetDeliveryDay(dayId);
         render();
       });
     });
-    const dayNoteEl = document.getElementById("checkoutDayNote");
-    const dayNoteText = BahcedenCart.lockedDayNote(sub.deliveryDay);
-    dayNoteEl.hidden = !dayNoteText;
-    dayNoteEl.textContent = dayNoteText || "";
-    shippingNoteEl.textContent = "Kargo: " + (deliveryFee > 0 ? money(deliveryFee) + " TL" : "Dahil");
+    let note = "";
+    if (selectedDate) {
+      const firstOfDay = deliveryDates.find((d) => d.day === selectedDate.day);
+      note = firstOfDay && firstOfDay !== selectedDate && (firstOfDay.locked || firstOfDay.full)
+        ? "Bu haftanın " + dayLabel(selectedDate.day) + " kesimi kapandı — teslimatın " + dateLabel(selectedDate.date) + " " + dayLabel(selectedDate.day) + " günü yapılır."
+        : "Teslimat: " + dateLabel(selectedDate.date) + " " + dayLabel(selectedDate.day);
+    } else if (BahcedenCart.isLoggedIn()) {
+      if (deliveryDatesError) note = "Teslimat günleri yüklenemedi — " + (deliveryDatesError.message || "tekrar dene.");
+      else if (deliveryDatesZone && !deliveryDates.some((d) => !d.locked && !d.full)) note = "Bu bölge için şu an açık teslimat günü yok.";
+      else if (sub.deliveryDay && deliveryDatesZone) note = "Seçtiğin gün için açık tarih kalmadı — başka bir gün seç.";
+    }
+    dayNoteEl.hidden = !note;
+    dayNoteEl.textContent = note || "";
+    const fee = quote ? Number(quote.shippingFee || 0) : null;
+    shippingNoteEl.textContent = fee === null ? "" : "Kargo: " + (fee > 0 ? money(fee) + " TL" : "Dahil");
   }
 
-  // ---- Complete checkout (design prototype — no real payment) ----
+  // ---- Yasal onaylar (ADR-0003 istisna 3) — requiresAck belgeler; abonelik sözleşmesi yalnız abonelik kutusu varken ----
+  const LEGAL_CONSENT_KIND = { PREINFO: "PREINFO_ACK", DISTANCE_SALES: "CONTRACT_ACK", SUBSCRIPTION_CONTRACT: "SUBSCRIPTION_CONTRACT_ACK" };
+  function loadLegal() {
+    BahcedenCart.loadLegalRequiresAck()
+      .then((docs) => { legalDocs = Array.isArray(docs) ? docs : []; renderLegal(); })
+      .catch(() => { legalDocs = []; renderLegal(); });
+  }
+  function hasSubscriptionBox() {
+    const payload = BahcedenCart.buildCheckoutPayload();
+    return !!(payload.box && !payload.box.isOneTime);
+  }
+  function requiredLegalDocs() {
+    const subBox = hasSubscriptionBox();
+    return legalDocs.filter((d) => LEGAL_CONSENT_KIND[d.kind] && (d.kind !== "SUBSCRIPTION_CONTRACT" || subBox));
+  }
+  function renderLegal() {
+    const docs = requiredLegalDocs();
+    const show = docs.length > 0 && BahcedenCart.isLoggedIn() && BahcedenCart.hasCheckoutItems() && !checkoutState.paid;
+    legalEl.hidden = !show;
+    if (!show) { legalEl.innerHTML = ""; return; }
+    const html = docs.map((d) =>
+      '<label class="consent-row"><input type="checkbox" data-legal-slug="' + escAttr(d.slug) + '"' + (legalChecked[d.slug] ? " checked" : "") + (checkoutState.awaiting ? " disabled" : "") + ">" +
+        '<span><a href="politikalar.html#' + escAttr(d.slug) + '" target="_blank" rel="noopener">' + escText(d.title) + "</a> belgesini okudum ve onaylıyorum.</span></label>"
+    ).join("");
+    if (legalEl.getAttribute("data-rendered") === html) return;
+    legalEl.innerHTML = html;
+    legalEl.setAttribute("data-rendered", html);
+    legalEl.querySelectorAll("input[data-legal-slug]").forEach((cb) => {
+      cb.addEventListener("change", () => { legalChecked[cb.getAttribute("data-legal-slug")] = cb.checked; });
+    });
+  }
+  function legalConsents() {
+    return requiredLegalDocs().map((d) => ({ kind: LEGAL_CONSENT_KIND[d.kind], documentSlug: d.slug, version: d.version }));
+  }
+  function legalMissing() {
+    return requiredLegalDocs().filter((d) => !legalChecked[d.slug]);
+  }
+
+  // ---- Fiyat özeti — F8 checkout: POST /checkout/quote (istemci hesaplamaz) ----
+  function quoteExtra() {
+    const extra = { zoneSlug: currentZoneSlug() };
+    if (couponCode) extra.couponCode = couponCode;
+    const sub = BahcedenCart.getSub();
+    if (sub.active && !sub.purchased && sub.skipThisWeek) extra.skipThisWeek = true;
+    return extra;
+  }
+  function quoteKey() {
+    return JSON.stringify([BahcedenCart.buildCheckoutPayload(), quoteExtra()]);
+  }
+  function requestQuote(immediate) {
+    clearTimeout(quoteTimer);
+    const run = () => {
+      const key = quoteKey();
+      if (!BahcedenCart.hasCheckoutItems()) { quote = null; quoteError = null; lastQuoteKey = key; renderSummary(); return; }
+      const seq = ++quoteSeq;
+      lastQuoteKey = key;
+      BahcedenCart.quoteCheckout(quoteExtra()).then(
+        (q) => { if (seq !== quoteSeq) return; quote = q || null; quoteError = null; render(); },
+        (err) => { if (seq !== quoteSeq) return; quoteError = err; renderSummary(); },
+      );
+    };
+    if (immediate) run(); else quoteTimer = setTimeout(run, 250);
+  }
+  // Teklif satırı eşleme: satır tutarları API'den; eşleşmezse "…" (hesap istemcide yapılmaz).
+  function quoteLines(kind) {
+    return quote && Array.isArray(quote.lines) ? quote.lines.filter((l) => l.kind === kind) : [];
+  }
+  function boxLineTotal() {
+    if (!quote) return null;
+    const lines = quoteLines("BOX").concat(quoteLines("EXTRA"));
+    if (!lines.length) return null;
+    return lines.reduce((sum, l) => sum + Number(l.lineTotal || 0), 0);
+  }
+  function productLineTotal(item, p, used) {
+    if (!quote) return null;
+    const candidates = quoteLines("PRODUCT").filter((l) => used.indexOf(l) === -1);
+    const byRef = candidates.filter((l) => l.productId === item.id || l.productId === p.id || l.name === p.name || l.productSlug === item.id);
+    const exact = byRef.find((l) => Number(l.qty) === Number(item.qty) && (l.pref || null) === (item.pref || null)) || byRef[0];
+    if (!exact) return null;
+    used.push(exact);
+    return Number(exact.lineTotal || 0);
+  }
+  function fmtMaybe(n) { return n === null || n === undefined ? "…" : money(n) + " TL"; }
+
+  // ---- Complete checkout — F8 checkout: POST /checkout → PayTR iFrame (ya da saklı kart / manuel sağlayıcı) →
+  // GET /orders/:orderNo/status (2 s, 120 s) → teşekkür görünümü ----
   const checkoutCompleteBtn = document.getElementById("checkoutComplete");
   const checkoutSuccessEl = document.getElementById("checkoutSuccess");
-  checkoutCompleteBtn.addEventListener("click", () => {
+  function stopPolling() { if (poller && poller.stop) poller.stop(); poller = null; }
+  function setBusy(on) {
+    checkoutState.busy = on;
+    checkoutCompleteBtn.disabled = on || checkoutState.awaiting;
+  }
+  function validateCheckout() {
     const requiredEls = document.querySelectorAll(".checkout-left [required]");
     let valid = true;
     requiredEls.forEach((el) => {
@@ -381,68 +674,196 @@
       el.classList.toggle("invalid", !filled);
       if (!filled) valid = false;
     });
-    if (!valid || !BahcedenCart.getSub().deliveryDay) return;
-    saveCustomerForm();
-
-    // Sipariş kaydı — üyelik sayfasındaki "önceki siparişler" bu listeden
-    // beslenir. Sepet temizlenmeden ÖNCE toplanmalı.
-    const cartItems = BahcedenCart.getCart();
-    const paidSub = BahcedenCart.getSub();
-    const paidTier = paidSub.active ? BahcedenCart.subTier() : null;
-    const orderLines = [];
-    let orderTotal = 0;
-    if (paidTier) {
-      orderLines.push(paidTier.label + " — " + paidTier.count + " ürün");
-      (paidSub.extras || []).forEach((ex) => {
-        const p = PRODUCTS.find((x) => x.id === ex.id);
-        if (p) orderLines.push("+ " + p.name + " (" + ex.label + ")");
+    if (!valid) return "Müşteri bilgilerini tamamla.";
+    if (!BahcedenCart.hasCheckoutItems()) return "Sepetin boş.";
+    if (!selectedDate || !selectedDate.date) return selectedDate ? "Teslimat tarihi alınamadı — sayfayı yenileyip tekrar dene." : "Teslimat gününü seç.";
+    const missing = legalMissing();
+    if (missing.length) return missing.length === 1 ? missing[0].title + " onayı gerekli." : "Devam etmek için belgeleri onayla.";
+    if (quoteError && !quote) return "Tutar hesaplanamadı — tekrar dene.";
+    return null;
+  }
+  checkoutCompleteBtn.addEventListener("click", () => {
+    if (checkoutState.busy || checkoutState.awaiting || checkoutState.paid) return;
+    const problem = validateCheckout();
+    if (problem) { showMsg(checkoutMsgEl, problem); return; }
+    showMsg(checkoutMsgEl, "");
+    showMsg(paymentMsgEl, "");
+    setBusy(true);
+    const fields = { consents: legalConsents() };
+    if (couponCode) fields.couponCode = couponCode;
+    if (paymentMethodId) fields.paymentMethodId = paymentMethodId;
+    ensureAddressSaved()
+      .then((addressId) => {
+        fields.addressId = addressId;
+        // Teslimat günü: GET /delivery/dates öğesinde id yok → checkout `deliveryOn` (YYYY-MM-DD, adres bölgesi) kabul eder; id varsa o da gider.
+        if (selectedDate.id) fields.deliveryDateId = selectedDate.id; else fields.deliveryOn = selectedDate.date;
+        return BahcedenCart.submitCheckout(fields);
+      })
+      .then((res) => { setBusy(false); handleCheckoutResponse(res); })
+      .catch((err) => {
+        setBusy(false);
+        const code = err && err.code;
+        let text = (err && err.message) || "Sipariş oluşturulamadı — tekrar dene.";
+        if (code === "DAY_FULL" || code === "DAY_LOCKED") { text = "Seçtiğin teslimat günü doldu ya da kesimi geçti — başka bir gün seç."; selectedDate = null; loadDatesForZone(); }
+        else if (code === "SUBSCRIPTION_EXISTS" || code === "ACTIVE_SUBSCRIPTION_EXISTS") text = "Zaten aktif bir aboneliğin var — kutuyu sepetten kaldırıp yalnızca tekil ürünleri sipariş edebilirsin.";
+        else if (code === "CONSENT_REQUIRED" || code === "ACK_REQUIRED") text = "Devam etmek için belgeleri onayla.";
+        else if (code === "COUPON_INVALID") text = "Kupon kodu geçersiz — kaldırıp tekrar dene.";
+        showMsg(checkoutMsgEl, text);
       });
-      orderTotal += paidSub.skipThisWeek ? 0 : paidTier.price + BahcedenCart.subExtrasTotal();
+  });
+  function handleCheckoutResponse(res) {
+    if (!res || !res.orderNo) { showMsg(checkoutMsgEl, "Sipariş yanıtı alınamadı — üyelik sayfandan siparişlerini kontrol et."); return; }
+    checkoutState.orderNo = res.orderNo;
+    // Sağlayıcı adı `payment.providerName` ("manual" | "paytr"); `payment.provider` enum'dur (MANUAL/PAYTR) → küçük harfe indirgenir.
+    checkoutState.provider = res.payment ? String(res.payment.providerName || res.payment.provider || "").toLowerCase() || null : null;
+    checkoutState.subscription = hasSubscriptionBox();
+    if (res.status === "PAID") { onPaid(res.orderNo); return; }
+    if (res.status === "PAYMENT_FAILED" || res.status === "CANCELLED") { onPaymentFailed(); return; }
+    checkoutState.awaiting = true;
+    checkoutCompleteBtn.disabled = true;
+    // Ödeme adımı açık olsun (akordiyon kapalıysa aç; mobilde ödeme sekmesine geç).
+    sectionState.payment.manual = true; sectionState.payment.collapsed = false;
+    refreshSections();
+    if (typeof showStep === "function" && isMobileSteps()) showStep("payment");
+    if (checkoutState.provider === "manual") {
+      showPaymentTestNote("Test ödeme onaylandı — siparişin işleniyor…");
+    } else {
+      showPaymentFrame(res.payment);
+      showMsg(paymentMsgEl, "Ödemeni güvenli ekranda tamamla — sonucu burada göreceğiz.", true);
     }
-    cartItems.forEach((item) => {
-      const p = PRODUCTS.find((x) => x.id === item.id);
-      if (!p) return;
-      orderLines.push(p.name + " × " + item.qty);
-      orderTotal += p.price * item.qty;
+    startPolling(res.orderNo);
+  }
+  function startPolling(orderNo) {
+    stopPolling();
+    poller = BahcedenCart.pollOrderStatus(orderNo, { intervalMs: 2000, timeoutMs: 120000 });
+    poller.then((r) => {
+      if (!checkoutState.awaiting && !returnInfo) return;
+      if (r.ok) { onPaid(orderNo, r.status); return; }
+      if (r.timedOut) {
+        stopAwaiting();
+        showMsg(paymentMsgEl, "Ödeme sonucu henüz bize ulaşmadı — siparişinin durumunu üyelik sayfandaki \"önceki siparişler\"den takip edebilirsin.");
+        return;
+      }
+      if (r.error) {
+        stopAwaiting();
+        showMsg(paymentMsgEl, r.error.status === 404 ? "Sipariş bulunamadı — üyelik sayfandaki \"önceki siparişler\"den kontrol edebilirsin." : (r.error.message || "Ödeme durumu alınamadı."));
+        return;
+      }
+      onPaymentFailed();
     });
-    const paidIsSubscriber = !!(paidTier && paidSub.type === "subscription");
-    const paidFee = paidIsSubscriber || orderTotal > 1000 ? 0 : (typeof DELIVERY_FEE !== "undefined" ? DELIVERY_FEE : 0);
-    const deliveryDate = BahcedenCart.nextDeliveryDate(paidSub.deliveryDay);
-    BahcedenCart.addOrder({
-      date: Date.now(),
-      deliveryDate: deliveryDate ? deliveryDate.getTime() : null,
-      lines: orderLines,
-      total: orderTotal + paidFee,
-      deliveryDay: paidSub.deliveryDay,
-      type: paidTier ? paidSub.type : "tekli",
-    });
-
-    // Ödeme tamam: sepetteki kutu "satın alınmış" aboneliğe dönüşür — artık
-    // üyelik sayfasındaki aboneliklerimde yönetilir. Sepet de boşalır.
-    if (paidSub.active) {
-      paidSub.active = false;
-      paidSub.purchased = true;
-      BahcedenCart.setSub(paidSub);
+  }
+  // Bekleme bitti ama sonuç yok (zaman aşımı / hata): formlar geri gelir, "doğrulanıyor" görünümü kapanır; iFrame yerinde kalır.
+  function stopAwaiting() {
+    checkoutState.awaiting = false;
+    checkoutCompleteBtn.disabled = false;
+    if (document.body.classList.contains("order-done") && !checkoutState.paid) {
+      document.body.classList.remove("order-done");
+      checkoutSuccessEl.hidden = true;
+      checkoutCompleteBtn.hidden = false;
+      sectionState.payment.manual = true; sectionState.payment.collapsed = false;
+      refreshSections();
     }
+  }
+  function onPaymentFailed() {
+    stopPolling();
+    checkoutState.awaiting = false;
+    checkoutCompleteBtn.disabled = false;
+    document.body.classList.remove("order-done");
+    checkoutSuccessEl.hidden = true;
+    checkoutCompleteBtn.hidden = false;
+    resetPaymentFrame();
+    showMsg(paymentMsgEl, "Ödeme alınamadı — kartını kontrol edip \"siparişi tamamla\" ile yeniden deneyebilirsin.");
+    refreshSections();
+  }
+  function onPaid(orderNo, statusInfo) {
+    stopPolling();
+    checkoutState.awaiting = false;
+    checkoutState.paid = true;
+    const isSubscription = checkoutState.subscription || !!(statusInfo && (statusInfo.subscriptionId || statusInfo.subscriptionStatus));
+    // Ödeme tamam: sepet boşalır; kutu taslağı (bahceden_sub) temizlenir — artık sunucudaki abonelik/siparişte yaşar.
     BahcedenCart.setCart([]);
+    BahcedenCart.clearSubDraft();
     // Abonelikli kutu ödemesinde üyelik yönlendirmesi eklenir; yalnızca
     // tekli ürün siparişinde kısa teşekkür yeter.
-    checkoutSuccessEl.innerHTML = paidIsSubscriber
-      ? 'Siparişin alındı — teşekkürler! Aboneliğini <a href="uyelik.html">üyelik sayfandan</a> yönetebilirsin.'
-      : "Siparişin alındı — teşekkürler!";
+    const prefix = checkoutState.provider === "manual" ? "Test ödeme onaylandı — siparişin alındı" : "Siparişin alındı";
+    checkoutSuccessEl.innerHTML = isSubscription
+      ? prefix + " (#" + escText(orderNo) + ") — teşekkürler! Aboneliğini <a href=\"uyelik.html\">üyelik sayfandan</a> yönetebilirsin."
+      : prefix + " (#" + escText(orderNo) + ") — teşekkürler! Siparişlerini <a href=\"uyelik.html\">üyelik sayfandan</a> takip edebilirsin.";
     checkoutCompleteBtn.hidden = true;
     checkoutSuccessEl.hidden = false;
+    showMsg(checkoutMsgEl, "");
+    showMsg(paymentMsgEl, "");
+    legalEl.hidden = true;
     // Ödeme alındı: formlar ve adım sekmeleri kapanır, yalnızca teşekkür
-    // mesajı kalır (mobilde kart formu ekranda durmasın).
+    // mesajı kalır (mobilde ödeme ekranı ekranda durmasın).
     document.body.classList.add("order-done");
     if (stepsEl) stepsEl.hidden = true;
+    stripReturnQuery();
+    BahcedenCart.loadSubscription().catch(() => null);
+  }
+
+  // ---- ?siparis=<no>&odeme=ok|hata — PayTR merchant_ok_url / merchant_fail_url dönüşü (yanıt no-store) ----
+  const returnInfo = (function () {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      const no = qs.get("siparis");
+      if (!no) return null;
+      return { orderNo: no, result: qs.get("odeme") || "" };
+    } catch (e) { return null; }
+  })();
+  function stripReturnQuery() {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      if (!qs.has("siparis") && !qs.has("odeme")) return;
+      qs.delete("siparis"); qs.delete("odeme");
+      const rest = qs.toString();
+      history.replaceState(null, "", window.location.pathname + (rest ? "?" + rest : "") + window.location.hash);
+    } catch (e) { /* yok say */ }
+  }
+  let returnHandled = false;
+  function handleReturnFromPayment() {
+    if (!returnInfo || returnHandled || !BahcedenCart.isLoggedIn()) return;
+    returnHandled = true;
+    checkoutState.orderNo = returnInfo.orderNo;
+    if (returnInfo.result === "hata") {
+      showMsg(paymentMsgEl, "Ödeme alınamadı — kartını kontrol edip \"siparişi tamamla\" ile yeniden deneyebilirsin.");
+      sectionState.payment.manual = true; sectionState.payment.collapsed = false;
+      refreshSections();
+      stripReturnQuery();
+      return;
+    }
+    // ok: callback sunucuya birkaç saniye sonra düşebilir — doğrulanana kadar bekle.
+    checkoutState.awaiting = true;
+    checkoutCompleteBtn.hidden = true;
+    checkoutSuccessEl.textContent = "Ödemen doğrulanıyor — birkaç saniye…";
+    checkoutSuccessEl.hidden = false;
+    document.body.classList.add("order-done");
+    if (stepsEl) stepsEl.hidden = true;
+    startPolling(returnInfo.orderNo);
+  }
+  // Ödeme dönüşü iFrame içinde kaldıysa (üst pencereye çıkamadı) sayfayı sonuca taşı.
+  window.addEventListener("message", (e) => {
+    if (e.origin !== window.location.origin || !e.data || typeof e.data !== "object" || typeof e.data.bagdamCheckout !== "string") return;
+    if (!/^\?/.test(e.data.bagdamCheckout)) return;
+    window.location.href = window.location.pathname + e.data.bagdamCheckout;
   });
+  // Giriş yapılmadan dönüldüyse (çerez yok): giriş kutusuna kısa not; giriş sonrası sayfa yenilenir, ?siparis korunur.
+  if (returnInfo && !BahcedenCart.isLoggedIn()) {
+    const loginMsg = document.getElementById("loginMsg");
+    if (loginMsg) { loginMsg.textContent = "Ödeme sonucunu görmek için giriş yap."; loginMsg.hidden = false; }
+  }
 
   // "Bu haftaki kutuma ekle" az önce kullanıldıysa, boşalan sepette bunun
   // onay notunu gösterebilmek için akılda tutulur (sayfa görünümü boyunca).
   let justAddedToBox = false;
+  let mergeError = "";
 
-  function render() {
+  function renderSummary() {
+    // Yalnız toplam bloğunu tazelemek yerine özet baştan çizilir (satır tutarları da teklife bağlı).
+    render(true);
+  }
+
+  function render(skipQuote) {
     const items = BahcedenCart.getCart();
     const sub = BahcedenCart.getSub();
     const tier = sub.active ? BahcedenCart.subTier() : null;
@@ -458,21 +879,18 @@
           '<a class="btn" href="uyelik.html">aboneliğini görüntüle</a>'
         : '<p class="cart-empty mono">henüz bir aboneliğin yok.</p>' +
           '<a class="btn" href="urunler.html">aboneliği başlat</a>';
-      renderDeliveryDay(0);
+      quote = null;
+      renderDeliveryDay();
       refreshSections();
       return;
     }
 
-    let subtotal = 0;
-    let vat = 0;
     let subBlock = "";
+    const usedLines = [];
     if (tier) {
       const isSub = sub.type === "subscription";
       const extras = sub.extras || [];
-      const extrasTotal = BahcedenCart.subExtrasTotal();
-      const lineTotal = sub.skipThisWeek ? 0 : tier.price + extrasTotal;
-      subtotal += lineTotal;
-      if (!sub.skipThisWeek) vat += lineTotal * (0.01 / 1.01);
+      const lineTotal = sub.skipThisWeek ? 0 : boxLineTotal();
       const itemNames = sub.items
         .map((id) => { const p = PRODUCTS.find((x) => x.id === id); return p ? p.name : ""; })
         .filter(Boolean)
@@ -503,7 +921,7 @@
             noteHtml +
             controlsHtml +
           "</div>" +
-          '<span class="price mono">' + money(lineTotal) + " TL</span>" +
+          '<span class="price mono">' + fmtMaybe(lineTotal) + "</span>" +
         "</div>";
     }
 
@@ -514,9 +932,7 @@
       .map((item, i) => {
         const p = PRODUCTS.find((x) => x.id === item.id);
         if (!p) return "";
-        const lineTotal = p.price * item.qty;
-        subtotal += lineTotal;
-        vat += lineTotal * (0.01 / 1.01);
+        const lineTotal = productLineTotal(item, p, usedLines);
         const isTrash = item.qty === 1;
         return (
           '<div class="cart-row">' +
@@ -532,40 +948,67 @@
                 '<button class="qty-stepper-inc" data-idx="' + i + '" data-dir="1" type="button" aria-label="Arttır">+</button>' +
               "</div>" +
             "</div>" +
-            '<span class="price mono">' + money(lineTotal) + " TL</span>" +
+            '<span class="price mono">' + fmtMaybe(lineTotal) + "</span>" +
           "</div>"
         );
       })
       .join("");
 
-    const vatLines = vat > 0 ? '<div class="cart-vat-row"><span>%1 KDV</span><span class="mono">' + money(Math.round(vat)) + " TL</span></div>" : "";
-
     // Aktif (satın alınmış) aboneliği olan biri tekli ürün eklediyse iki yol
     // sunulur: normal akışla hemen ödemek, ya da ürünleri bu haftaki kutuya
     // taşımak — o zaman ücreti kutu ödemesiyle aynı gün çekilir ve kutuyla
-    // aynı gün teslim edilir.
+    // aynı gün teslim edilir. (F8 checkout: POST /me/subscription/cycles/current/merge-cart)
     const addToBoxHtml = BahcedenCart.hasPurchasedSub() && items.length > 0
       ? '<div class="addon-choice">' +
           '<p><b>Aktif aboneliğin var.</b> Bu ürünleri hemen ödemek için aşağıdaki sipariş adımlarını tamamla — ayrı bir sipariş olarak işlenir, teslimat gününü seçersin. İstersen bu haftaki kutuna ekle: ücreti kutu ödemenle aynı gün çekilir, kutunla aynı gün teslim edilir.</p>' +
           '<button class="btn" id="addToBoxBtn" type="button">bu haftaki kutuma ekle</button>' +
+          (mergeError ? '<p class="checkout-auth-msg mono">' + escText(mergeError) + "</p>" : "") +
         "</div>"
       : "";
 
-    // Aboneliklerde kargo her zaman dahil; tek ürün/tek seferlik siparişlerde
-    // 1000 TL üzeri ücretsiz, altında sabit kargo ücreti uygulanır.
-    const isSubscriber = !!(tier && sub.type === "subscription");
-    const freeShipping = isSubscriber || subtotal > 1000;
-    const deliveryFee = freeShipping ? 0 : (typeof DELIVERY_FEE !== "undefined" ? DELIVERY_FEE : 0);
-    const grandTotal = subtotal + deliveryFee;
+    // F8 checkout: toplamlar teklife göre (POST /checkout/quote) — istemci hesap yapmaz. Kupon alanı (ADR-0003 istisna 8 adayı).
+    const vatRate = quote && quote.lines && quote.lines.length ? quote.lines[0].vatRate : null;
+    const vatTotal = quote ? Number(quote.vatTotal || 0) : null;
+    const shippingFee = quote ? Number(quote.shippingFee || 0) : null;
+    const grandTotal = quote ? Number(quote.grandTotal || 0) : null;
+    const discountTotal = quote ? Number(quote.discountTotal || 0) : 0;
+    const couponStatus = quote && quote.couponStatus ? quote.couponStatus : null;
+    const couponDiscount = couponStatus && couponStatus.valid ? Number(couponStatus.discount || 0) : 0;
+    const otherDiscount = Math.max(0, discountTotal - couponDiscount);
+    const discountNote = quote && Array.isArray(quote.notes)
+      ? quote.notes.find((n) => n && (n.code === "FIRST_BOXES_DISCOUNT" || n.code === "RETENTION_DISCOUNT"))
+      : null;
+    const vatLines = vatTotal !== null && vatTotal > 0
+      ? '<div class="cart-vat-row"><span>' + (vatRate !== null && vatRate !== undefined ? "%" + money(vatRate) + " " : "") + 'KDV</span><span class="mono">' + money(vatTotal) + " TL</span></div>"
+      : "";
+    const discountLines =
+      (couponDiscount > 0 ? '<div class="cart-vat-row"><span>Kupon ' + escText(couponCode) + '</span><span class="mono">−' + money(couponDiscount) + " TL</span></div>" : "") +
+      (otherDiscount > 0 ? '<div class="cart-vat-row"><span>' + escText(discountNote && discountNote.message ? discountNote.message : "İndirim") + '</span><span class="mono">−' + money(otherDiscount) + " TL</span></div>" : "");
+    // Teklif alınamadı (ağ/sunucu): teknik zarf mesajı yerine sabit Türkçe not + yeniden dene (tutar istemcide hesaplanmaz).
+    const errorLine = quoteError && !quote
+      ? '<div class="cart-vat-row"><span>' + escText(quoteError.status === 0 ? quoteError.message : "Tutar şu an hesaplanamıyor.") + '</span><span class="mono"><a href="#" id="quoteRetry">tekrar dene</a></span></div>'
+      : "";
+    const couponMsg = couponStatus && couponStatus.message
+      ? '<p class="checkout-auth-msg mono coupon-msg' + (couponStatus.valid ? " ok" : "") + '" id="couponMsg">' + escText(couponStatus.message) + "</p>"
+      : '<p class="checkout-auth-msg mono coupon-msg" id="couponMsg" hidden></p>';
+    const couponHtml =
+      '<div class="checkout-form coupon-row" id="couponRow">' +
+        '<label>Kupon kodu<span class="coupon-field"><input type="text" id="couponInput" placeholder="KOD" autocomplete="off" value="' + escAttr(couponCode) + '">' +
+        '<button class="btn" type="button" id="couponApply">' + (couponCode ? "kaldır" : "uygula") + "</button></span></label>" +
+        couponMsg +
+      "</div>";
 
     wrap.innerHTML =
       '<h2 class="checkout-section-title">Sipariş Özeti</h2>' +
       '<div class="cart-rows">' + subBlock + rows + "</div>" +
       addToBoxHtml +
+      couponHtml +
       '<div class="cart-summary">' +
-        '<div class="cart-total"><span>Toplam</span><span class="mono">' + money(grandTotal) + " TL</span></div>" +
-        '<div class="cart-vat-row"><span>Kargo</span><span class="mono">' + (deliveryFee > 0 ? money(deliveryFee) + " TL" : "Dahil") + "</span></div>" +
+        '<div class="cart-total"><span>Toplam</span><span class="mono">' + fmtMaybe(grandTotal) + "</span></div>" +
+        '<div class="cart-vat-row"><span>Kargo</span><span class="mono">' + (shippingFee === null ? "…" : (shippingFee > 0 ? money(shippingFee) + " TL" : "Dahil")) + "</span></div>" +
+        discountLines +
         vatLines +
+        errorLine +
       "</div>" +
       // Mobil adım akışı: özetten sonraki adıma geçiş (masaüstünde gizli).
       '<button class="cta wide summary-continue" id="summaryContinue" type="button" hidden>devam et</button>';
@@ -575,16 +1018,25 @@
     const addToBoxBtn = document.getElementById("addToBoxBtn");
     if (addToBoxBtn) {
       addToBoxBtn.addEventListener("click", () => {
-        BahcedenCart.getCart().forEach((item) => {
-          const p = PRODUCTS.find((x) => x.id === item.id);
-          if (!p) return;
-          BahcedenCart.subAddExtra(item.id, item.qty, item.qty + " × " + p.unit + (item.pref ? " · " + item.pref : ""));
-        });
-        BahcedenCart.setCart([]);
-        justAddedToBox = true;
-        render();
+        addToBoxBtn.disabled = true;
+        mergeError = "";
+        BahcedenCart.mergeCartIntoBox()
+          .then(() => { justAddedToBox = true; render(); })
+          .catch((err) => { mergeError = (err && err.message) || "Kutuya eklenemedi — tekrar dene."; render(); });
       });
     }
+    const couponInput = document.getElementById("couponInput");
+    const couponApply = document.getElementById("couponApply");
+    function applyCoupon() {
+      const next = couponCode ? "" : couponInput.value.trim().toLocaleUpperCase("tr-TR");
+      couponCode = next;
+      render();
+      requestQuote(true);
+    }
+    if (couponApply) couponApply.addEventListener("click", applyCoupon);
+    if (couponInput) couponInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } });
+    const quoteRetry = document.getElementById("quoteRetry");
+    if (quoteRetry) quoteRetry.addEventListener("click", (e) => { e.preventDefault(); lastQuoteKey = null; requestQuote(true); });
 
     const subRemove = document.getElementById("subRemove");
     if (subRemove) {
@@ -608,8 +1060,10 @@
       });
     });
 
-    renderDeliveryDay(deliveryFee);
+    renderDeliveryDay();
     refreshSections();
+    // Sepet/bölge/kupon değiştiyse teklif yenilenir (aynıysa istek yok).
+    if (!skipQuote && quoteKey() !== lastQuoteKey) requestQuote();
   }
 
   // ---- Mobil adım sekmeleri (≤640px). Masaüstünde çubuk gizli; bölümler
@@ -646,18 +1100,18 @@
   function refreshSteps() {
     if (!stepsEl) return; // kurulumdan önce çağrılırsa
     const loggedIn = BahcedenCart.isLoggedIn();
-    // Sepet boşken (ürün/kutu yok) sekme çubuğu anlamsız — gizli.
-    stepsEl.hidden = !(loggedIn && isMobileSteps() && stepUnlocked("customer"));
+    // Sepet boşken (ürün/kutu yok) sekme çubuğu anlamsız — gizli. Ödeme alındıysa da gizli.
+    stepsEl.hidden = !(loggedIn && isMobileSteps() && stepUnlocked("customer")) || checkoutState.paid;
     stepBtns.forEach((b) => {
       const k = b.getAttribute("data-step");
       b.disabled = !stepUnlocked(k);
-      const done = (k === "customer" && customerComplete()) || (k === "delivery" && !!BahcedenCart.getSub().deliveryDay) || (k === "payment" && paymentComplete());
+      const done = (k === "customer" && customerComplete()) || (k === "delivery" && !!selectedDate) || (k === "payment" && paymentComplete());
       b.classList.toggle("done", done);
     });
     // Otomatik ilerleme: müşteri tamamlandı → teslimat; teslimat günü seçildi → ödeme.
     if (isMobileSteps() && loggedIn) {
       if (currentStep === "customer" && customerComplete() && !lastAuto.customer) { lastAuto.customer = true; showStep("delivery"); }
-      else if (currentStep === "delivery" && BahcedenCart.getSub().deliveryDay && !lastAuto.delivery) { lastAuto.delivery = true; showStep("payment"); }
+      else if (currentStep === "delivery" && selectedDate && !lastAuto.delivery) { lastAuto.delivery = true; showStep("payment"); }
       else if (!stepUnlocked(currentStep)) showStep("summary");
       else Object.keys(stepPanels).forEach((k) => stepPanels[k].classList.toggle("step-hidden", k !== currentStep));
     } else {
@@ -675,13 +1129,12 @@
   // Müşteri alanları her değiştiğinde ve teslimat günü seçildiğinde kilitler güncellensin.
   [custName, custEmail, custPhone, custAddress, custZip, custDistrict].forEach((el) => el.addEventListener("input", refreshSteps));
   custDistrict.addEventListener("change", refreshSteps);
-  [cardName, cardNumber, cardExpiry, cardCvc].forEach((el) => el.addEventListener("input", refreshSteps));
   window.addEventListener("resize", refreshSteps);
 
   refreshAuthGate();
   render();
   refreshSteps();
-  if (BahcedenCart.isLoggedIn()) loadProfileIntoForms(); // F6 auth: adres/e-posta sunucudan
+  if (BahcedenCart.isLoggedIn()) loadProfileIntoForms(); // F6 auth: adres/e-posta sunucudan (+ F8 checkout verileri)
 })();
 </script>
 

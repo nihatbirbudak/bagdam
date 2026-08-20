@@ -82,3 +82,77 @@ export interface CouponApplication {
   /** Uygulanan indirim tutarı (TL, kuruşa yuvarlı). */
   amount: Money;
 }
+
+// ── F8 ekleri (CouponsModule + checkout kupon uygulaması) — yalnız EKLEME ─────────────────────────────────────────
+// Kupon doğrulama CouponsService.validate (apps/api modules/coupons); indirim hesabı PricingService.quote içinde (ADR-0018 yuvarlama).
+// Admin ekranı "Kuponlar" (F8 D): GET /admin/coupons?q&active&page · GET /admin/coupons/:id (+ redemptions) · POST · PUT · DELETE (soft) · PATCH /:id/active
+
+/** Kuponun reddedilme nedeni (makine kodu; Türkçe metin `COUPON_REJECT_MESSAGES`). */
+export type CouponRejectReason =
+  | 'NOT_FOUND'
+  | 'INACTIVE'
+  | 'NOT_STARTED'
+  | 'EXPIRED'
+  | 'USAGE_LIMIT'
+  | 'PER_USER_LIMIT'
+  | 'MIN_SUBTOTAL'
+  | 'SCOPE_MISMATCH'
+  | 'LOGIN_REQUIRED'
+  | 'NO_DISCOUNT';
+
+export const COUPON_REJECT_MESSAGES: Readonly<Record<CouponRejectReason, string>> = {
+  NOT_FOUND: 'Böyle bir kupon kodu yok.',
+  INACTIVE: 'Bu kupon artık kullanımda değil.',
+  NOT_STARTED: 'Bu kupon henüz başlamadı.',
+  EXPIRED: 'Bu kuponun süresi dolmuş.',
+  USAGE_LIMIT: 'Bu kuponun kullanım hakkı dolmuş.',
+  PER_USER_LIMIT: 'Bu kuponu daha önce kullandın.',
+  MIN_SUBTOTAL: 'Bu kupon için sepet tutarı yeterli değil.',
+  SCOPE_MISMATCH: 'Bu kupon sepetindeki ürünlerde geçerli değil.',
+  LOGIN_REQUIRED: 'Kuponu kullanmak için giriş yapmalısın.',
+  NO_DISCOUNT: 'Bu kupon sepetine indirim sağlamıyor.',
+};
+
+/** `CouponsService.validate(code, ctx)` sonucu — geçerliyse kupon kaydı + indirim uygulanacak alan (api hesaplar). */
+export interface CouponValidationResult {
+  valid: boolean;
+  reason: CouponRejectReason | null;
+  message: string;
+  /** Geçerliyse kupon (admin DTO biçimi); değilse null. */
+  coupon: Coupon | null;
+  /** Hesaplanan indirim (TL) — `validate`'e `eligible` tutar verildiyse; yoksa 0. */
+  discount: Money;
+}
+
+/** Admin `GET /admin/coupons?q&active&page&limit`. */
+export interface CouponListQuery {
+  q?: string;
+  active?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface CouponList {
+  items: CouponListItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** Kupon detayındaki kullanım satırı (sipariş no + durum + müşteri e-postası). */
+export interface CouponRedemptionListItem extends CouponRedemption {
+  orderNo: number;
+  orderStatus: string;
+  userEmail: string | null;
+}
+
+/** Admin `GET /admin/coupons/:id` — kupon + kullanımlar (yeni → eski). */
+export interface CouponDetail extends Coupon {
+  deletedAt: IsoDateTime | null;
+  redemptions: CouponRedemptionListItem[];
+}
+
+/** Admin `PATCH /admin/coupons/:id/active {isActive}`. */
+export interface CouponActivePatch {
+  isActive: boolean;
+}

@@ -2,14 +2,16 @@
 // Uygulanma sırası (state-machines §8 adım 2): ilk-kutu hakkı varsa O uygulanır; yoksa retention; ÜST ÜSTE BİNMEZ.
 // İndirim yalnız BOX satırına iner (ekstralar ve tekil ürünler tam fiyat — kutu.html: tier fiyatı yarıya, extras +).
 // "Üye başına 1 kez" (User.firstBoxesPromoUsedAt / retentionOfferUsedAt) ÇAĞIRANIN sorumluluğu: hak yoksa
-// `firstBoxesLeft: 0` / `retentionPct: null` verilir. Yuvarlama: kuruşa (649 × %50 = 324,50 — prototip ekranda
-// Math.round ile 325 gösterir; DB Decimal(12,2) olduğundan kuruş esas alınır, gösterim F9'da formatMoneyTr).
+// `firstBoxesLeft: 0` / `retentionPct: null` verilir. Yuvarlama kodda sabit değil — Setting `commerce.discountRounding`
+// (ADR-0018): `kurus` 649 × %50 = 324,50 (varsayılan; DB Decimal(12,2)) ya da `tl` Math.round → 325 (prototip cart.js).
 import { OrderLineKind } from '../enums';
 import type { Money, PricingContext, PricingLineInput, PricingNote, PricingResult } from '../types/pricing';
+import type { DiscountRounding } from '../types/settings';
 import { COMMERCE_SETTINGS_DEFAULTS } from '../types/settings';
 import { applyVat, priceLines, subtotalOf } from './lines';
 import { discountAmount, roundMoney, sumMoney } from './money';
 import { resolveOrderKind } from './order-kind';
+import { resolvePricingRules } from './rules';
 
 export interface FirstBoxesDiscountInput {
   /** Kutu satırı toplamı (tier fiyatı × 1), KDV dahil. */
@@ -18,6 +20,8 @@ export interface FirstBoxesDiscountInput {
   firstBoxesLeft: number;
   /** Yüzde; yoksa Setting varsayılanı (50). */
   pct?: number;
+  /** Yuvarlama (Setting `commerce.discountRounding`); yoksa kuruş. */
+  rounding?: DiscountRounding;
 }
 
 /** İlk kutular indirimi: hak kaldıysa kutu satırına `pct`; yoksa 0. */
@@ -25,19 +29,21 @@ export function firstBoxesDiscount(input: FirstBoxesDiscountInput): Money {
   const pct = input.pct ?? COMMERCE_SETTINGS_DEFAULTS.firstBoxDiscount.pct;
   if (!Number.isInteger(input.firstBoxesLeft)) throw new RangeError('firstBoxesDiscount: firstBoxesLeft tam sayı olmalı');
   if (input.firstBoxesLeft <= 0 || pct <= 0 || input.boxTotal <= 0) return 0;
-  return discountAmount(input.boxTotal, pct);
+  return discountAmount(input.boxTotal, pct, input.rounding);
 }
 
 export interface RetentionDiscountInput {
   boxTotal: Money;
   /** `Subscription.nextBoxDiscountPct` (retention kabulünde 50); null/0 → indirim yok. */
   retentionPct: number | null;
+  /** Yuvarlama (Setting `commerce.discountRounding`); yoksa kuruş. */
+  rounding?: DiscountRounding;
 }
 
 /** Retention (iptalden vazgeçme) indirimi: bir sonraki kutuya `retentionPct`; yoksa 0. */
 export function retentionDiscount(input: RetentionDiscountInput): Money {
   if (input.retentionPct === null || input.retentionPct <= 0 || input.boxTotal <= 0) return 0;
-  return discountAmount(input.boxTotal, input.retentionPct);
+  return discountAmount(input.boxTotal, input.retentionPct, input.rounding);
 }
 
 export type BoxDiscountKind = 'FIRST_BOXES' | 'RETENTION';
@@ -53,12 +59,13 @@ export interface BoxDiscountResult {
  */
 export function resolveBoxDiscount(
   boxTotal: Money,
-  ctx: Pick<PricingContext, 'firstBoxesLeft' | 'retentionPct' | 'firstBoxPct'>,
+  ctx: Pick<PricingContext, 'firstBoxesLeft' | 'retentionPct' | 'firstBoxPct' | 'rules'>,
 ): BoxDiscountResult {
   const firstPct = ctx.firstBoxPct ?? COMMERCE_SETTINGS_DEFAULTS.firstBoxDiscount.pct;
-  const first = firstBoxesDiscount({ boxTotal, firstBoxesLeft: ctx.firstBoxesLeft, pct: firstPct });
+  const rounding = resolvePricingRules(ctx.rules).discountRounding;
+  const first = firstBoxesDiscount({ boxTotal, firstBoxesLeft: ctx.firstBoxesLeft, pct: firstPct, rounding });
   if (first > 0) return { amount: first, kind: 'FIRST_BOXES', pct: firstPct };
-  const retention = retentionDiscount({ boxTotal, retentionPct: ctx.retentionPct });
+  const retention = retentionDiscount({ boxTotal, retentionPct: ctx.retentionPct, rounding });
   if (retention > 0) return { amount: retention, kind: 'RETENTION', pct: ctx.retentionPct ?? 0 };
   return { amount: 0, kind: null, pct: 0 };
 }

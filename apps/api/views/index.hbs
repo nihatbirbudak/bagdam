@@ -177,94 +177,13 @@
       <p>Süt ürünleri, fırın ve kilerden en çok tercih edilenler — taze, doğrudan üreticiden.</p>
     </div>
     <div class="pcard-grid offers-grid">
-      <article class="pcard">
-        <a class="pcard-link" href="urun.html?id=zeytinyagi">
-          <div class="pcard-visual"><img src="assets/images/urunler/zeytinyagi.jpg" alt="Sızma Zeytinyağı" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
-          <h3>Sızma Zeytinyağı</h3>
-        </a>
-        <p class="pcard-meta mono">Bağdam Çiftlik · Kuşçular · Urla — Erken Hasat</p>
-        <div class="pcard-foot">
-          <p class="pcard-price mono">480 TL <span>/ L</span></p>
-          <div class="qty-stepper-slot" data-add-to-cart="zeytinyagi"></div>
-        </div>
-      </article>
-      <article class="pcard">
-        <a class="pcard-link" href="urun.html?id=beyazpeynir">
-          <div class="pcard-visual"><img src="assets/images/urunler/beyazpeynir.jpg" alt="Beyaz İnek Peyniri" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
-          <h3>Beyaz İnek Peyniri</h3>
-        </a>
-        <p class="pcard-meta mono">Emrem Çiftlik · Kuşçular · Urla</p>
-        <div class="pcard-foot">
-          <p class="pcard-price mono">260 TL <span>/ 500 g</span></p>
-          <div class="qty-stepper-slot" data-add-to-cart="beyazpeynir"></div>
-        </div>
-      </article>
-      <article class="pcard">
-        <a class="pcard-link" href="urun.html?id=ekmek">
-          <div class="pcard-visual"><img src="assets/images/urunler/ekmek.jpg" alt="Ekşi Mayalı Ekmek" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
-          <h3>Ekşi Mayalı Ekmek</h3>
-        </a>
-        <p class="pcard-meta mono">Hatice Yıldız · Yağcılar · Urla</p>
-        <div class="pcard-foot">
-          <p class="pcard-price mono">95 TL <span>/ 800 g somun</span></p>
-          <div class="qty-stepper-slot" data-add-to-cart="ekmek"></div>
-        </div>
-      </article>
-      <article class="pcard">
-        <a class="pcard-link" href="kutu.html?tier=sezon">
-          <div class="pcard-visual"><img src="assets/images/urunler/sezon.jpg" alt="10'lu Sezon Kutusu" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
-          <h3>10'lu Sezon Kutusu</h3>
-        </a>
-        <p class="pcard-meta mono">9–10 ürün · haftalık</p>
-        <div class="pcard-foot">
-          <p class="pcard-price mono">1099 TL <span>/ kutu</span></p>
-          <a class="qty-stepper-add" href="kutu.html?tier=sezon" aria-label="Kutunu seç">+</a>
-        </div>
-      </article>
-      <article class="pcard">
-        <a class="pcard-link" href="urun.html?id=zeytin">
-          <div class="pcard-visual"><img src="assets/images/urunler/zeytin.jpg" alt="Sofralık Zeytin" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
-          <h3>Sofralık Zeytin</h3>
-        </a>
-        <p class="pcard-meta mono">Bağdam Çiftlik · Kuşçular · Urla</p>
-        <div class="pcard-foot">
-          <p class="pcard-price mono">180 TL <span>/ 500 g</span></p>
-          <div class="qty-stepper-slot" data-add-to-cart="zeytin"></div>
-        </div>
-      </article>
-      <article class="pcard">
-        <a class="pcard-link" href="urun.html?id=yogurt">
-          <div class="pcard-visual"><img src="assets/images/urunler/yogurt.jpg" alt="Süzme Yoğurt" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
-          <h3>Süzme Yoğurt</h3>
-        </a>
-        <p class="pcard-meta mono">Bağdam Çiftlik · Kuşçular · Urla</p>
-        <div class="pcard-foot">
-          <p class="pcard-price mono">150 TL <span>/ 700 g kavanoz</span></p>
-          <div class="qty-stepper-slot" data-add-to-cart="yogurt"></div>
-        </div>
-      </article>
-      <article class="pcard">
-        <a class="pcard-link" href="urun.html?id=tereyagi">
-          <div class="pcard-visual"><img src="assets/images/urunler/tereyagi.jpg" alt="Tereyağı" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
-          <h3>Tereyağı</h3>
-        </a>
-        <p class="pcard-meta mono">Bağdam Çiftlik · Kuşçular · Urla</p>
-        <div class="pcard-foot">
-          <p class="pcard-price mono">180 TL <span>/ 250 g</span></p>
-          <div class="qty-stepper-slot" data-add-to-cart="tereyagi"></div>
-        </div>
-      </article>
-      <article class="pcard">
-        <a class="pcard-link" href="urun.html?id=salca">
-          <div class="pcard-visual"><img src="assets/images/urunler/salca.jpg" alt="Salça" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
-          <h3>Salça</h3>
-        </a>
-        <p class="pcard-meta mono">Emrem Çiftlik · Kuşçular · Urla</p>
-        <div class="pcard-foot">
-          <p class="pcard-price mono">140 TL <span>/ 500 g kavanoz</span></p>
-          <div class="qty-stepper-slot" data-add-to-cart="salca"></div>
-        </div>
-      </article>
+{{#each featured}}
+{{#if product}}
+{{> featured_product product}}
+{{else}}
+{{> featured_tier tier}}
+{{/if}}
+{{/each}}
     </div>
     <a class="showcase-row offers-more" href="urunler.html">tümünü gör <span class="showcase-arrow">↗</span></a>
   </section>
@@ -421,8 +340,7 @@
   </div>
 </footer>
 
-<script src="assets/products.js"></script>
-<script src="assets/cart.js"></script>
+{{> bootstrap}}
 <script>
 (function () {
   var crate = document.querySelector(".toptan-crate");

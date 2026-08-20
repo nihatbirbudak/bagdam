@@ -24,8 +24,12 @@
   "devDependencies": {
     "@playwright/test": "^1.54.0",
     "@types/bcrypt": "^6.0.0",
+    "@types/pixelmatch": "^5.2.6",
+    "@types/pngjs": "^6.0.5",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.4.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "prisma": "6.19.2",
     "tsx": "^4.21.0",
     "turbo": "^2.5.0",

@@ -9,6 +9,7 @@
 // ondan farklıdır: birim fiyat + KDV oranı çözülmüş, çeşidi belli satırdır (api bu dönüşümü katalogdan yapar).
 import type { DeliveryDay, OrderKind, OrderLineKind } from '../enums';
 import type { IsoDate } from './common';
+import type { CommerceSettings } from './settings';
 
 /**
  * Para: TL, KDV DAHİL, 2 ondalık (kuruş). DB'de `Decimal(12,2)`; API DTO'larında number (mapper: `Number(decimal)`).
@@ -70,6 +71,14 @@ export interface ShippingResult {
 }
 
 /**
+ * Fiyatlama KURALLARI (ADR-0018) — kodda sabit değil, Setting `commerce.*` (admin F5) ile değişir:
+ *   freeShippingRule `gte`|`gt` · discountRounding `kurus`|`tl` · subscriberFreeShipping boolean.
+ * `CommerceSettings`'in alt kümesidir: çağıran DB'den çözdüğü CommerceSettings'i olduğu gibi verebilir.
+ * Verilmeyen alan → `DEFAULT_PRICING_RULES` (= COMMERCE_SETTINGS_DEFAULTS; `pricing/rules.ts`).
+ */
+export type PricingRules = Pick<CommerceSettings, 'freeShippingRule' | 'discountRounding' | 'subscriberFreeShipping'>;
+
+/**
  * Fiyatlama bağlamı — çağıranın (api PricingService / admin önizleme) DB'den çözüp verdiği gerçekler.
  * "Üye başına 1 kez" kuralları (ilk-2-kutu `User.firstBoxesPromoUsedAt`, retention `User.retentionOfferUsedAt`)
  * ÇAĞIRANIN sorumluluğudur: hak yoksa `firstBoxesLeft: 0` / `retentionPct: null` verilir.
@@ -95,6 +104,11 @@ export interface PricingContext {
   firstBoxPct?: number;
   /** cart.js `sub.skipThisWeek`: bu hafta atlandı → BOX ve EXTRA satırları 0 TL, indirim uygulanmaz (atlanan hafta tahsil edilmez, ADR-0007). */
   skipThisWeek?: boolean;
+  /**
+   * Fiyatlama kuralları (ADR-0018): Setting `commerce.{freeShippingRule,discountRounding,subscriberFreeShipping}`.
+   * Kısmi verilebilir; eksik alan varsayılan (`DEFAULT_PRICING_RULES`). Verilmezse tümü varsayılan (geriye dönük uyumlu).
+   */
+  rules?: Partial<PricingRules>;
 }
 
 /** Fiyatlama notu — makine kodu + Türkçe açıklama (+ varsa tutar). UI doğrudan `message`'ı basabilir. */

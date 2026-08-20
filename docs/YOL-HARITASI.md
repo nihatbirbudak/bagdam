@@ -63,12 +63,12 @@ Amaç: çalışan iskelet — **lokalde** (ADR-0017: sunucu kurulumu ve yayın F
 - [x] CI: `services: postgres:14` ile `migrate deploy + seed + test`; `prisma validate + migrate diff` *(ADR-0017: CI/PG14 provası F10b'ye — şimdilik yok)*
 - **Bitti sayılır (lokal):** migration `bagdam_dev`'de ✓; seed yüklü ve idempotent ✓; testler üç TZ'de yeşil ✓; ERD `docs/erd.md` ✓; API health `db: up` ✓; sayfa paritesi 10/10 ✓.
 
-### F3 — Inline bootstrap + katalog dinamik (2 gün)
-- [ ] `CatalogModule` + `GET /api/v1/bootstrap` (products.js şekline birebir; `tab=legacyTab`, freqOptions şekli, why/batch lot'tan, SOLD_OUT/OUT_OF_SEASON/HIDDEN hariç) + snapshot testi
-- [ ] 10 `.hbs`'de `<script src="assets/products.js">` → `{{> bootstrap}}` (me/sub şimdilik null); `index.hbs` öne çıkanlar → `home.featured` partial'ı (ürün kartı / tier kartı); `kutu.hbs` pairIds/recommendedTier bootstrap'tan
-- [ ] cart.js yaması: `subSetTier` → `__BAGDAM__.templates`, `freshProducts` → `pool`, `isLoggedIn/getSub` → `__BAGDAM__.me/sub` okuyucuları (boşken eski davranış)
-- [ ] `products.js` repodan silinir; nginx `location /assets/` immutable + `cart.js?v=`
-- **Bitti sayılır:** staging diff 0; DB'de fiyat/şablon değişince sayfada; snapshot testi yeşil. İlk dinamik sayfa: `urunler.html`, sonra urun/kutu/index.
+### F3 — Inline bootstrap + katalog dinamik (2 gün) — ✅ TAMAM (2026-08-20)
+- [x] `CatalogModule` + `GET /api/v1/bootstrap` (products.js şekline birebir; `tab=legacyTab`, freqOptions şekli, why/batch lot'tan, SOLD_OUT/OUT_OF_SEASON/HIDDEN hariç) + snapshot testi *(✓ dto·controller·service·repository·mapper; snapshot testi products.js ile alan+sıra deepStrictEqual; 2 suite/70 test)*
+- [x] 10 `.hbs`'de `<script src="assets/products.js">` → `{{> bootstrap}}` (me/sub şimdilik null); `index.hbs` öne çıkanlar → `home.featured` partial'ı (ürün kartı / tier kartı); `kutu.hbs` pairIds/recommendedTier bootstrap'tan *(✓ `partials/bootstrap.hbs`; `home.featured` şimdilik `web/featured.ts` DEFAULT_FEATURED — F5'te SiteContent)*
+- [x] cart.js yaması: `subSetTier` → `__BAGDAM__.templates`, `freshProducts` → `pool`, `isLoggedIn/getSub` → `__BAGDAM__.me/sub` okuyucuları (boşken eski davranış) *(✓ 3 planlı yama, `// F3 bootstrap:` yorumlu)*
+- [x] `products.js` repodan silinir; nginx `location /assets/` immutable + `cart.js?v=` *(✓ public/assets/products.js silindi; website/ referansı duruyor; nginx kısmı F10b)*
+- **Bitti sayılır (lokal):** HTML diff 8/10 byte-byte + 2 kabul edilen satır (urunler.hbs RECOMMENDED_TIER, kutu.hbs pairIds) ✓; **Playwright 30/30 çift 0 px fark** (10 sayfa × 390/820/1440) ✓; sepet/kutu duman testi 14/14 ✓; bootstrap ≡ products.js ✓; DB'de fiyat/şablon değişince sayfada (60 s cache) ✓. Rapor: `tools/visual-parity/report.md`.
 
 ### F4 — Admin iskeleti + admin auth + katalog CRUD + medya import (6 gün) → **ilk görünür teslim**
 - [ ] `AuthModule` çekirdeği (cookie path=/, CSRF, kilit) + UA admin iskeleti (same-origin, `credentials:'include'`)

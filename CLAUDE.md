@@ -4,7 +4,7 @@ Bağdam (bagdam.com): Urla'dan sofraya seçki kutusu aboneliği + tekil ürün +
 
 ## Önce oku (her görevde)
 1. [docs/YOL-HARITASI.md](docs/YOL-HARITASI.md) — hangi fazdayız, sıradaki iş, "bitti sayılır" ölçütleri
-2. [docs/adr/](docs/adr/) — 16 karar (özellikle ADR-0002 mimari, ADR-0003 frontend, ADR-0016 kapsam kilidi)
+2. [docs/adr/](docs/adr/) — 18 karar (özellikle ADR-0002 mimari, ADR-0003 frontend, ADR-0016 kapsam kilidi)
 3. [docs/BACKEND-PLANI.md](docs/BACKEND-PLANI.md) — gerekçeler, Prisma şeması, API yüzeyi, admin ekranları
 4. [docs/state-machines.md](docs/state-machines.md) — Order/Subscription/Cycle/Payment/Cancellation geçişleri
 
@@ -22,7 +22,7 @@ apps/admin    Vite + React 19 + Tailwind 4 (:4011 dev)
 packages/shared
 database/     schema.prisma, migrations/, seeds/
 deploy/       nginx, scripts, runbook (sunucuya uygulanacak dosyalar)
-website/      ORİJİNAL statik prototip — parite referansı; F3'e kadar dokunma
+website/      ORİJİNAL statik prototip — parite referansı (tools/visual-parity); dokunma
 docs/         plan, ADR, yol haritası, araştırma; sunucu-baglanti.md gitignore'lu
 ```
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { OrderKind } from '../enums';
-import { computeShipping } from './shipping';
+import type { PricingRules } from '../types/pricing';
+import { computeShipping, meetsFreeThreshold } from './shipping';
 
 // Test verisi = prototip değerleri (products.js DELIVERY_FEE 49, sepet.html 1000 TL eşiği) — ama fonksiyon
 // bunları zone'dan alır; hiçbir sabit yoktur (ADR-0005 [B11]).
@@ -35,5 +36,40 @@ describe('pricing/shipping (ADR-0005: abone ‖ zone eşik)', () => {
   it('geçersiz zone değerleri hata', () => {
     expect(() => computeShipping({ subtotalAfterDiscount: 10, zone: { fee: -1, freeThreshold: null }, hasActiveSubscription: false, orderKind: OrderKind.SINGLE })).toThrow(RangeError);
     expect(() => computeShipping({ subtotalAfterDiscount: 10, zone: { fee: 49, freeThreshold: Number.NaN }, hasActiveSubscription: false, orderKind: OrderKind.SINGLE })).toThrow(RangeError);
+  });
+});
+
+describe('pricing/shipping kurallar Setting\'den (ADR-0018)', () => {
+  const single = (subtotal: number, rules?: Partial<PricingRules>, hasActiveSubscription = false) =>
+    computeShipping({ subtotalAfterDiscount: subtotal, zone: URLA, hasActiveSubscription, orderKind: OrderKind.SINGLE, rules });
+
+  it('freeShippingRule gte (varsayılan): 1000 → 0; gt: 1000 → 49, 1000,01 → 0', () => {
+    expect(single(1000).fee).toBe(0);
+    expect(single(1000, { freeShippingRule: 'gte' })).toEqual({ fee: 0, reason: 'THRESHOLD' });
+    expect(single(999.99, { freeShippingRule: 'gte' }).fee).toBe(49);
+    expect(single(1000, { freeShippingRule: 'gt' })).toEqual({ fee: 49, reason: 'ZONE_FEE' });
+    expect(single(1000.01, { freeShippingRule: 'gt' })).toEqual({ fee: 0, reason: 'THRESHOLD' });
+    expect(meetsFreeThreshold(1000, 1000, 'gte')).toBe(true);
+    expect(meetsFreeThreshold(1000, 1000, 'gt')).toBe(false);
+  });
+
+  it('subscriberFreeShipping true (varsayılan): aktif abone tekil üründe 0; false: bölge kuralı', () => {
+    expect(single(89, undefined, true)).toEqual({ fee: 0, reason: 'SUBSCRIBER' });
+    expect(single(89, { subscriberFreeShipping: true }, true)).toEqual({ fee: 0, reason: 'SUBSCRIBER' });
+    expect(single(89, { subscriberFreeShipping: false }, true)).toEqual({ fee: 49, reason: 'ZONE_FEE' });
+    expect(single(1000, { subscriberFreeShipping: false }, true)).toEqual({ fee: 0, reason: 'THRESHOLD' });
+  });
+
+  it('subscriberFreeShipping false: abonelik siparişinin kendisinde kargo yine 0; aktif abonenin tek seferlik kutusu da 0 (yalnız SINGLE etkilenir)', () => {
+    const rules = { subscriberFreeShipping: false } as const;
+    expect(computeShipping({ subtotalAfterDiscount: 324.5, zone: URLA, hasActiveSubscription: false, orderKind: OrderKind.SUBSCRIPTION, rules })).toEqual({ fee: 0, reason: 'SUBSCRIBER' });
+    expect(computeShipping({ subtotalAfterDiscount: 324.5, zone: URLA, hasActiveSubscription: true, orderKind: OrderKind.SUBSCRIPTION, rules })).toEqual({ fee: 0, reason: 'SUBSCRIBER' });
+    expect(computeShipping({ subtotalAfterDiscount: 649, zone: URLA, hasActiveSubscription: true, orderKind: OrderKind.BOX_ONE_TIME, rules })).toEqual({ fee: 0, reason: 'SUBSCRIBER' });
+    expect(computeShipping({ subtotalAfterDiscount: 649, zone: URLA, hasActiveSubscription: false, orderKind: OrderKind.BOX_ONE_TIME, rules })).toEqual({ fee: 49, reason: 'ZONE_FEE' });
+  });
+
+  it('bozuk kural değeri → varsayılan (gte / true)', () => {
+    expect(single(1000, { freeShippingRule: 'foo' as never }).fee).toBe(0);
+    expect(single(89, { subscriberFreeShipping: 'no' as never }, true).fee).toBe(0);
   });
 });

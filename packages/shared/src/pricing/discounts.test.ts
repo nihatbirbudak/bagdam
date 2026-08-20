@@ -41,6 +41,23 @@ describe('pricing/discounts resolveBoxDiscount (sıra: ilk-kutu → retention; �
   });
 });
 
+describe('pricing/discounts yuvarlama Setting commerce.discountRounding (ADR-0018)', () => {
+  it('kurus (varsayılan): 649 %50 → 324,50; tl: → 325 (Math.round, prototip)', () => {
+    expect(firstBoxesDiscount({ boxTotal: 649, firstBoxesLeft: 2, rounding: 'kurus' })).toBe(324.5);
+    expect(firstBoxesDiscount({ boxTotal: 649, firstBoxesLeft: 2, rounding: 'tl' })).toBe(325);
+    expect(retentionDiscount({ boxTotal: 649, retentionPct: 50, rounding: 'kurus' })).toBe(324.5);
+    expect(retentionDiscount({ boxTotal: 649, retentionPct: 50, rounding: 'tl' })).toBe(325);
+    expect(firstBoxesDiscount({ boxTotal: 1099, firstBoxesLeft: 1, rounding: 'tl' })).toBe(550); // 549,50 → 550
+  });
+
+  it('resolveBoxDiscount ctx.rules ile: tl → 325 (ilk-kutu ve retention); rules yoksa / bozuksa kuruş', () => {
+    expect(resolveBoxDiscount(649, { firstBoxesLeft: 1, retentionPct: null, rules: { discountRounding: 'tl' } })).toEqual({ amount: 325, kind: 'FIRST_BOXES', pct: 50 });
+    expect(resolveBoxDiscount(649, { firstBoxesLeft: 0, retentionPct: 50, rules: { discountRounding: 'tl' } })).toEqual({ amount: 325, kind: 'RETENTION', pct: 50 });
+    expect(resolveBoxDiscount(649, { firstBoxesLeft: 1, retentionPct: null, rules: {} }).amount).toBe(324.5);
+    expect(resolveBoxDiscount(649, { firstBoxesLeft: 1, retentionPct: null, rules: { discountRounding: 'lira' as never } }).amount).toBe(324.5);
+  });
+});
+
 describe('pricing/discounts computeDeltaOrder (ADR-0006: kesim öncesi eklenen ekstralar ayrı küçük sipariş)', () => {
   const extras = [
     { kind: OrderLineKind.EXTRA, unitPrice: 249, qty: 0.5, productId: 'zeytinyagi' }, // 124.5 → 125 (cart.js)

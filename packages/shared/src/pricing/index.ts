@@ -6,26 +6,30 @@
 //   money.ts      roundMoney (kuruş, yarım yukarı) · vatFromGross (gross×r/(100+r)) · sumMoney · roundExtraPrice (tam TL) · formatMoneyTr
 //   lines.ts      satır toplamı + KDV ayrıştırma çekirdeği
 //   order-kind.ts Order.kind önceliği SUBSCRIPTION > BOX_ONE_TIME > SINGLE (ADR-0008)
-//   shipping.ts   kargo: abone ‖ zone eşik; değer yalnız DeliveryZone (ADR-0005)
-//   discounts.ts  ilk-2-kutu %50 / retention %50 (ADR-0007) + DELTA Order (ADR-0006)
+//   shipping.ts   kargo: abone ‖ zone eşik (≥/>: Setting freeShippingRule); değer yalnız DeliveryZone (ADR-0005)
+//   discounts.ts  ilk-2-kutu %50 / retention %50 (ADR-0007; yuvarlama Setting discountRounding) + DELTA Order (ADR-0006)
+//   rules.ts      fiyatlama kuralları (ADR-0018): Setting commerce.{freeShippingRule,discountRounding,subscriberFreeShipping}
+//                 → PricingContext.rules; verilmezse varsayılan (gte / kurus / true)
 //   extras.ts     ekstra miktar seçenekleri (Setting extraAmountOptions / Product.extraOptions) + tam TL fiyat
 //   cutoff.ts     kesim anı TZ'li (fromZonedTime), teslimat tarihleri, kilitli gün (ADR-0004/0005)
 //
 // computeQuote sırası: satır toplamları → indirimler (yalnız BOX) → kargo → KDV ayrıştırma (indirim sonrası) → grandTotal.
 // Kargo KDV'ye DAHİL DEĞİLDİR (vatTotal yalnız satır KDV'si; kargo KDV oranı kararı açık — ADR gerekirse eklenir).
 import { OrderKind, OrderLineKind } from '../enums';
-import type { CycleChargeQuote, Money, PricingContext, PricingLineInput, PricingNote, PricingResult, ZoneShippingRule } from '../types/pricing';
+import type { CycleChargeQuote, Money, PricingContext, PricingLineInput, PricingNote, PricingResult, PricingRules, ZoneShippingRule } from '../types/pricing';
 import { resolveBoxDiscount } from './discounts';
 import { extrasTotal } from './extras';
 import { applyVat, priceLines, subtotalOf } from './lines';
 import { formatMoneyTr, roundMoney, sumMoney } from './money';
 import { resolveOrderKind } from './order-kind';
+import { resolvePricingRules } from './rules';
 import { computeShipping } from './shipping';
 
-export type { Money } from '../types/pricing';
+export type { Money, PricingRules } from '../types/pricing';
 export * from './money';
 export * from './lines';
 export * from './order-kind';
+export * from './rules';
 export * from './shipping';
 export * from './discounts';
 export * from './extras';
@@ -36,14 +40,17 @@ export * from './cutoff';
  *
  * 1. Satır toplamları (PRODUCT/BOX kuruşa, EXTRA tam TL; `skipThisWeek` → BOX+EXTRA 0).
  * 2. Order.kind (karışık sepet önceliği).
- * 3. İndirim: yalnız SUBSCRIPTION ve atlanmamışsa, BOX satırına ilk-kutu (hak varsa) YA DA retention — üst üste binmez.
- * 4. Kargo: abone (aktif abonelik ya da abonelik siparişi) → 0; değilse indirim sonrası ara toplam ≥ zone eşiği → 0; aksi hâlde zone.fee.
- *    Boş sepet → 0.
+ * 3. İndirim: yalnız SUBSCRIPTION ve atlanmamışsa, BOX satırına ilk-kutu (hak varsa) YA DA retention — üst üste binmez;
+ *    tutar `rules.discountRounding` ile kuruş/tam TL (ADR-0018).
+ * 4. Kargo: abonelik siparişi → 0; aktif abone → 0 (SINGLE'da yalnız `rules.subscriberFreeShipping`); değilse indirim sonrası
+ *    ara toplam eşiği karşılıyorsa (`rules.freeShippingRule` ≥ / >) → 0; aksi hâlde zone.fee. Boş sepet → 0.
  * 5. KDV: satır bazlı, indirim sonrası tutardan (gross×r/(100+r)); vatTotal = Σ(yuvarlanmamış) → kuruş.
  * 6. grandTotal = subtotal − discountTotal + shippingFee.
+ * `ctx.rules` verilmezse varsayılan kurallar (gte / kurus / true) — mevcut çağrılar aynı sonucu verir.
  */
 export function computeQuote(lines: readonly PricingLineInput[], ctx: PricingContext): PricingResult {
   const notes: PricingNote[] = [];
+  const rules = resolvePricingRules(ctx.rules);
   const skipped = ctx.skipThisWeek === true;
   const priced = priceLines(lines, ctx.vatRateDefault, skipped ? [OrderLineKind.BOX, OrderLineKind.EXTRA] : []);
   const orderKind = resolveOrderKind(priced, ctx);
@@ -81,11 +88,16 @@ export function computeQuote(lines: readonly PricingLineInput[], ctx: PricingCon
       zone: ctx.zone,
       hasActiveSubscription: ctx.hasActiveSubscription,
       orderKind,
+      rules,
     });
     shippingFee = shipping.fee;
     if (shipping.reason === 'SUBSCRIBER') notes.push({ code: 'FREE_SHIPPING_SUBSCRIBER', message: 'Abonelere kargo dahil.' });
     else if (shipping.reason === 'THRESHOLD') {
-      notes.push({ code: 'FREE_SHIPPING_THRESHOLD', message: `${formatMoneyTr(ctx.zone.freeThreshold ?? 0)} TL ve üzeri kargo ücretsiz.` });
+      const threshold = formatMoneyTr(ctx.zone.freeThreshold ?? 0);
+      notes.push({
+        code: 'FREE_SHIPPING_THRESHOLD',
+        message: rules.freeShippingRule === 'gt' ? `${threshold} TL üzeri kargo ücretsiz.` : `${threshold} TL ve üzeri kargo ücretsiz.`,
+      });
     } else notes.push({ code: 'SHIPPING_FEE', message: `Kargo ücreti ${formatMoneyTr(shippingFee)} TL.`, amount: shippingFee });
   }
 
@@ -115,26 +127,30 @@ export interface CycleChargeInput {
   firstBoxPct?: number;
   /** cycle#1: checkout'ta peşin ödenen tutar; cycle#n: 0. */
   prepaidAmount: Money;
+  /** Fiyatlama kuralları (ADR-0018; Setting commerce.*); yoksa varsayılan. Burada yalnız discountRounding ve freeShippingRule etkilidir. */
+  rules?: Partial<PricingRules>;
 }
 
 /**
  * Cycle kilit anı snapshot'ı (state-machines §8 adım 2–3; `cycles:lock-and-charge`):
- *   boxPrice · extrasTotal = Σ roundExtraPrice · discount = ilk-kutu ?: retention (yalnız abonelik) ·
- *   shippingFee = abonelik 0 / tek seferlik zone kuralı · total = box + extras − discount + shipping · due = total − prepaid.
+ *   boxPrice · extrasTotal = Σ roundExtraPrice · discount = ilk-kutu ?: retention (yalnız abonelik; yuvarlama `rules.discountRounding`) ·
+ *   shippingFee = abonelik 0 / tek seferlik zone kuralı (`rules.freeShippingRule`) · total = box + extras − discount + shipping · due = total − prepaid.
  * `due <= 0` → tahsilat yok (cycle CHARGED, tutar 0); cycle#1'de due = yalnız DELTA (ekstralar).
  */
 export function computeCycleCharge(input: CycleChargeInput): CycleChargeQuote {
+  const rules = resolvePricingRules(input.rules);
   const boxPrice = roundMoney(input.boxPrice);
   const extras = extrasTotal(input.extras);
   const discount = input.isOneTime
     ? { amount: 0, kind: null as CycleChargeQuote['discountKind'] }
-    : resolveBoxDiscount(boxPrice, { firstBoxesLeft: input.firstBoxesLeft, retentionPct: input.retentionPct, firstBoxPct: input.firstBoxPct });
+    : resolveBoxDiscount(boxPrice, { firstBoxesLeft: input.firstBoxesLeft, retentionPct: input.retentionPct, firstBoxPct: input.firstBoxPct, rules });
   const orderKind = input.isOneTime ? OrderKind.BOX_ONE_TIME : OrderKind.SUBSCRIPTION;
   const shippingFee = computeShipping({
     subtotalAfterDiscount: roundMoney(boxPrice + extras - discount.amount),
     zone: input.zone,
     hasActiveSubscription: !input.isOneTime,
     orderKind,
+    rules,
   }).fee;
   const total = roundMoney(boxPrice + extras - discount.amount + shippingFee);
   const due = roundMoney(total - input.prepaidAmount);

@@ -29,6 +29,33 @@ export interface CommerceFrequency {
   label: string;
 }
 
+// ── Fiyatlama kuralları (ADR-0018) — kodda sabit değil, Setting `commerce.*` ile admin'den değiştirilebilir ───────
+// Kalıp enums.ts ile aynı (değer nesnesi + union + _VALUES + _LABELS); Prisma enum'u DEĞİLDİR (Setting JSON değeri).
+
+/** Ücretsiz kargo eşik karşılaştırması: `gte` = ara toplam ≥ eşik → ücretsiz (varsayılan); `gt` = eşiği aşınca (prototip `> 1000`). */
+export const FreeShippingRule = {
+  GTE: 'gte',
+  GT: 'gt',
+} as const;
+export type FreeShippingRule = (typeof FreeShippingRule)[keyof typeof FreeShippingRule];
+export const FREE_SHIPPING_RULE_VALUES: readonly FreeShippingRule[] = Object.values(FreeShippingRule);
+export const FREE_SHIPPING_RULE_LABELS: Readonly<Record<FreeShippingRule, string>> = {
+  gte: 'Eşik ve üzeri ücretsiz (≥ eşik)',
+  gt: 'Eşiği aşınca ücretsiz (> eşik)',
+};
+
+/** İndirim tutarı yuvarlama: `kurus` = kuruş hassasiyeti (649 × %50 = 324,50; varsayılan); `tl` = tam TL'ye (Math.round → 325, prototip). */
+export const DiscountRounding = {
+  KURUS: 'kurus',
+  TL: 'tl',
+} as const;
+export type DiscountRounding = (typeof DiscountRounding)[keyof typeof DiscountRounding];
+export const DISCOUNT_ROUNDING_VALUES: readonly DiscountRounding[] = Object.values(DiscountRounding);
+export const DISCOUNT_ROUNDING_LABELS: Readonly<Record<DiscountRounding, string>> = {
+  kurus: 'Kuruş hassasiyeti (324,50)',
+  tl: 'Tam TL’ye yuvarla (325)',
+};
+
 /**
  * Setting `commerce.*` anahtarları (BACKEND-PLANI §2 "Setting anahtarları"). Kargo/eşik BURADA YOK (DeliveryZone) [B11].
  * Bootstrap'a gizli olmayan alanlar gider (`BootstrapPayload.commerce`).
@@ -49,6 +76,16 @@ export interface CommerceSettings {
   dunning: { retryHours: number[]; pastDueAfterUnpaid: number };
   chargeStrategy: ChargeStrategy;
   paymentLinkHours: number;
+  // ── Fiyatlama kuralları (ADR-0018; admin F5 Ayarlar › Kampanya/Bölgeler) — pricing `PricingRules` bunları okur ──
+  /** Ücretsiz kargo eşiği karşılaştırması: `gte` ≥ eşik ücretsiz (varsayılan) · `gt` eşiği aşınca. Eşik değeri DeliveryZone'da. */
+  freeShippingRule: FreeShippingRule;
+  /** İlk-2-kutu / retention indirim tutarı yuvarlaması: `kurus` 324,50 (varsayılan) · `tl` tam TL 325. */
+  discountRounding: DiscountRounding;
+  /**
+   * Aktif abonesi olan müşterinin TEKİL ürün (SINGLE) siparişinde kargo 0 mı? `true` (varsayılan) → 0;
+   * `false` → bölge kuralı (eşik/ücret). Abonelik siparişinin kendisinde kargo her zaman 0 (ADR-0005).
+   */
+  subscriberFreeShipping: boolean;
 }
 
 /** Setting varsayılanları — seed ve testlerde tek kaynak (BACKEND-PLANI §2). */
@@ -75,6 +112,9 @@ export const COMMERCE_SETTINGS_DEFAULTS: Readonly<CommerceSettings> = {
   dunning: { retryHours: [24, 72], pastDueAfterUnpaid: 2 },
   chargeStrategy: 'MERCHANT_INITIATED',
   paymentLinkHours: 20,
+  freeShippingRule: 'gte',
+  discountRounding: 'kurus',
+  subscriberFreeShipping: true,
 };
 
 /** Setting `payment.iyzico` (gizli anahtarlar .env / panelden; burada yalnız bayraklar). */

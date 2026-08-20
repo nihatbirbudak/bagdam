@@ -6,6 +6,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { RequestLoggerInterceptor } from './common/interceptors/request-logger.interceptor';
 import { TIMEOUT_MS, TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { PrismaModule } from './common/prisma.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { HealthModule } from './modules/health/health.module';
 import { WebModule } from './web/web.module';
 
@@ -36,8 +37,9 @@ new Logger('AppModule').log(
     ]),
     PrismaModule, // @Global — PrismaService tüm repository'lerde (F2)
     HealthModule,
+    CatalogModule, // F3: GET /api/v1/bootstrap + public katalog uçları; WebModule aynı servisi kullanır
     WebModule,
-    // F3: CatalogModule · F4: AuthModule, MediaModule ...
+    // F4: AuthModule, MediaModule ...
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

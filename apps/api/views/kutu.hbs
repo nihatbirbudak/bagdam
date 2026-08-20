@@ -149,8 +149,7 @@
   </div>
 </footer>
 
-<script src="assets/products.js"></script>
-<script src="assets/cart.js"></script>
+{{> bootstrap}}
 <script>
 (function () {
   const params = new URLSearchParams(window.location.search);
@@ -466,7 +465,7 @@
 
     // Öne çıkan 4'ü başa; kalan tekli ürünler arkasına (mobilde yana
     // kaydırınca görünür, masaüstünde dikey liste uzar).
-    const pairIds = ["ekmek", "zeytinyagi", "beyazpeynir", "tereyagi"];
+    const pairIds = (typeof __BAGDAM__ !== "undefined" && __BAGDAM__.pairIds) || ["ekmek", "zeytinyagi", "beyazpeynir", "tereyagi"]; // F3 bootstrap
     const pairList = pairIds.map((id) => PRODUCTS.find((p) => p.id === id)).filter(Boolean)
       .concat(PRODUCTS.filter((p) => !p.fresh && pairIds.indexOf(p.id) === -1));
     // İlk 4 her zaman; kalanlar .pair-mini-more — masaüstünde gizli, mobilde

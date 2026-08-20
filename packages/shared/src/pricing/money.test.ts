@@ -5,6 +5,7 @@ import {
   discountAmount,
   formatMoneyTr,
   netFromGross,
+  roundDiscount,
   roundExtraPrice,
   roundMoney,
   sumMoney,
@@ -79,6 +80,19 @@ describe('pricing/money indirim', () => {
     expect(applyDiscountPct(649, 50)).toBe(324.5);
     expect(applyDiscountPct(1099, 0)).toBe(1099);
     expect(() => discountAmount(100, 101)).toThrow(RangeError);
+  });
+
+  it('yuvarlama kuralı (Setting discountRounding, ADR-0018): kurus 324,50 · tl 325 (Math.round)', () => {
+    expect(roundDiscount(324.5)).toBe(324.5);
+    expect(roundDiscount(324.5, 'kurus')).toBe(324.5);
+    expect(roundDiscount(324.5, 'tl')).toBe(325);
+    expect(roundDiscount(324.49, 'tl')).toBe(324);
+    expect(Object.is(roundDiscount(-0.2, 'tl'), 0)).toBe(true);
+    expect(() => roundDiscount(Number.NaN, 'tl')).toThrow(TypeError);
+    expect(discountAmount(649, 50, 'kurus')).toBe(324.5);
+    expect(discountAmount(649, 50, 'tl')).toBe(325);
+    expect(applyDiscountPct(649, 50, 'tl')).toBe(324); // 649 − 325
+    expect(discountAmount(1099, 50, 'tl')).toBe(550); // 549,50 → 550
   });
 });
 

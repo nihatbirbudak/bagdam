@@ -1,7 +1,10 @@
 // ── Para yardımcıları: yuvarlama, KDV ayrıştırma, toplam, ekstra yuvarlama, yüzde indirim, biçim ──
 // Kaynak: BACKEND-PLANI §1.1 Para (Decimal(12,2) TL KDV dahil, vatRate varsayılan 1; sepet.html `line*(0.01/1.01)`),
 // cart.js `subExtraPrice` (Math.round), `money()` (tr-TR). Saf fonksiyonlar; DB/framework yok.
+// İndirim yuvarlaması (`roundDiscount`) Setting `commerce.discountRounding` ile kuruş/tam TL arasında seçilir (ADR-0018).
 import type { Money } from '../types/pricing';
+import type { DiscountRounding } from '../types/settings';
+import { COMMERCE_SETTINGS_DEFAULTS } from '../types/settings';
 
 /** Varsayılan KDV oranı (yüzde): gıda %1 — `Product.vatRate`/`OrderLine.vatRate` varsayılanı (Setting `commerce.vatRate`). */
 export const DEFAULT_VAT_RATE = 1;
@@ -62,15 +65,28 @@ export function roundExtraPrice(unitPrice: Money, factor: number): Money {
   return Math.round(unitPrice * factor);
 }
 
-/** Yüzde indirim tutarı (kuruşa yuvarlı). pct 0–100. */
-export function discountAmount(amount: Money, pct: number): Money {
-  if (!Number.isFinite(pct) || pct < 0 || pct > 100) throw new RangeError('discountAmount: pct 0–100 aralığında olmalı');
-  return roundMoney((amount * pct) / 100);
+/**
+ * İndirim tutarını kurala göre yuvarlar (Setting `commerce.discountRounding`, ADR-0018):
+ * `kurus` → kuruşa (324,50; varsayılan) · `tl` → tam TL'ye (Math.round, yarım yukarı: 324,50 → 325 — prototip cart.js).
+ */
+export function roundDiscount(value: number, rounding: DiscountRounding = COMMERCE_SETTINGS_DEFAULTS.discountRounding): Money {
+  if (!Number.isFinite(value)) throw new TypeError(`roundDiscount: sonlu bir sayı bekleniyordu, gelen: ${String(value)}`);
+  if (rounding === 'tl') {
+    const rounded = Math.round(value); // cart.js ile birebir (tam TL)
+    return rounded === 0 ? 0 : rounded; // -0 → 0
+  }
+  return roundMoney(value);
 }
 
-/** Yüzde indirim uygulanmış tutar. */
-export function applyDiscountPct(amount: Money, pct: number): Money {
-  return roundMoney(amount - discountAmount(amount, pct));
+/** Yüzde indirim tutarı — yuvarlama `rounding` kuralına göre (varsayılan kuruş). pct 0–100. */
+export function discountAmount(amount: Money, pct: number, rounding?: DiscountRounding): Money {
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) throw new RangeError('discountAmount: pct 0–100 aralığında olmalı');
+  return roundDiscount((amount * pct) / 100, rounding);
+}
+
+/** Yüzde indirim uygulanmış tutar (indirim tutarı `rounding` kuralıyla yuvarlanır). */
+export function applyDiscountPct(amount: Money, pct: number, rounding?: DiscountRounding): Money {
+  return roundMoney(amount - discountAmount(amount, pct, rounding));
 }
 
 /** Tutarı Türkçe biçimde yazar ("1.099" / "1.099,50") — cart.js `money()` ile aynı görünüm (binlik nokta, kuruş varsa virgül). */

@@ -52,7 +52,8 @@ varsa admin kullanıcı (rol ADMIN, bcrypt 12 tur, e-posta doğrulanmış) oluş
 - **Bölge/tarih** (ADR-0005): `urla`, `cesme` — fee 49 (`DELIVERY_FEE`), ücretsiz eşik 1000 (sepet.html:573), kapasite 999.
   `DeliveryDate`: bugünden 8 hafta × bölge × {Salı, Perşembe, Cumartesi} = 48 satır; `cutoffAt` = teslimattan 1 gün önce 12:00
   Europe/Istanbul — `packages/shared` `nextDeliveryDates/computeCutoffAt` (fromZonedTime) ile.
-- **Setting**: `commerce.*` (14 anahtar — `@bagdam/shared` `COMMERCE_SETTINGS_DEFAULTS` tek kaynak), `cookies.analyticsEnabled`,
+- **Setting**: `commerce.*` (17 anahtar — `@bagdam/shared` `COMMERCE_SETTINGS_DEFAULTS` tek kaynak; fiyatlama kuralları
+  `freeShippingRule`/`discountRounding`/`subscriberFreeShipping` dahil, ADR-0018), `cookies.analyticsEnabled`,
   `payment.iyzico {enabled:false, nonThreeDsGranted:false}`, `seo.<sayfa> {title}` (12 sayfa). **Gizli anahtar yok** [B33];
   kargo/eşik Setting'de değil, DeliveryZone'da [B11].
 - **SiteContent**: yalnız 3 örnek anahtar gerçek metinle — `promoBar`, `footer`, `urunler.trust` (şema biçimi

@@ -1,0 +1,14 @@
+{{!-- index.hbs öne çıkanlar — tier (kutu) kartı (BACKEND-PLANI [B7]); bağlam: FeaturedTierView (src/web/featured.ts).
+     Alanlar WebController'da kaçışlanmış gelir, {{{ }}} ile basılır (bkz. featured-product.hbs notu).
+     Markup website/index.html satır 213-223 ile birebir; yalnız veri değişir. --}}
+      <article class="pcard">
+        <a class="pcard-link" href="kutu.html?tier={{{id}}}">
+          <div class="pcard-visual"><img src="{{{img}}}" alt="{{{label}}}" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>{{{label}}}</h3>
+        </a>
+        <p class="pcard-meta mono">{{{meta}}}</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">{{{price}}} TL <span>/ kutu</span></p>
+          <a class="qty-stepper-add" href="kutu.html?tier={{{id}}}" aria-label="Kutunu seç">+</a>
+        </div>
+      </article>

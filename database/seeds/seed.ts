@@ -380,7 +380,11 @@ async function seedDeliveryDates(zones: Array<{ id: string; slug: string; capaci
   return n;
 }
 
-/** Setting: commerce.* (shared COMMERCE_SETTINGS_DEFAULTS tek kaynak) + cookies + payment bayrakları + seo başlıkları. Gizli anahtar YOK. */
+/**
+ * Setting: commerce.* (shared COMMERCE_SETTINGS_DEFAULTS tek kaynak — fiyatlama kuralları `freeShippingRule` / `discountRounding` /
+ * `subscriberFreeShipping` dahil, ADR-0018) + cookies + payment bayrakları + seo başlıkları. Gizli anahtar YOK (hepsi isSecret false).
+ * Create-only: mevcut DB'ye yeni eklenen anahtarlar (ör. ADR-0018'in üçü) SEED_OVERWRITE_SETTINGS olmadan da gelir.
+ */
 async function seedSettings(): Promise<{ created: number; kept: number }> {
   const rows: Array<{ key: string; group: string; value: Prisma.InputJsonValue }> = [];
   for (const [name, value] of Object.entries(COMMERCE_SETTINGS_DEFAULTS)) {

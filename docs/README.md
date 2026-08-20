@@ -3,7 +3,7 @@
 | Dosya | Ne için |
 |---|---|
 | [YOL-HARITASI.md](YOL-HARITASI.md) | **Çalışma listesi**: fazlar F0–F11, kutucuklar, "bitti sayılır" ölçütleri, sıradaki adım |
-| [adr/](adr/) | 17 mimari/iş kararı (≤25 satır, düzenlenmez; değişirse yeni ADR) |
+| [adr/](adr/) | 18 mimari/iş kararı (≤25 satır, düzenlenmez; değişirse yeni ADR) |
 | [BACKEND-PLANI.md](BACKEND-PLANI.md) | Tam plan: gerekçeler, Prisma şeması, API yüzeyi, admin ekranları, deploy/ops, riskler |
 | [arastirma/](arastirma/README.md) | Planı üreten araştırmanın ham çıktıları (frontend envanteri, TR gereksinimleri, referans projeler, mimari öneriler, hakem/eleştirmen raporları) |
 | `sunucu-baglanti.md` | Sunucu bağlantı bilgileri — **gitignore'lu**, repo'ya girmez |

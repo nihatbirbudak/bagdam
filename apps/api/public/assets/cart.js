@@ -684,6 +684,8 @@ const BahcedenCart = (function () {
   };
 
   function getSub() {
+    // F3 bootstrap: satın alınmış (purchased) abonelik sunucudan (__BAGDAM__.sub); yoksa eski localStorage taslağı.
+    if (typeof __BAGDAM__ !== "undefined" && __BAGDAM__.sub) return Object.assign({}, SUB_DEFAULTS, __BAGDAM__.sub);
     // Merge with defaults so subs saved before freq/type existed still work.
     const sub = Object.assign({}, SUB_DEFAULTS, readJSON(SUB_KEY, {}));
     // A sub saved with a since-removed frequency (e.g. "Haftada 3") falls
@@ -770,6 +772,8 @@ const BahcedenCart = (function () {
     writeJSON(MEMBER_KEY, member);
   }
   function isLoggedIn() {
+    // F3 bootstrap: oturum sunucudan (__BAGDAM__.me); yoksa eski localStorage bayrağı.
+    if (typeof __BAGDAM__ !== "undefined" && __BAGDAM__.me) return !!__BAGDAM__.me.loggedIn;
     return !!readJSON(SESSION_KEY, null);
   }
 
@@ -872,7 +876,11 @@ const BahcedenCart = (function () {
   }
 
   function freshProducts() {
-    return typeof PRODUCTS === "undefined" ? [] : PRODUCTS.filter((p) => p.fresh);
+    if (typeof PRODUCTS === "undefined") return [];
+    // F3 bootstrap: kutu havuzu sunucudan (__BAGDAM__.pool slug listesi, PRODUCTS sırasıyla); yoksa eski fresh filtresi.
+    const pool = typeof __BAGDAM__ !== "undefined" && __BAGDAM__.pool;
+    if (pool && pool.length) return PRODUCTS.filter((p) => pool.indexOf(p.id) !== -1);
+    return PRODUCTS.filter((p) => p.fresh);
   }
 
   // Fills `count` slots, preferring products whose pref axis matches what the
@@ -895,7 +903,9 @@ const BahcedenCart = (function () {
     if (!tier) return;
     const sub = getSub();
     sub.tierId = tierId;
-    sub.items = defaultFill(tier.count);
+    // F3 bootstrap: bu haftanın yayınlanmış şablonu varsa (__BAGDAM__.templates[tierId]) onunla doldur; yoksa eski defaultFill.
+    const tpl = typeof __BAGDAM__ !== "undefined" && __BAGDAM__.templates && __BAGDAM__.templates[tierId];
+    sub.items = tpl && tpl.length ? tpl.slice() : defaultFill(tier.count);
     setSub(sub);
   }
 

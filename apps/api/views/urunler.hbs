@@ -145,8 +145,7 @@
   </div>
 </footer>
 
-<script src="assets/products.js"></script>
-<script src="assets/cart.js"></script>
+{{> bootstrap}}
 <script>
 (function () {
   // ---- tabs ----
@@ -204,7 +203,7 @@
   // görünür (çapa etkisi: büyük kutu referans olunca küçük daha makul,
   // büyük daha çok tercih edilir). Gerçek bir seçim varsa o vurgulanır;
   // diğerine tıklamak her zaman serbest.
-  const RECOMMENDED_TIER = "sezon";
+  const RECOMMENDED_TIER = (typeof __BAGDAM__ !== "undefined" && __BAGDAM__.recommendedTier) || "sezon"; // F3 bootstrap
   function tierCardHtml(t, active, sub, recommended) {
     const half = Math.round(t.price / 2);
     const promoLine = sub.type === "subscription"

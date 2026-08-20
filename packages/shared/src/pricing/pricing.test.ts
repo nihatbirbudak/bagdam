@@ -174,6 +174,61 @@ describe('pricing/computeQuote — cart.js/sepet.html senaryoları', () => {
   });
 });
 
+describe('pricing/computeQuote — kurallar Setting commerce.* ile (ADR-0018; ctx.rules)', () => {
+  it('discountRounding: kurus (varsayılan) 324,50 · tl 325 — KDV ve grandTotal indirim sonrası tutardan', () => {
+    const kurus = computeQuote([BOX_SMALL], ctx({ isSubscriptionCheckout: true, firstBoxesLeft: 2, rules: { discountRounding: 'kurus' } }));
+    expect(kurus.discountTotal).toBe(324.5);
+    expect(kurus.grandTotal).toBe(324.5);
+    const tl = computeQuote([BOX_SMALL, EXTRA_DOMATES_3], ctx({ isSubscriptionCheckout: true, firstBoxesLeft: 2, rules: { discountRounding: 'tl' } }));
+    expect(tl.discountTotal).toBe(325);
+    expect(tl.lines[0]?.discount).toBe(325);
+    expect(tl.grandTotal).toBe(591); // 324 + 267
+    expect(tl.prepaidAmount).toBe(591);
+    expect(tl.vatTotal).toBe(roundMoney(vatFromGrossRaw(591)));
+    expect(tl.notes[0]?.amount).toBe(325);
+    // retention da aynı kuralla
+    expect(computeQuote([BOX_SMALL], ctx({ isSubscriptionCheckout: true, retentionPct: 50, rules: { discountRounding: 'tl' } })).discountTotal).toBe(325);
+    // varsayılan (rules yok) = kuruş — geriye dönük
+    expect(computeQuote([BOX_SMALL], ctx({ isSubscriptionCheckout: true, firstBoxesLeft: 2 })).discountTotal).toBe(324.5);
+  });
+
+  it('freeShippingRule: gte (varsayılan) 1000 → 0 · gt 1000 → 49, 1000,50 → 0; not metni değişir', () => {
+    const line1000 = [{ kind: OrderLineKind.PRODUCT, unitPrice: 500, qty: 2 }];
+    const gte = computeQuote(line1000, ctx({ rules: { freeShippingRule: 'gte' } }));
+    expect(gte.shippingFee).toBe(0);
+    expect(gte.notes.find((n) => n.code === 'FREE_SHIPPING_THRESHOLD')?.message).toBe('1.000 TL ve üzeri kargo ücretsiz.');
+    const gt = computeQuote(line1000, ctx({ rules: { freeShippingRule: 'gt' } }));
+    expect(gt.shippingFee).toBe(49);
+    expect(gt.grandTotal).toBe(1049);
+    expect(codes(gt)).toEqual(['SHIPPING_FEE']);
+    const gtOver = computeQuote([{ kind: OrderLineKind.PRODUCT, unitPrice: 1000.5, qty: 1 }], ctx({ rules: { freeShippingRule: 'gt' } }));
+    expect(gtOver.shippingFee).toBe(0);
+    expect(gtOver.notes.find((n) => n.code === 'FREE_SHIPPING_THRESHOLD')?.message).toBe('1.000 TL üzeri kargo ücretsiz.');
+    // tek seferlik kutu 1099: gt'de de eşik üstü → 0
+    expect(computeQuote([BOX_SEZON], ctx({ rules: { freeShippingRule: 'gt' } })).shippingFee).toBe(0);
+  });
+
+  it('subscriberFreeShipping: true (varsayılan) aktif aboneye tekil üründe 0 · false → zone kuralı (49 / eşik); abonelik siparişi yine 0', () => {
+    expect(computeQuote([PRODUCT_89x2], ctx({ hasActiveSubscription: true, rules: { subscriberFreeShipping: true } })).shippingFee).toBe(0);
+    const paid = computeQuote([PRODUCT_89x2], ctx({ hasActiveSubscription: true, rules: { subscriberFreeShipping: false } }));
+    expect(paid.orderKind).toBe(OrderKind.SINGLE);
+    expect(paid.shippingFee).toBe(49);
+    expect(paid.grandTotal).toBe(227);
+    expect(codes(paid)).toEqual(['SHIPPING_FEE']);
+    expect(computeQuote([{ kind: OrderLineKind.PRODUCT, unitPrice: 1000, qty: 1 }], ctx({ hasActiveSubscription: true, rules: { subscriberFreeShipping: false } })).shippingFee).toBe(0);
+    const sub = computeQuote([BOX_SMALL, PRODUCT_89x2], ctx({ isSubscriptionCheckout: true, hasActiveSubscription: true, rules: { subscriberFreeShipping: false } }));
+    expect(sub.shippingFee).toBe(0);
+    expect(codes(sub)).toEqual(['FREE_SHIPPING_SUBSCRIBER']);
+  });
+
+  it('computeCycleCharge rules: tl → indirim 325, due ona göre; gt → tek seferlik 1000 kutu kargo 49', () => {
+    const q = computeCycleCharge({ boxPrice: 649, extras: [{ unitPrice: 249, factor: 0.5 }], isOneTime: false, zone: ZONE, firstBoxesLeft: 2, retentionPct: null, prepaidAmount: 324, rules: { discountRounding: 'tl' } });
+    expect(q).toEqual({ boxPrice: 649, extrasTotal: 125, discount: 325, shippingFee: 0, total: 449, due: 125, discountKind: 'FIRST_BOXES' });
+    expect(computeCycleCharge({ boxPrice: 1000, extras: [], isOneTime: true, zone: ZONE, firstBoxesLeft: 0, retentionPct: null, prepaidAmount: 0, rules: { freeShippingRule: 'gt' } }).shippingFee).toBe(49);
+    expect(computeCycleCharge({ boxPrice: 1000, extras: [], isOneTime: true, zone: ZONE, firstBoxesLeft: 0, retentionPct: null, prepaidAmount: 0 }).shippingFee).toBe(0);
+  });
+});
+
 describe('pricing/computeCycleCharge — kilit snapshot\'ı ve DELTA (state-machines §8, ADR-0006)', () => {
   it('cycle#1 peşin + sonradan eklenen ekstra → yalnız DELTA tahsil edilir', () => {
     // checkout: 649 kutu, ilk kutu %50 → 324,50 peşin. Kesime kadar 500 g zeytinyağı (125) eklendi.

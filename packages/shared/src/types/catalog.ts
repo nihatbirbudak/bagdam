@@ -347,3 +347,18 @@ export interface BootstrapPayload {
   /** Setting `commerce.*` içinden istemcinin ihtiyaç duyduğu, gizli olmayan alt küme. */
   commerce: CommerceSettings;
 }
+
+// ── F3 ekleri (CatalogService.getBootstrap) — yalnız EKLEME; yukarıdaki sözleşme değişmez ────────
+
+/**
+ * Bootstrap `commerce` bloğunun somut şekli: Setting `commerce.*` (CommerceSettings; gizli alan yok) +
+ * varsayılan teslimat bölgesinden kargo ücreti / ücretsiz kargo eşiği. Değerlerin TEK SAHİBİ DeliveryZone'dur [B11];
+ * burada yalnız istemciye kopyalanır (sepet.html "1000 TL üzeri kargo ücretsiz" / 49 TL metinleri F9'da buradan okunur).
+ * `BootstrapPayload.commerce: CommerceSettings` alanına atanabilir (üst küme); JSON'da iki ek alan görünür.
+ */
+export interface BootstrapCommerce extends CommerceSettings {
+  /** Varsayılan bölgenin ücretsiz kargo eşiği (DeliveryZone.freeThreshold); null = eşik yok. */
+  freeThreshold: Money | null;
+  /** Varsayılan bölgenin kargo ücreti (= BootstrapPayload.deliveryFee). */
+  deliveryFee: Money;
+}

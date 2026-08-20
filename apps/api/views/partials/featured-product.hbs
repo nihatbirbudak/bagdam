@@ -1,0 +1,15 @@
+{{!-- index.hbs öne çıkanlar — ürün kartı (BACKEND-PLANI [B7]); bağlam: FeaturedProductView (src/web/featured.ts).
+     Alanlar WebController'da HTML'e hazır kaçışlanır (escapeHtml) ve burada {{{ }}} ile basılır: Handlebars'ın
+     varsayılan kaçışı ' karakterini &#x27; yapar ("10'lu Sezon Kutusu", "6'lı") ve website/index.html ile
+     byte paritesini bozar. Markup website/index.html satır 180-267 ile birebir; yalnız veri değişir. --}}
+      <article class="pcard">
+        <a class="pcard-link" href="urun.html?id={{{id}}}">
+          <div class="pcard-visual"><img src="{{{img}}}" alt="{{{name}}}" loading="lazy"><img class="seal" src="assets/logo/logo-icon.svg" alt=""></div>
+          <h3>{{{name}}}</h3>
+        </a>
+        <p class="pcard-meta mono">{{{meta}}}</p>
+        <div class="pcard-foot">
+          <p class="pcard-price mono">{{{price}}} TL <span>/ {{{unit}}}</span></p>
+          <div class="qty-stepper-slot" data-add-to-cart="{{{id}}}"></div>
+        </div>
+      </article>

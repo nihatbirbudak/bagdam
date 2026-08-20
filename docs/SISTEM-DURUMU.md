@@ -7,7 +7,7 @@
 | Faz | Durum | Not |
 |---|---|---|
 | F0 Karar sprinti | ✅ | 16 ADR (docs/adr), state-machines.md; kullanıcı aksiyonları (iyzico/e-posta sağlayıcısı/ETBİS) bekliyor |
-| F1 Walking skeleton | 🟡 lokal tamam, sunucu bekliyor | Monorepo + apps/api + apps/admin + packages/shared + deploy/ dosyaları; sunucu kurulumu (Node 22, DB, nginx, Origin CA, CF, CI, yedek) uygulanmadı |
+| F1 Walking skeleton | ✅ (lokal) | Monorepo + apps/api + apps/admin + packages/shared + deploy/ dosyaları. Sunucu kurulumu ADR-0017 ile F10b'ye taşındı |
 | F2–F11 | ⬜ | — |
 
 ## Lokal ortam (doğrulandı 2026-08-20)
@@ -23,9 +23,9 @@
 | SITE_MODE | ✅ `coming-soon`: `/` ve `/index.html` → coming-soon, diğer 9 sayfa 404, statikler 200 |
 | `@bagdam/admin` | ✅ tsc + eslint + vite build + 8 vitest; dev `http://localhost:4011` (Vite ::1'e bağlanır), `/api` proxy → 4010 |
 
-## Sunucu (henüz uygulanmadı)
+## Sunucu
 
-`deploy/README.md` runbook'u F1 sunucu adımlarını içerir. Uygulama kullanıcı onayıyla yapılacak. Portlar 5010 (prod) / 5011 (staging) ayrılmış durumda.
+ADR-0017: sunucu kurulumu ve yayın **F10b**'de (lansmandan hemen önce). `deploy/README.md` runbook'u hazır. Portlar 5010 (prod) / 5011 (staging) ayrılmış durumda.
 
 ## Bilinen açık notlar (F1 ajan raporlarından, sonraki fazlarda ele alınacak)
 

@@ -8,7 +8,7 @@
 |---|---|
 | Dil | Kod/tanımlayıcı İngilizce, commit/doküman Türkçe. Her şey TypeScript (SQL yalnız ham migration'da, bash yalnız deploy/ops). |
 | Mimari | [ADR-0002](adr/0002-moduler-katmanli-mimari-api-first.md): özellik modülü × (controller · service · repository · dto · mapper) + `packages/shared` + `common/`. Kural: **mantık Service'te, veri tablolarda, istemciler ince, her şey `/api/v1`'den.** |
-| Ortamlar | Lokal PG 14 + `migrate dev` → `staging` branch → `staging.bagdam.com` → `main` → `bagdam.com`. `db push` yasak. Prod DB'ye yalnız `bagdam_ro` salt-okunur tünel (bağlantı ayrıntısı `docs/sunucu-baglanti.md`). |
+| Ortamlar | **Lokal-önce (ADR-0017):** lokal PostgreSQL (`bagdam_dev`) + `migrate dev`; sunucu/staging yalnız F10b'de. `db push` yasak. Prod DB'ye yalnız `bagdam_ro` salt-okunur tünel (bağlantı ayrıntısı `docs/sunucu-baglanti.md`). |
 | Repo | Public monorepo. Sır yok (`.env` sunucuda). Feature branch → PR → staging → main. |
 | Kapsam | [ADR-0016](adr/0016-kapsam-kilidi.md): P2 listesi lansmana kadar kapalı; açık karar kuyruğu ≤3. |
 | Tasarım | Piksel parite: Playwright baseline staging'de; yalnız ADR-0003'teki 7 istisna. |
@@ -31,7 +31,7 @@ Modüller (sırayla doğar): health → web → pricing/state (shared, F2) → c
 
 ## 2. Fazlar
 
-Toplam ≈ **55 iş günü** tek geliştirici (≈ 11 hafta) · iki geliştirici ≈ 40 gün (A: api/motor, B: admin/içerik). İlk görünür teslim (dinamik site + admin, staging'de) **F4 sonu ≈ 17. gün**.
+Toplam ≈ **55 iş günü** (+ F10b 3 gün sunucu) tek geliştirici (≈ 11 hafta) · iki geliştirici ≈ 40 gün (A: api/motor, B: admin/içerik). İlk görünür teslim (dinamik site + admin, staging'de) **F4 sonu ≈ 17. gün**.
 
 ### F0 — Karar sprinti (2 gün) — *şimdi*
 - [x] 16 ADR yazıldı (adr/0001–0016) — onaylandı sayılır; itiraz gelirse yeni ADR açılır, eskisi "Yerini aldı: ADR-00xx" olarak işaretlenir
@@ -41,19 +41,19 @@ Toplam ≈ **55 iş günü** tek geliştirici (≈ 11 hafta) · iki geliştirici
 - [ ] **Sizin yapmanız gerekenler** (bkz. §3): iyzico sandbox + merchant başvurusu + NON3D yazılı sorgu; e-posta sağlayıcısı seçimi (Resend/SES); GitHub'da secret scanning + push protection; ETBİS / İşletme Kayıt Belgesi / İYS / e-Arşiv yolu (mali müşavir)
 - **Bitti sayılır:** ADR'ler commit; sandbox anahtarları elde; karar kuyruğu ≤3.
 
-### F1 — Walking skeleton (4 gün) — *ilk kurulacak yapı*
-Amaç: boş ama **canlı** iskelet. Apex coming-soon, staging'de bugünkü statik site, API health, CI/CD, yedek — hepsi ilk hafta kanıtlanır.
+### F1 — Walking skeleton (4 gün) — *ilk kurulacak yapı* — ✅ LOKAL TAMAM (2026-08-20)
+Amaç: çalışan iskelet — **lokalde** (ADR-0017: sunucu kurulumu ve yayın F10b'ye taşındı). API health, 10 sayfa byte-byte, admin kabuğu, shared paket, deploy dosyaları (uygulanmaz).
 - [x] Monorepo: `pnpm-workspace.yaml`, `turbo.json`, `.npmrc`, `.env.example`, root `package.json` (UA'dan kopya, `@bagdam/*`); `.gitignore`: `docs/sunucu-*.md`, `*.pem`, `*.key`, `.env*` (`!.env.example`), `apps/api/uploads/`, `node_modules/`, `dist/` *(✓ 2026-08-20)*
 - [x] `apps/api`: Nest 11 bootstrap (UA `main.ts/app.module.ts/env-validator/common/*`), `api/v1` öneki, hbs view engine, `useStaticAssets`, `HOST 127.0.0.1`; `HealthController`; `WebController` (10 `.hbs` + `404.hbs` + `coming-soon.hbs`); `NotFoundExceptionFilter` (HTML 404) *(✓ 2026-08-20 — lokalde :4010, 10 sayfa byte-byte aynı, health/404/coming-soon doğrulandı)*
 - [x] `website/*.html` → `apps/api/views/*.hbs`, `website/assets + styles.css` → `apps/api/public/`; `website/unused` → `docs/arsiv-prototip/` *(✓)*
 - [x] `apps/admin` kabuğu (Vite + React; UA iskeleti; login sayfası boş), `packages/shared` boş paket, `database/` klasörü *(✓ 2026-08-20 — :4011, login/dashboard/menü, lint+tsc+test temiz; shared: 36 test iki TZ'de yeşil)*
-- [ ] Sunucu: Node 22 ikilisi (proje bazlı) + PM2 `interpreter`; `/opt/bagdam`, `/opt/bagdam-staging`; PG `bagdam_db` + `bagdam_staging` (+ `citext`), roller `bagdam`, `bagdam_ro`; `.env` (600); `ecosystem.config.js` (cluster×1, TZ, HOST, 768M)
-- [ ] nginx: `conf.d/02-bagdam-cache.conf` (proxy_cache_path) + gzip_types; vhost'lar (apex → coming-soon location; `admin.bagdam.com`; `staging.*` basic auth + `auth_basic off` callback/webhook/pay); bakım sayfası `/var/www/maintenance/bagdam`
-- [ ] SSL: Cloudflare Origin CA wildcard → `/etc/ssl/bagdam/`; Cloudflare kayıtları (A @, CNAME www/admin/staging/admin-staging proxied; SPF/DKIM/DMARC + MX DNS-only); Full (strict), Always HTTPS, HSTS, WAF istisnası webhook/callback, Cache Rule `/api/*` bypass + `/assets/*` cache
-- [x] CI/CD: `deploy.yml` (main) + `deploy-staging.yml`; Bağdam'a özel kısıtlı SSH anahtarı + `/opt/birbudak/scripts/deploy-dispatch.sh`; `deploy.sh` (flock → fetch/reset → install → generate → build → `psql citext` → pg_dump pre-migrate → migrate deploy → reload → health → pm2 save) *(dosyalar repo'da ✓ — sunucuda anahtar/dispatch kurulumu ve ilk çalıştırma bekliyor)*
-- [x] Ops: `backup-bagdam.sh` (03:30; db dump + uploads; 7 gün yerel + şifreli off-site 30 gün), `health-check.sh ENDPOINTS` 5010/5011, `error-watcher/daily-error-digest` DBS, `daily-report` satırı, logrotate *(script'ler `deploy/scripts/` ✓ — sunucuya kopyalama/cron/health satırları bekliyor)*
-- [ ] Playwright baseline: 10 sayfa × 3 viewport (staging)
-- **Bitti sayılır:** `https://bagdam.com` coming-soon 200; `https://staging.bagdam.com` bugünkü site (diff 0, basic auth); `/api/v1/health` 200 (prod+staging); push → deploy yeşil; gece yedeği + off-site kopya alındı; health-check Bağdam satırlarını raporluyor.
+- [→F10b] Sunucu: Node 22 ikilisi (proje bazlı) + PM2 `interpreter`; `/opt/bagdam`, `/opt/bagdam-staging`; PG `bagdam_db` + `bagdam_staging` (+ `citext`), roller `bagdam`, `bagdam_ro`; `.env` (600); `ecosystem.config.js` (cluster×1, TZ, HOST, 768M)
+- [→F10b] nginx: `conf.d/02-bagdam-cache.conf` (proxy_cache_path) + gzip_types; vhost'lar (apex → coming-soon location; `admin.bagdam.com`; `staging.*` basic auth + `auth_basic off` callback/webhook/pay); bakım sayfası `/var/www/maintenance/bagdam`
+- [→F10b] SSL: Cloudflare Origin CA wildcard → `/etc/ssl/bagdam/`; Cloudflare kayıtları (A @, CNAME www/admin/staging/admin-staging proxied; SPF/DKIM/DMARC + MX DNS-only); Full (strict), Always HTTPS, HSTS, WAF istisnası webhook/callback, Cache Rule `/api/*` bypass + `/assets/*` cache
+- [x] CI/CD: `deploy.yml` (main) + `deploy-staging.yml`; Bağdam'a özel kısıtlı SSH anahtarı + `/opt/birbudak/scripts/deploy-dispatch.sh`; `deploy.sh` (flock → fetch/reset → install → generate → build → `psql citext` → pg_dump pre-migrate → migrate deploy → reload → health → pm2 save) *(dosyalar repo'da ✓ — kurulum F10b)*
+- [x] Ops: `backup-bagdam.sh` (03:30; db dump + uploads; 7 gün yerel + şifreli off-site 30 gün), `health-check.sh ENDPOINTS` 5010/5011, `error-watcher/daily-error-digest` DBS, `daily-report` satırı, logrotate *(script'ler `deploy/scripts/` ✓ — kurulum F10b)*
+- [→F10b] Playwright baseline: 10 sayfa × 3 viewport (staging)
+- **Bitti sayılır (lokal, ADR-0017):** `http://127.0.0.1:4010` 10 sayfa byte-byte aynı ✓; `/api/v1/health` 200 ✓; admin :4011 açılıyor ✓; shared/api/admin tsc+build+test yeşil ✓; Playwright baseline lokalde (F3 başında alınır). Sunucu DoD'si → F10b.
 
 ### F2 — Şema-a + seed + paylaşılan kurallar (3 gün)
 - [ ] `database/schema.prisma` F2a modelleri (User, Address, DeliveryZone, DeliveryDate, Category, Producer, Product, ProductImage, ProductLot, BoxTier, BoxTemplate(+Item), WholesaleLead, Post, LegalDocument, Consent, SiteContent, Setting, MediaFile, AuditLog, MailLog, SystemLog, CronLog) — tümü `Timestamptz(3)`
@@ -110,6 +110,16 @@ Amaç: boş ama **canlı** iskelet. Apex coming-soon, staging'de bugünkü stati
 ### F10 — Bildirimler + yasal/çerez + KVKK + sertleştirme + şema dondurma (4 gün)
 - [ ] E-posta şablonları (ADR-0014 listesi); SMS opsiyonel; çerez banner'ı + Consent; veri saklama matrisi ADR'ı + `kvkk:purge`; güvenlik gözden geçirme (helmet/CSP frame-src iyzico, WAF); k6; restore provası; **ADR "şema v1 donduruldu"**; ekran 22 (Sistem); runbook + `SISTEM-DURUMU.md`
 - **Bitti sayılır:** her yaşam döngüsü olayı MailLog'da; restore raporu; go-live checklist.
+
+### F10b — Sunucu kurulumu + yayın hazırlığı (3 gün) — *ADR-0017: lansmandan hemen önce*
+- [ ] Sunucu: Node 22 ikilisi (proje bazlı) + PM2 `interpreter`; `/opt/bagdam`, `/opt/bagdam-staging`; PG `bagdam_db` + `bagdam_staging` (+ `citext`), roller `bagdam`, `bagdam_ro`; `.env` (600); `ecosystem.config.js`
+- [ ] nginx: `conf.d/02-bagdam-cache.conf` + gzip_types; vhost'lar (apex, admin, staging, admin-staging; staging basic auth); bakım sayfası; `nginx -t`
+- [ ] SSL: Cloudflare Origin CA wildcard → `/etc/ssl/bagdam/`; Cloudflare kayıtları (A @, CNAME www/admin/staging/admin-staging proxied; SPF/DKIM/DMARC + MX DNS-only); Full (strict), Always HTTPS, HSTS, WAF istisnası, Cache Rule
+- [ ] CI/CD: GitHub'a push; kısıtlı deploy anahtarı + `deploy-dispatch.sh`; secrets; ilk deploy staging → prod; `SITE_MODE=coming-soon` apex'te
+- [ ] Ops: `backup-bagdam.sh` cron, health-check/error-watcher/daily-report satırları, logrotate, off-site yedek
+- [ ] PG 14 uyum provası: staging DB'ye `migrate deploy` + seed + duman testi
+- [ ] Playwright: lokal baseline ile staging karşılaştırması (diff ≈ 0)
+- **Bitti sayılır:** `https://bagdam.com` "yakında" 200; `https://staging.bagdam.com` tam site (basic auth) lokal ile aynı; health 200 ×2; deploy yeşil; gece yedeği + off-site; health-check Bağdam satırları.
 
 ### F11 — Lansman + hypercare (2 gün)
 - [ ] iyzico prod anahtarları + NON3D teyidi → `commerce.chargeStrategy`; apex coming-soon → tam site; 404/500/bakım kontrol; `unused/` + 27 kullanılmayan görsel temizliği; ETBİS/İşletme Kayıt/İYS durumu; ilk teslimat günü izleme; 2 hafta günlük rapor

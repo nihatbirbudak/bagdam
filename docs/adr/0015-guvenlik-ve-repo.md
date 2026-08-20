@@ -1,0 +1,5 @@
+# ADR-0015: Güvenlik ve repo: public repo'da sır yok, kısıtlı CI anahtarı, KVKK saklama matrisi
+
+- **Tarih:** 2026-08-20
+- **Durum:** Kabul edildi
+- **Karar:** Repo public; `.env` yalnız sunucuda; `.gitignore`: `docs/sunucu-*.md, *.pem, *.key, .env*`; GitHub secret scanning + push protection; gitleaks pre-commit/CI; seed admin şifresi env'den. CI: Bağdam'a özel SSH anahtarı `command="/opt/birbudak/scripts/deploy-dispatch.sh",no-pty,no-port-forwarding` + `environment: production` + `concurrency`; echo'da sır yok. API: helmet, CORS fonksiyonu, ValidationPipe whitelist, Throttler → JwtAuth → Csrf → Roles guard sırası, `AuditLogInterceptor` (e-posta/telefon/adres redaksiyonu). KVKK: F10'da veri saklama matrisi ADR'ı (anonimleştirme, MailLog 90 g, SystemLog 30 g, CronLog 90 g, access log 14 g, yedek 30 g off-site), `kvkk:purge` cron, `POST /admin/customers/:id/anonymize`. Yedek: `backup-bagdam.sh` 03:30 + age-şifreli rclone off-site, aylık restore provası. Çerez: banner + Consent (COOKIE_ANALYTICS/COOKIE_MARKETING) F10'da; `Setting cookies.analyticsEnabled` varsayılan false.

@@ -1,0 +1,8 @@
+# ADR-0003: Frontend: mevcut HTML byte-byte .hbs + senkron gömülü bootstrap; .html URL'ler korunur
+
+- **Tarih:** 2026-08-20
+- **Durum:** Kabul edildi
+- **Bağlam:** Tasarım hazır ve piksel piksel korunmalı; cart.js (1235 satır) parse anında `PRODUCTS`, `isLoggedIn()`, `getSub()` okur; site geçiş boyunca kesilmemeli.
+- **Karar:** 10 HTML → `apps/api/views/*.hbs` (byte-byte). `<script src="assets/products.js">` satırı `{{> bootstrap}}` partial'ına dönüşür: `window.__BAGDAM__` + `var PRODUCTS/SUB_TIERS/FREQ_OPTIONS/DELIVERY_DAYS/DELIVERY_FEE` + `me` (oturum) + `sub` (abonelik DTO'su) + `deliveryDates` (mutlak kesim zamanları) + `templates`/`pool`/`pairIds` senkron gömülür. products.js repodan silinir (alias yok). cart.js'e yalnız planlı yamalar: F3 şablon/bootstrap okuyucuları, F6 `api()` yardımcısı, F9 `BahcedenCart.remote`. DOM/data-* değişmez. URL'ler `.html` ile kalır (temiz URL + 301 = P2).
+- **Kişiselleşme/önbellek:** HTML yalnız bootstrap JSON'unda kişiselleşir; cookie `access_token` `path=/`; nginx micro-cache çerezli isteği bypass eder, çerezli yanıt `Cache-Control: private, no-store`; anonim HTML 10 s cache.
+- **İzinli tasarım istisnaları (7):** iyzico CF konteyneri; üye ol formunda KVKK + pazarlama kutucukları; checkout belge onayı + "ödeme yükümlülüğü doğurur"; "parolamı unuttum" linki; adres ilçe select; coming-soon/404/bakım sayfaları; uyelik'te yeni abonelik durum metinleri. Doğrulama: Playwright 10 sayfa × 3 viewport staging'de, diff ≈ 0.

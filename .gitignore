@@ -3,3 +3,20 @@
 website/.port
 website/server.log
 website/assets/search_*.json
+
+# Sunucu bilgileri (repo public) — asla commit etme
+docs/sunucu-baglanti.md
+# --- Bağdam backend (ADR-0015) ---
+docs/sunucu-*.md
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+apps/api/uploads/
+node_modules/
+dist/
+.turbo/
+coverage/
+playwright-report/
+test-results/

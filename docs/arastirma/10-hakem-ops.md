@@ -1,0 +1,64 @@
+> **Hakem raporu — sunucu uyumu & operasyon merceği** — Bu dosya 2026-08-20 tarihli çok ajanlı araştırmanın ham çıktısıdır (Faz 2 — hakem). Sunucu IP/port gibi bilgiler repo public olduğu için `<…>` ile maskelenmiştir; gerçek değerler gitignore'lu `docs/sunucu-baglanti.md` dosyasındadır.
+
+# Hakem merceği: ops
+
+**Kazanan:** mvp-once
+
+## Puanlar
+
+- **mvp-once** — kapsam 8, sıra 8, sunucu uyumu 9, sadelik 9, risk 7 → **toplam 41/50**
+  Sunucu gerçekleriyle birebir: Node20/Nest11/Prisma6/PG14, tek PM2 süreci bagdam-api :5010, nginx /api proxy + /assets alias, certbot webroot + CF Full(strict), backup-bagdam.sh + health-check 5010, deploy.sh sırası düzeltilmiş (build→pg_dump→migrate→reload→health curl→telegram). Frontend (b)-lite iddiası kanıtlı: cart.js 314/325/348/558/613/875/969 'typeof PRODUCTS' guard'ları ve urunler.html:192-194 senkron PRODUCTS kullanımı doğrulandı; HTML'de '{{' yok (hbs çakışması yok). Cookie auth (access/refresh httpOnly, CSRF), login 3r/m + 5 hata kilidi, roller CUSTOMER/STAFF/ADMIN, Consent+Policy.version, KVKK anonimleştirme (Faz 9), restore provası (Faz 10), .env yalnız sunucu, seed admin env'den, gitleaks. Eksikler: şema MailLog/SystemLog/CronLog içermiyor ama Faz 6/jobs bunlara dayanıyor; staging yok → iyzico webhook testi için public URL yok; tek süreç = site API ile birlikte düşer; inline JSON bootstrap için '</script>' kaçışı belirtilmemiş; 44 gün iyimser.
+- **alan-dogru** — kapsam 9, sıra 8, sunucu uyumu 8, sadelik 5, risk 6 → **toplam 36/50**
+  En kapsamlı ops/mevzuat: DeliveryDate.cutoffAt + atomik kapasite, LegalDocument versiyon satırları, Consent+IYS, SubscriptionCancellation (≤7 gün/≤15 gün), kvkk:purge, staging (:5020/5021 + CF Access), deploy.sh 'dist.next→mv' atomik build, /api/webhooks limit_req off, certbot önce DNS-only sonra proxied, off-site/aylık yedek, CronLog + Telegram, FOR UPDATE SKIP LOCKED, DST testleri, k6. Ordering güçlü: F6 motoru sahte PSP + fake timers ile F7 iyzico'dan önce test ediyor; ancak müşteri uçtan uca akışı (F8 kutu/sepet/uyelik) ~45. güne kalıyor. Server fit iyi ama ikinci framework (Express+Nunjucks ayrı süreç :5011) + 2 staging süreci = 4 PM2 app, 2 health/2 log. Basitlik düşük: ~50 model (TrNeighborhood 74k satır, Invoice, OtpCode, NotificationTemplate, Shipment/Event), 61 iş günü, küçük ekip için bakım yükü. Risk: temiz URL kararı — sayfalarda 142 '.html' referansı + cart.js'te 15, ve 150 göreli 'src="assets/…"' yolu; /urun/:slug gibi iç içe yollar göreli asset yollarını kırar (base href veya toplu rewrite gerekir); cart.js→bagdam.js yeniden yazımı piksel/regresyon riski; şema 'TASLAK' (Subscription.addressId, Coupon↔Order, Shipment.courierUserId ilişkileri eksik).
+- **konvansiyon** — kapsam 7, sıra 7, sunucu uyumu 8, sadelik 7, risk 6 → **toplam 35/50**
+  UA konvansiyonuna en sadık (api.bagdam.com + COOKIE_DOMAIN .bagdam.com + CORS credentials — UA main.ts:133-149 ve cookie.config.ts ile doğrulandı; .npmrc public-hoist-pattern doğru; jest guard kalıbı doğru), statik web nginx'ten (API düşse site ayakta), deploy.sh sırası düzeltilmiş, SETTINGS_ENCRYPTION_KEY REQUIRED, /api/webhooks rate-limit dışı. Fakat ÇELİŞKİ: 'Cloudflare zone zaten aktif (NS Cloudflare)' ve '/root/cf-api.sh' — görev sunucu gerçekleri 'DNS/Cloudflare kurulumu henüz yok' diyor; UA/BA dokümanlarında cf-api.sh yok (DOĞRULANMADI). Admin auth UA AdminAuthContext kopyası = localStorage Bearer (AdminAuthContext.tsx:38-64) → XSS riski, cookie P1'e ertelenmiş. (a) fetch yaklaşımı '10 sayfa × 1 satır' diye hafife alınmış: inline script'ler PRODUCTS'ı senkron kullanıyor (urunler.html:192-194) ve cart.js init DOMContentLoaded'da (cart.js:1214) fetch dönmeden çalışır → re-init + FOUC/CLS; urun/gunluk SEO zayıf. Çerez banner'ı lansman sonrasına (adım 9) bırakılmış. UA'dan Ticket/Incident/SmsTemplate/messaging gibi gereksiz modüller şemaya taşınıyor. Adım 7 (abonelik motoru+cron+dunning+SMS+Shipment+3 admin ekranı+3 web sayfası) 8 güne sığdırılmış — kayma riski yüksek.
+
+# Bağdam Mimari Önerileri — Hakem Raporu (Mercek: Sunucu Uyumu, Operasyon & Sürdürülebilirlik)
+
+Tarih: 2026-08-20 · Değerlendiren: bağımsız teknik hakem · Kaynaklar: 3 öneri metni, Faz 1 çıktıları A-D, sunucu gerçekleri, ve doğrulama için açılan dosyalar (`www.bagdam.com/website/*`, `www.uyanisakademi.com.tr/{deploy.sh,ecosystem.config.js,.npmrc,package.json,apps/api/src/main.ts,config/cookie.config.ts,__tests__/jest-global-setup.ts,apps/admin/src/contexts/AdminAuthContext.tsx,apps/web/src/lib/api.ts}`, `www.bahcedenal.com.tr/deploy/coming-soon/*`).
+
+## 1. Doğrulanan ortak zemin
+
+Üç öneri de sunucu gerçekleriyle uyumlu çekirdeği paylaşıyor: TypeScript/Node 20, NestJS 11 + Prisma 6 + PostgreSQL 14 (127.0.0.1:5432), PM2 `bagdam-api` :5010, nginx vhost kalıbı (80→301, LE, rate-limit zonları), certbot webroot, Cloudflare Full(strict), `/opt/bagdam`, `/opt/birbudak/scripts/backup-bagdam.sh` + health-check, GitHub Actions → `deploy.sh`, PHP/Redis/Docker yok, public repo → `.env` yalnız sunucuda, seed admin env'den, "tek DB kuralı"ndan bilinçli sapma (lokal PG + `migrate dev` lokal → prod `migrate deploy`). Üçü de UA `deploy.sh`'ın "migrate build'den önce" sırasını (doğrulandı: deploy.sh [3/6] migrate → [4/6] build) düzeltiyor ve `connection_limit=5` öneriyor. Bu noktalarda ayrışma yok.
+
+Kanıtla doğrulanan teknik iddialar:
+- `cart.js` 314/325/348/558/613/875/969 satırlarında `typeof PRODUCTS !== "undefined"` guard'ları var; `cart.js:1214` init `DOMContentLoaded`'da; `urunler.html:192-194` inline script `PRODUCTS.filter(...)` ile **senkron** grid basıyor; her sayfa `products.js → cart.js → inline` sırasıyla yüklüyor. → Sunucu tarafında basılan bootstrap (mvp-once) veya sunucu-üretimli `products.js` (alan-dogru) doğru; asenkron `fetch` (konvansiyon) ek iş ve FOUC demek.
+- HTML/JS'de `{{` yok → mvp-once'ın hbs yaklaşımında delimiter çakışması yok.
+- Sayfalarda 142 `.html` referansı, cart.js'te 15; 150 adet göreli `src="assets/..."` → alan-dogru'nun temiz URL (iç içe yol) kararı risklidir.
+- UA gerçekten `api.uyanisakademi.com.tr` + `COOKIE_DOMAIN .uyanisakademi.com.tr` + CORS credentials kullanıyor (konvansiyon'un "UA konvansiyonu" iddiası doğru); UA admin token'ı localStorage'da (konvansiyon bunu aynen kopyalıyor).
+- UA/BA dokümanlarında `/root/cf-api.sh` geçmiyor; görev gerçekleri "DNS/Cloudflare kurulumu henüz yok" diyor → konvansiyon'un "zone zaten aktif" iddiası çelişkili (DOĞRULANMADI).
+
+## 2. Puan tablosu
+
+| Öneri | Completeness | Ordering | Server fit | Simplicity | Risk (10=en az) | Toplam |
+|---|---|---|---|---|---|---|
+| **mvp-once** | 8 | 8 | 9 | 9 | 7 | **41** |
+| alan-dogru | 9 | 8 | 8 | 5 | 6 | 36 |
+| konvansiyon | 7 | 7 | 8 | 7 | 6 | 35 |
+
+## 3. Öneri bazlı değerlendirme
+
+### 3.1 mvp-once — KAZANAN
+**Sunucu uyumu (9):** Tek PM2 süreci (`bagdam-api` :5010, instances 1, cron kilidi `NODE_APP_INSTANCE`), nginx `/api/` proxy + `/assets/` alias + `/uploads/` alias, aynı-origin cookie (CORS yok, `Domain=` yok), `www→apex 301`, `client_max_body_size 20M` Multer ile eşleşik, certbot webroot mevcut timer'la, Cloudflare adımları (DNSSEC kapat→NS→aç, WAF istisnası webhook/callback, `/api/*` cache bypass). Backup/health/error-watcher/Telegram entegrasyonu somut. `deploy.sh`: build→pg_dump→migrate→reload→health curl→`.last-deploy-sha`→hata halinde Telegram. Sapma: UA'nın `api.` subdomain'i yerine `/api` path — sunucu açısından daha basit ve daha güvenli (admin ve web cookie'leri host bazında izole).
+**Operasyon/güvenlik:** httpOnly access 15 dk + refresh 30 gün rotasyon, CSRF double-submit, login 3r/m + 5 hata/30 dk kilit, roller CUSTOMER/STAFF/ADMIN, `@Audited` admin mutasyonları, `env-validator` fail-fast, kart verisi yalnız PSP token, `Consent` + `Policy.version`, KVKK anonimleştirme (Faz 9), restore provası (Faz 10), gitleaks, `docs/SISTEM-DURUMU.md`.
+**Basitlik (9):** ~26 model, tek süreç, P2 listesi net (Shipment, Coupon, ProductLot, BoxWeek, kargo API, e-Arşiv). Küçük ekip için bakım yükü en düşük.
+**Sıralama (8):** Faz 0 kararlar → Faz 1 walking skeleton canlıda (statik siteyle piksel aynı) → şema → bootstrap/katalog → admin+medya (14. günde "dinamik site + admin") → CMS → auth → checkout/iyzico → abonelik motoru → bildirim/yasal → lansman. Bağımlılıklar doğru; abonelik motoru şema dondurulduktan sonra yalnız servis/cron kodu.
+**Zayıflıklar/risk (7):** (i) Şema `MailLog/SystemLog/CronLog` içermiyor ama Faz 6 ve cron işleri bunlara dayanıyor. (ii) Staging yok → iyzico webhook (HMAC/idempotency) hiçbir ortamda uçtan uca test edilemez. (iii) HTML'i API süreci render ettiği için API düşünce site de düşer; nginx stale-cache/bakım sayfası yok. (iv) Inline `__BAGDAM__` JSON için `</script>` kaçışı belirtilmemiş. (v) 44 gün iyimser; `kutu.html`/`uyelik.html` için `BahcedenCart.remote` adaptörü (Faz 8) cart.js'e dokunuyor — "cart.js değişmez" iddiası Faz 6-8'de kısmen geçersiz (planda açıkça yazılı).
+
+### 3.2 alan-dogru — en kapsamlı, en ağır
+**Güçlü:** Ops/mevzuat bakışından en olgun plan: `DeliveryDate.cutoffAt` tek kesim kaynağı + atomik kapasite; `LegalDocument` versiyon satırları; `Consent` + İYS alanları; `SubscriptionCancellation` (≤7 gün / ≤15 gün); `kvkk:purge`; staging (:5020/5021 + Cloudflare Access); deploy.sh atomik build (`dist.next→mv`); `/api/webhooks/ limit_req off`; certbot DNS-only → proxied sırası; off-site/aylık yedek; `FOR UPDATE SKIP LOCKED` ile kuyruk; DST testleri; k6; F6'da motoru sahte PSP + fake timers ile F7'den önce test etmek. Bunlar final plana alınmalı (bkz. §5).
+**Sunucu uyumu (8):** Hepsi Node ama ikinci framework (Express+Nunjucks, ayrı süreç :5011) + iki staging süreci → 4 PM2 app, 2 health, 2 log, 2 build. Sunucu kaldırır; küçük ekip için gereksiz yüzey.
+**Basitlik (5):** ~50 model (TrNeighborhood 74k satır, Invoice, OtpCode, NotificationTemplate, Shipment/ShipmentEvent, Coupon/Redemption, WhatsApp), 61 iş günü. Bahcedenal'ın "aşırı kapsam" dersine yaklaşıyor.
+**Risk (6):** Temiz URL kararı — 142 `.html` referansı + 15 cart.js + 150 göreli `assets/` yolu; `/urun/:slug` gibi iç içe yollar göreli yolları kırar (base href/rewrite şart). cart.js→bagdam.js yeniden yazımı (F8) piksel riski. Şema açıkça "taslak" (ilişkiler eksik). Müşteri uçtan uca akışı F8'e (~45. gün) kalıyor.
+
+### 3.3 konvansiyon — UA'ya en sadık, iki ciddi hata
+**Güçlü:** UA kalıbının birebir kopyası (doğrulandı: api subdomain, cookie domain, CORS, `.npmrc`, jest guard), statik web nginx'ten (`try_files`, HTML no-cache, `?v=sha`) → API düşse site ayakta; 40 iş günü; `SETTINGS_ENCRYPTION_KEY` REQUIRED; webhook/callback rate-limit dışı; medya içe aktarımı; "silme değil, hiç alma" ilkesi.
+**Hatalar/risk (6):** (i) "Cloudflare zone zaten aktif / `/root/cf-api.sh`" — sunucu gerçekleriyle çelişiyor, DNS kesim planı eksik. (ii) Admin auth localStorage Bearer (UA `AdminAuthContext.tsx:38-64` kopyası) — XSS riski, cookie P1'e ertelenmiş. (iii) (a) fetch yaklaşımı: inline script'ler senkron `PRODUCTS` bekliyor, cart.js init fetch'ten önce koşuyor → boş grid/FOUC, re-init, urun/gunluk SEO'su zayıf; "10 sayfa × 1 satır" gerçekçi değil. (iv) Çerez banner'ı lansman sonrasına bırakılmış. (v) UA'dan Ticket/Incident/SmsTemplate/messaging şemaya taşınıyor (bakım yükü). (vi) Adım 7'de abonelik motoru + cron + dunning + SMS + Shipment + 3 admin ekranı + 3 web sayfası 8 güne sığdırılmış — kayma riski. (vii) Şema+seed sunucu iskeletinden önce (adım 1 → 2); walking skeleton ilkesine göre ters ama 2 gün fark.
+
+## 4. Karar: mvp-once kazanır
+Sunucu uyumu ve küçük ekip sürdürülebilirliği merceğinde mvp-once tek süreç/az tablo/aynı-origin cookie/UA ops kopyası ile en düşük bakım yükünü ve en doğru frontend stratejisini (kanıtlı senkron bootstrap) veriyor; 14. günde görünür değer (dinamik site + admin) üretiyor. alan-dogru'nun ops/mevzuat derinliği ve konvansiyon'un statik dayanıklılığı ise final plana "ek" olarak alınmalı, "yerine" değil.
+
+## 5. Final plana MUTLAKA eklenecek düzeltmeler (özet)
+1. Şemaya `MailLog`, `SystemLog`, `CronLog` ekle (Faz 2 dondurma öncesi). 2. Hafif staging (`bagdam_staging` + :5020 + staging.bagdam.com, CF Access) — iyzico webhook testi için. 3. nginx `proxy_cache_use_stale`/bakım sayfası + health-check'e HTML kontrolü. 4. Inline JSON kaçışı (`<`→`<`). 5. `.html` URL'leri MVP'de korunur. 6. Admin cookie auth ilk günden. 7. Cloudflare zone/NS/DNSSEC adımları Faz 1'e açıkça. 8. `DeliveryDate`/kapasite veya en az `Setting.commerce.cutoff` tek kaynağı + cart.js'in buradan beslenmesi. 9. Off-site/aylık yedek + pre-migrate dump rotasyonu. 10. iyzico NON3D yetkisi teyidi + geri dönüş yolu Faz 0'da. 11. Çerez/consent kararı ADR'da (zorunlu-çerez-yalnız mı, banner mı).
+
+DOĞRULANMADI notları: sunucudaki `/root/cf-api.sh`, iyzico NON3D yetkisi ve `X-Frame-Options` ile iyzico iframe uyumu (frame-src alan adları) bu oturumda doğrulanamadı.

@@ -62,3 +62,52 @@ export interface DeliveryDatePatch {
   capacity?: number;
   status?: DeliveryDateStatus;
 }
+
+// ── F5 ekleri (DeliveryModule) — yalnız EKLEME ────────────────────────────────
+
+/** Public `GET /delivery/zones` öğesi — yalnız aktif bölgeler; kapasite/sıra istemciye gitmez. */
+export interface DeliveryZonePublic {
+  id: Id;
+  slug: string;
+  name: string;
+  fee: Money;
+  freeThreshold: Money | null;
+}
+
+/** Public `GET /delivery/dates?zone=&weeks=` sorgusu (zone varsayılan `urla`, weeks varsayılan 4, en çok 12). */
+export interface DeliveryDatesQuery {
+  zone?: string;
+  weeks?: number;
+}
+
+/** Admin `PUT /admin/delivery/zones/:id` — tüm alanlar isteğe bağlı (yalnız gönderilenler güncellenir). */
+export type DeliveryZoneUpdate = Partial<DeliveryZoneInput>;
+
+/** Admin `PATCH /admin/delivery/zones/:id/active`. */
+export interface DeliveryZoneActivePatch {
+  isActive: boolean;
+}
+
+/** Admin `GET /admin/delivery/dates?zone=&from=&to=` (zone slug; from/to `YYYY-MM-DD`, varsayılan bugün → +ufuk). */
+export interface DeliveryDatesAdminQuery {
+  zone?: string;
+  from?: IsoDate;
+  to?: IsoDate;
+}
+
+/** Admin `POST /admin/delivery/dates/generate {weeks?}` (varsayılan Setting `commerce.deliveryDatesHorizonWeeks`). */
+export interface DeliveryDatesGenerateInput {
+  weeks?: number;
+}
+
+/** `generate` sonucu — idempotent: ikinci koşuda `created` 0, var olan tarihlerde yalnız day/cutoffAt tazelenir. */
+export interface DeliveryDatesGenerateResult {
+  weeks: number;
+  /** Üretilen ufuk (ilk/son takvim günü); teslimat günü yoksa null. */
+  from: IsoDate | null;
+  to: IsoDate | null;
+  /** İşlenen aktif bölge sayısı. */
+  zones: number;
+  created: number;
+  updated: number;
+}

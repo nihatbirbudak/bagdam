@@ -34,7 +34,7 @@ import {
   toProductDto,
   toSubTier,
 } from './catalog.mapper';
-import { CatalogRepository, type ZoneRecord } from './catalog.repository';
+import { CatalogRepository, type ActiveCategoryRecord, type ZoneRecord } from './catalog.repository';
 
 /** `getBootstrap` seçenekleri — çerezli istekte WebController/F6 JwtAuth doldurur; anonimde ikisi de null. */
 export interface BootstrapOptions {
@@ -74,9 +74,24 @@ export class CatalogService {
     return { ...base, me: opts?.me ?? null, sub: opts?.sub ?? null };
   }
 
-  /** Admin mutasyonları (F4: ürün/parti/şablon/tier/ayar) sonrası çağrılır; sonraki istek DB'den kurar. */
+  /**
+   * Admin mutasyonları (F4: ürün/parti/şablon/tier/ayar/kategori) sonrası çağrılır; sonraki istek DB'den kurar.
+   * Kategori cache'i de birlikte düşer (F5: web sekmeleri/panel notları — kategori düzenlemesi anında sayfaya yansır).
+   */
   async invalidateBootstrapCache(): Promise<void> {
-    await this.cache.del(CACHE_KEYS.bootstrapAnonymous);
+    await Promise.all([this.cache.del(CACHE_KEYS.bootstrapAnonymous), this.cache.del(CACHE_KEYS.categoriesActive)]);
+  }
+
+  /**
+   * Aktif kategoriler (slug/label/panelNote, sortOrder) — WebController index/urunler sekmeleri ve panel notları (F5).
+   * 60 s in-process cache; CatalogAdminService kategori mutasyonlarında invalidateBootstrapCache ile düşer.
+   */
+  async listActiveCategories(): Promise<ActiveCategoryRecord[]> {
+    const cached = await this.cache.get<ActiveCategoryRecord[]>(CACHE_KEYS.categoriesActive);
+    if (cached) return cached;
+    const rows = await this.repo.findActiveCategories();
+    await this.cache.set(CACHE_KEYS.categoriesActive, rows, BOOTSTRAP_CACHE_TTL_MS);
+    return rows;
   }
 
   /**

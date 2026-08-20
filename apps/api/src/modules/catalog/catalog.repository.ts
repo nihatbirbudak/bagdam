@@ -69,6 +69,13 @@ export type ProducerRecord = Prisma.ProducerGetPayload<{ include: typeof PRODUCE
 
 export type ZoneRecord = DeliveryZone;
 export type DeliveryDateRecord = DeliveryDateRow;
+
+/** Web sekmeleri / panel notları için kategori özeti (F5: index/urunler {{#each categories}}, Category.panelNote tek sahip [B11]). */
+export interface ActiveCategoryRecord {
+  slug: string;
+  label: string;
+  panelNote: string | null;
+}
 export type SettingRecord = Setting;
 
 @Injectable()
@@ -144,6 +151,15 @@ export class CatalogRepository {
     return this.prisma.deliveryDate.findMany({
       where: { zoneId, date: { gte: fromInclusive, lt: toExclusive } },
       orderBy: { date: 'asc' },
+    });
+  }
+
+  /** Aktif kategoriler, sortOrder sırasıyla (slug/label/panelNote) — WebController sekmeleri. */
+  findActiveCategories(): Promise<ActiveCategoryRecord[]> {
+    return this.prisma.category.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      select: { slug: true, label: true, panelNote: true },
     });
   }
 

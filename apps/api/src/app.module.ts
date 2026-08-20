@@ -13,8 +13,12 @@ import { PrismaModule } from './common/prisma.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { ContentModule } from './modules/content/content.module';
+import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
 import { MediaModule } from './modules/media/media.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { WholesaleModule } from './modules/wholesale/wholesale.module';
 import { WebModule } from './web/web.module';
 
 // PM2 cluster: cron job'lar yalnız primary instance'ta (0) ve ENABLE_CRON !== 'false' iken çalışır
@@ -49,6 +53,10 @@ new Logger('AppModule').log(
     AuditModule, // F4: AuditService (interceptor) + GET /api/v1/admin/audit-logs
     CatalogModule, // F3: GET /api/v1/bootstrap + public katalog uçları; WebModule aynı servisi kullanır
     MediaModule, // F4: POST/GET/PATCH/DELETE /api/v1/admin/media (ADMIN/STAFF, @Audited('media')); /uploads statik main.ts'te
+    ContentModule, // F5: site-content/posts/legal/consents (+ /admin/*) + sitemap.xml/robots.txt; WebModule ContentService'i kullanır
+    SettingsModule, // F5: /api/v1/admin/settings (registry şemalı gruplar, sırlar AES-256-GCM); DeliveryModule Setting'i buradan okur
+    DeliveryModule, // F5: /api/v1/delivery/* (public) + /admin/delivery/* (bölge CRUD, tarih üretimi); bootstrap cache'i düşürür
+    WholesaleModule, // F5: POST /api/v1/wholesale-leads (3/dk/IP) + /admin/wholesale-leads
     WebModule,
   ],
   providers: [

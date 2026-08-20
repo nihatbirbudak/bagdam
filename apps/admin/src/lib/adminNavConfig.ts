@@ -66,11 +66,24 @@ export const adminNavItems: AdminNavItem[] = [
   {
     label: 'İçerik',
     children: [
-      { label: 'Site İçerikleri', to: '/icerik/site', phase: 'F5', comingSoon: true, hint: 'Site blokları (home.featured, hero, SSS), promo, footer, iletişim.' },
-      { label: 'Günlük', to: '/icerik/gunluk', phase: 'F5', comingSoon: true, hint: 'Blog yazıları (posts).' },
-      { label: 'Yasal Metinler', to: '/icerik/yasal-metinler', phase: 'F5', comingSoon: true, hint: 'Versiyonlu yasal belgeler; showInNav; requiresAck.' },
+      {
+        label: 'Site İçerikleri',
+        to: '/icerik/site',
+        phase: 'F5',
+        comingSoon: false,
+        hint: 'Site blokları: ana sayfa (hero, sütunlar, vitrin, öne çıkanlar, SSS), ürünler, kutu, manifesto, toptan, günlük metinleri — şemadan üretilen form.',
+      },
+      {
+        label: 'Promo / Footer / İletişim',
+        to: '/icerik/promo-footer',
+        phase: 'F5',
+        comingSoon: false,
+        hint: 'Üst promosyon şeridi (promoBar) ile alt bilgi ve iletişim (footer) blokları.',
+      },
+      { label: 'Günlük', to: '/icerik/gunluk', phase: 'F5', comingSoon: false, hint: 'Blog yazıları (posts): taslak/yayın, kapak görseli, ilgili yazılar.' },
+      { label: 'Yasal Metinler', to: '/icerik/yasal-metinler', phase: 'F5', comingSoon: false, hint: 'Versiyonlu yasal belgeler; taslak → yayınla; nav/sıra/onay zorunluluğu.' },
       { divider: 'Talepler' },
-      { label: 'Toptan Talepleri', to: '/toptan-talepleri', phase: 'F5', comingSoon: true, hint: 'toptan.html formundan gelen talepler (wholesale_leads).' },
+      { label: 'Toptan Talepleri', to: '/toptan-talepleri', phase: 'F5', comingSoon: false, hint: 'toptan.html formundan gelen talepler (wholesale_leads): durum ve not.' },
     ],
   },
   {
@@ -91,12 +104,12 @@ export const adminNavItems: AdminNavItem[] = [
   {
     label: 'Ayarlar',
     children: [
-      { label: 'Genel', to: '/ayarlar', phase: 'F5', comingSoon: true, hint: 'Genel ayar grupları (commerce.* vb.) — generic grup formu.' },
-      { label: 'Bölgeler', to: '/ayarlar/bolgeler', phase: 'F5', comingSoon: true, hint: 'Teslimat bölgeleri: ücret / eşik / kapasite.' },
+      { label: 'Genel', to: '/ayarlar', phase: 'F5', comingSoon: false, hint: 'Genel ayar grupları (ticaret/kampanya, site, çerez) — registry’den üretilen grup formu.' },
+      { label: 'Bölgeler', to: '/ayarlar/bolgeler', phase: 'F5', comingSoon: false, hint: 'Teslimat bölgeleri: ücret / eşik / kapasite; teslimat tarihleri önizleme.' },
       { label: 'Teslimat Tarihleri', to: '/ayarlar/teslimat-tarihleri', phase: 'F9', comingSoon: true, hint: 'Doluluk, günü kapat.' },
-      { label: 'E-posta', to: '/ayarlar/e-posta', phase: 'F5', comingSoon: true, hint: 'Sağlayıcı ayarları (şifreli); test gönderimi.' },
-      { label: 'Ödeme', to: '/ayarlar/odeme', phase: 'F5', comingSoon: true, hint: 'iyzico anahtarları (şifreli), tahsilat stratejisi.' },
-      { label: 'SEO', to: '/ayarlar/seo', phase: 'F5', comingSoon: true, hint: 'Başlık/açıklama şablonları, sitemap/robots.' },
+      { label: 'E-posta', to: '/ayarlar/e-posta', phase: 'F5', comingSoon: false, hint: 'E-posta ve SMS sağlayıcı ayarları (şifreli); test gönderimi.' },
+      { label: 'Ödeme', to: '/ayarlar/odeme', phase: 'F5', comingSoon: false, hint: 'iyzico anahtarları (şifreli), tahsilat stratejisi.' },
+      { label: 'SEO', to: '/ayarlar/seo', phase: 'F5', comingSoon: false, hint: 'Sayfa başlıkları/açıklama, OG görseli; sitemap/robots API’den.' },
     ],
   },
   {

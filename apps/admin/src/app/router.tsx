@@ -10,6 +10,14 @@ import { AdminUreticilerPage } from '../pages/ureticiler/AdminUreticilerPage';
 import { AdminKutularPage } from '../pages/kutular/AdminKutularPage';
 import { AdminHaftaninKutusuPage } from '../pages/haftanin-kutusu/AdminHaftaninKutusuPage';
 import { AdminMedyaPage } from '../pages/medya/AdminMedyaPage';
+import { AdminSiteIcerikleriPage } from '../pages/icerik/AdminSiteIcerikleriPage';
+import { AdminGunlukPage } from '../pages/gunluk/AdminGunlukPage';
+import { AdminGunlukFormPage } from '../pages/gunluk/AdminGunlukFormPage';
+import { AdminYasalMetinlerPage } from '../pages/yasal/AdminYasalMetinlerPage';
+import { AdminYasalFormPage } from '../pages/yasal/AdminYasalFormPage';
+import { AdminToptanTalepleriPage } from '../pages/toptan/AdminToptanTalepleriPage';
+import { AdminAyarlarGenelPage, AdminEpostaPage, AdminOdemePage, AdminSeoPage } from '../pages/ayarlar/AdminAyarlarPage';
+import { AdminBolgelerPage } from '../pages/ayarlar/AdminBolgelerPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
@@ -64,6 +72,24 @@ export function AdminRouter() {
         <Route path="/katalog/kutular" element={<AdminKutularPage />} />
         <Route path="/katalog/haftanin-kutusu" element={<AdminHaftaninKutusuPage />} />
         <Route path="/medya" element={<AdminMedyaPage />} />
+
+        {/* F5 — İçerik */}
+        <Route path="/icerik/site" element={<AdminSiteIcerikleriPage mode="site" />} />
+        <Route path="/icerik/promo-footer" element={<AdminSiteIcerikleriPage mode="promo-footer" />} />
+        <Route path="/icerik/gunluk" element={<AdminGunlukPage />} />
+        <Route path="/icerik/gunluk/yeni" element={<AdminGunlukFormPage />} />
+        <Route path="/icerik/gunluk/:id" element={<AdminGunlukFormPage />} />
+        <Route path="/icerik/yasal-metinler" element={<AdminYasalMetinlerPage />} />
+        <Route path="/icerik/yasal-metinler/yeni" element={<AdminYasalFormPage />} />
+        <Route path="/icerik/yasal-metinler/:id" element={<AdminYasalFormPage />} />
+        <Route path="/toptan-talepleri" element={<AdminToptanTalepleriPage />} />
+
+        {/* F5 — Ayarlar */}
+        <Route path="/ayarlar" element={<AdminAyarlarGenelPage />} />
+        <Route path="/ayarlar/bolgeler" element={<AdminBolgelerPage />} />
+        <Route path="/ayarlar/e-posta" element={<AdminEpostaPage />} />
+        <Route path="/ayarlar/odeme" element={<AdminOdemePage />} />
+        <Route path="/ayarlar/seo" element={<AdminSeoPage />} />
 
         {placeholderLeaves.map((leaf) => (
           <Route key={leaf.to} path={leaf.to} element={<PlaceholderPage />} />

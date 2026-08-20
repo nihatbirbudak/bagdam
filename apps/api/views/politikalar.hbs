@@ -44,190 +44,29 @@
     <nav class="policies-nav" aria-label="Politikalar">
       <p class="policies-nav-title mono">TÜM POLİTİKALAR</p>
       <div class="policies-nav-links">
-        <a href="#gizlilik" data-policy="gizlilik" class="active">Gizlilik Politikası</a>
-        <a href="#kullanim-kosullari" data-policy="kullanim-kosullari">Kullanım Koşulları</a>
-        <a href="#mesafeli-satis" data-policy="mesafeli-satis">Mesafeli Satış Sözleşmesi</a>
-        <a href="#teslimat" data-policy="teslimat">Teslimat Koşulları</a>
-        <a href="#iptal-iade" data-policy="iptal-iade">İptal ve İade Koşulları</a>
-        <a href="#kvkk" data-policy="kvkk">KVKK Aydınlatma Metni</a>
-        <a href="#cerez" data-policy="cerez">Çerez Politikası</a>
-        <a href="#cerez-ayarlari" data-policy="cerez-ayarlari">Çerez Ayarları</a>
+{{#each legal}}
+        <a href="#{{{slug}}}" data-policy="{{{slug}}}"{{#if @first}} class="active"{{/if}}>{{{title}}}</a>
+{{/each}}
       </div>
     </nav>
     <div class="policies-body">
-    <article class="policy" id="gizlilik">
+{{#each legalDocs}}
+    <article class="policy" id="{{{slug}}}"{{#unless @first}} hidden{{/unless}}>
       <span class="eyebrow">Politikalar</span>
-      <h1>Gizlilik Politikası</h1>
-      <p class="policy-updated mono">SON GÜNCELLEME: 18 AĞUSTOS 2026</p>
-      <p class="policy-lead">Bağdam olarak kişisel verilerinizin gizliliğine önem veriyoruz. Bu politika, web sitemizi ziyaret ettiğinizde ve hizmetlerimizden yararlandığınızda hangi bilgileri topladığımızı, bu bilgileri nasıl kullandığımızı ve koruduğumuzu açıklar.</p>
-      <h2>Topladığımız bilgiler</h2>
-      <p>Ad, soyad, e-posta adresi, telefon numarası, teslimat adresi ve ödeme bilgileri; sipariş geçmişiniz; site kullanım verileri (çerezler aracılığıyla).</p>
-      <h2>Bilgilerin kullanımı</h2>
-      <p>Siparişlerinizi hazırlamak ve teslim etmek, aboneliğinizi yönetmek, sizinle iletişim kurmak, hizmetlerimizi geliştirmek ve yasal yükümlülüklerimizi yerine getirmek amacıyla kullanılır.</p>
-      <h2>Bilgilerin paylaşımı</h2>
-      <p>Kişisel verileriniz, yalnızca hizmetin sunulması için zorunlu olan iş ortaklarımızla (kargo, ödeme altyapısı) ve yasal zorunluluk hâllerinde yetkili kurumlarla paylaşılır. Üçüncü taraflara pazarlama amacıyla satılmaz.</p>
-      <h2>Veri güvenliği</h2>
-      <p>Verileriniz güncel teknik ve idari tedbirlerle korunur; ödeme bilgileri tarafımızca saklanmaz, güvenli ödeme altyapısı üzerinden işlenir.</p>
-      <h2>Haklarınız</h2>
-      <p>Verilerinize erişme, düzeltme, silme ve işlenmesine itiraz etme haklarınız için bize mutlu müşteri hattımızdan ulaşabilirsiniz.</p>
+      <h1>{{{title}}}</h1>
+      <p class="policy-updated mono">SON GÜNCELLEME: {{{updatedLabel}}}</p>
+      <p class="policy-lead">{{{leadHtml}}}</p>
+{{{bodyHtml}}}
     </article>
+{{#unless @last}}
 
-    <article class="policy" id="kullanim-kosullari" hidden>
-      <span class="eyebrow">Politikalar</span>
-      <h1>Kullanım Koşulları</h1>
-      <p class="policy-updated mono">SON GÜNCELLEME: 18 AĞUSTOS 2026</p>
-      <p class="policy-lead">Bu web sitesini kullanarak aşağıdaki koşulları kabul etmiş sayılırsınız. Koşulları zaman zaman güncelleyebiliriz; güncel hâli her zaman bu sayfada yayımlanır.</p>
-      <h2>Üyelik</h2>
-      <p>Sipariş verebilmek için doğru ve güncel bilgilerle üye olmanız gerekir. Hesabınızın güvenliğinden ve hesabınız üzerinden yapılan işlemlerden siz sorumlusunuz.</p>
-      <h2>Ürünler ve fiyatlar</h2>
-      <p>Ürünler mevsimseldir; kutu içerikleri hafta hafta değişebilir. Fiyatlar KDV dahildir ve önceden haber verilmeksizin güncellenebilir; sipariş anındaki fiyat geçerlidir.</p>
-      <h2>Abonelik</h2>
-      <p>Abonelik, seçtiğiniz sıklıkta otomatik yenilenir. Değişiklik ve iptal, teslimat gününden önceki gün 12:00'ye kadar yapılabilir; sonrasında o haftaki sipariş kesinleşir.</p>
-      <h2>Fikri mülkiyet</h2>
-      <p>Sitedeki tüm içerik, görsel ve markalar Bağdam'a aittir; izinsiz kopyalanamaz.</p>
-    </article>
-
-    <article class="policy" id="mesafeli-satis" hidden>
-      <span class="eyebrow">Politikalar</span>
-      <h1>Mesafeli Satış Sözleşmesi</h1>
-      <p class="policy-updated mono">SON GÜNCELLEME: 18 AĞUSTOS 2026</p>
-      <p class="policy-lead">Bu sözleşme, 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler Yönetmeliği uyarınca, Bağdam (Satıcı) ile sipariş veren müşteri (Alıcı) arasında elektronik ortamda kurulmuştur.</p>
-      <h2>Satıcı bilgileri</h2>
-      <p>BİRBUDAK GRUP DANIŞMANLIK TİC. LTD. ŞTİ. — 8034 Sokak No:38, Kuşçular, Urla / İzmir — Tel: +90 (530) 949 40 93</p>
-      <h2>Sözleşme konusu</h2>
-      <p>Alıcının elektronik ortamda siparişini verdiği, sitede nitelikleri ve satış bedeli belirtilen ürünlerin satışı ve teslimidir.</p>
-      <h2>Teslimat</h2>
-      <p>Ürünler, Alıcının seçtiği teslimat gününde, bildirdiği adrese teslim edilir. Teslimat bölgesi Urla ve Çeşme ile sınırlıdır.</p>
-      <h2>Ödeme</h2>
-      <p>Ödeme, sipariş sırasında kredi/banka kartı ile alınır. Aboneliklerde haftalık tutar teslimat günü tahsil edilir.</p>
-      <h2>Cayma hakkı</h2>
-      <p>Çabuk bozulabilen ve son kullanma tarihi geçebilecek gıda ürünlerinde, Yönetmelik gereği cayma hakkı kullanılamaz. Ayıplı ürünlerde İptal ve İade Koşulları uygulanır.</p>
-    </article>
-
-    <article class="policy" id="teslimat" hidden>
-      <span class="eyebrow">Politikalar</span>
-      <h1>Teslimat Koşulları</h1>
-      <p class="policy-updated mono">SON GÜNCELLEME: 18 AĞUSTOS 2026</p>
-      <p class="policy-lead">Teslimatlarımız Salı, Perşembe ve Cumartesi günleri, Urla ve Çeşme ilçelerine yapılır.</p>
-      <h2>Teslimat günü seçimi</h2>
-      <p>Sipariş sırasında üç günden birini seçersiniz. Seçilen günün kesimi, bir önceki gün 12:00'dir; kesim geçtikten sonra yapılan seçimler bir sonraki haftaya kalır.</p>
-      <h2>Teslimat saatleri</h2>
-      <p>Teslimatlar seçilen gün 09:00–18:00 arasında yapılır. Adreste bulunamazsanız kutunuz güvenli bir noktaya bırakılır ve size bilgi verilir.</p>
-      <h2>Kargo ücreti</h2>
-      <p>Aboneliklerde kargo dahildir. Tek seferlik siparişlerde 1.000 TL üzeri ücretsiz, altında 49 TL kargo ücreti uygulanır.</p>
-      <h2>Soğuk zincir</h2>
-      <p>Taze ürünler hasat sonrası en kısa sürede, süt ürünleri soğuk zincir korunarak teslim edilir.</p>
-    </article>
-
-    <article class="policy" id="iptal-iade" hidden>
-      <span class="eyebrow">Politikalar</span>
-      <h1>İptal ve İade Koşulları</h1>
-      <p class="policy-updated mono">SON GÜNCELLEME: 18 AĞUSTOS 2026</p>
-      <p class="policy-lead">Ürünlerimiz taze gıda olduğundan iade süreci ürün türüne göre farklılık gösterir.</p>
-      <h2>Sipariş iptali</h2>
-      <p>Sipariş, teslimat gününden önceki gün 12:00'ye kadar ücretsiz iptal edilebilir. Kesimden sonra iptal yapılamaz.</p>
-      <h2>Abonelik iptali</h2>
-      <p>Aboneliğinizi üyelik sayfanızdan dilediğiniz zaman iptal edebilirsiniz; kesimi geçmiş haftanın kutusu teslim edilir, sonraki haftalar durdurulur. Ayrıca yılda bir kez bir haftayı atlama hakkınız vardır.</p>
-      <h2>Ayıplı ürün</h2>
-      <p>Teslim aldığınız üründe bozulma, ezilme ya da eksiklik varsa teslimatı izleyen 24 saat içinde fotoğrafla bize bildirin; ürün bedelini iade eder ya da bir sonraki kutunuza ekleriz.</p>
-      <h2>İade süresi</h2>
-      <p>İadeler, ödemenin yapıldığı karta 3–7 iş günü içinde yansıtılır.</p>
-    </article>
-
-    <article class="policy" id="kvkk" hidden>
-      <span class="eyebrow">Politikalar</span>
-      <h1>KVKK Aydınlatma Metni</h1>
-      <p class="policy-updated mono">SON GÜNCELLEME: 18 AĞUSTOS 2026</p>
-      <p class="policy-lead">6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") uyarınca, veri sorumlusu sıfatıyla BİRBUDAK GRUP DANIŞMANLIK TİC. LTD. ŞTİ. tarafından kişisel verilerinizin işlenmesine ilişkin aydınlatma metnidir.</p>
-      <h2>İşlenen veriler</h2>
-      <p>Kimlik (ad, soyad), iletişim (telefon, e-posta, adres), müşteri işlem (sipariş, abonelik, ödeme kaydı) ve işlem güvenliği (IP, çerez) verileri.</p>
-      <h2>İşleme amaçları</h2>
-      <p>Sözleşmenin kurulması ve ifası, siparişlerin teslimi, müşteri ilişkilerinin yürütülmesi, yasal yükümlülüklerin yerine getirilmesi.</p>
-      <h2>Hukuki sebep</h2>
-      <p>KVKK m.5/2 (c) sözleşmenin ifası, (ç) hukuki yükümlülük ve (f) meşru menfaat.</p>
-      <h2>Aktarım</h2>
-      <p>Kargo ve ödeme hizmeti sağlayıcıları ile yetkili kamu kurumlarına, yalnızca gerektiği ölçüde aktarılır.</p>
-      <h2>Haklarınız (m.11)</h2>
-      <p>Verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme, itiraz ve zararın giderilmesini talep etme haklarınız için başvurularınızı mutlu müşteri hattımız üzerinden iletebilirsiniz.</p>
-    </article>
-
-    <article class="policy" id="cerez" hidden>
-      <span class="eyebrow">Politikalar</span>
-      <h1>Çerez Politikası</h1>
-      <p class="policy-updated mono">SON GÜNCELLEME: 18 AĞUSTOS 2026</p>
-      <p class="policy-lead">Web sitemiz, deneyiminizi iyileştirmek için çerezler kullanır. Çerezler, tarayıcınız aracılığıyla cihazınıza kaydedilen küçük metin dosyalarıdır.</p>
-      <h2>Zorunlu çerezler</h2>
-      <p>Sepetinizin, oturumunuzun ve tercihlerinizin hatırlanması için gereklidir; sitenin çalışması için zorunludur.</p>
-      <h2>Analitik çerezler</h2>
-      <p>Sitenin nasıl kullanıldığını anonim olarak ölçmemize yardımcı olur; hizmeti geliştirmek için kullanılır.</p>
-      <h2>Pazarlama çerezleri</h2>
-      <p>Şu an kullanılmamaktadır. Kullanıma alınması hâlinde açık rızanız istenir.</p>
-      <h2>Yönetim</h2>
-      <p>Çerez tercihlerinizi aşağıdaki Çerez Ayarları bölümünden ya da tarayıcı ayarlarınızdan değiştirebilirsiniz.</p>
-    </article>
-
-    <article class="policy" id="cerez-ayarlari" hidden>
-      <span class="eyebrow">Politikalar</span>
-      <h1>Çerez Ayarları</h1>
-      <p class="policy-updated mono">SON GÜNCELLEME: 18 AĞUSTOS 2026</p>
-      <p class="policy-lead">Hangi çerez türlerine izin verdiğinizi buradan yönetebilirsiniz. Zorunlu çerezler sitenin çalışması için gereklidir ve kapatılamaz.</p>
-      <h2>Zorunlu çerezler</h2>
-      <p>Her zaman açık — sepet, oturum ve tercihler.</p>
-      <h2>Analitik çerezler</h2>
-      <p>İsteğe bağlı — anonim kullanım istatistikleri.</p>
-      <h2>Pazarlama çerezleri</h2>
-      <p>İsteğe bağlı — şu an kullanılmıyor.</p>
-      <h2>Tercihini değiştirmek için</h2>
-      <p>Tarayıcınızın ayarlarından çerezleri silebilir ya da engelleyebilirsiniz; bu durumda sitenin bazı özellikleri çalışmayabilir.</p>
-    </article>
+{{/unless}}
+{{/each}}
     </div>
   </section>
 </main>
 
-<footer class="site-foot">
-  <div class="site-foot-top">
-    <div class="site-foot-brand">
-      <div class="site-foot-logo-row">
-        <a class="wordmark small" href="index.html" aria-label="Bağdam ana sayfa"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></a>
-      </div>
-    </div>
-    <div class="site-foot-contact-row">
-      <a class="site-foot-contact" href="tel:+905309494093">
-        <img src="assets/icons/mutlu-musteri.png" alt="">
-        <span class="site-foot-contact-text">
-          <span class="site-foot-contact-label mono">mutlu müşteri hattı</span>
-          <span class="site-foot-contact-value">+90 (530) 949 40 93</span>
-        </span>
-      </a>
-      <a class="site-foot-contact site-foot-contact-location" href="https://www.google.com/maps/search/?api=1&query=8034%20Sokak%20No%3A38%20Ku%C5%9F%C3%A7ular%20Urla%20%C4%B0zmir" target="_blank" rel="noopener">
-        <img src="assets/icons/konum.png" alt="">
-        <span class="site-foot-contact-text">
-          <span class="site-foot-contact-label mono">bağdam</span>
-          <span class="site-foot-contact-value">8034 Sokak No:38,<span class="addr-break"> </span>Kuşçular — Urla / İzmir</span>
-        </span>
-      </a>
-    </div>
-    <div class="site-foot-social">
-      <a class="site-foot-ig-link" href="#" aria-label="Instagram">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg>
-      </a>
-      <a class="site-foot-yt-link" href="#" aria-label="YouTube">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l6 3-6 3z" fill="currentColor" stroke="none"/></svg>
-      </a>
-    </div>
-  </div>
-  <div class="site-foot-bottom">
-    <div class="site-foot-left mono">
-      <span class="site-foot-copyright">© 2026 — BAĞDAM. TÜM HAKLARI SAKLIDIR.</span>
-      <span class="site-foot-sep">|</span>
-      <a class="policies-link" href="politikalar.html">Tüm Politikalar</a>
-    </div>
-    <a class="site-foot-credit" href="https://youmedya.com/iletisim/" target="_blank" rel="noopener">
-      <span class="mono">designed and powered by</span>
-      <span class="site-foot-credit-logo" role="img" aria-label="You Medya"></span>
-    </a>
-  </div>
-</footer>
+{{> site_footer}}
 
 {{> bootstrap}}
 <script>

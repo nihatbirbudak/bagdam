@@ -43,143 +43,95 @@
 
   <!-- MANIFESTO HERO -->
   <section class="manifesto">
-    <span class="eyebrow">Bağdam Nasıl Çalışır</span>
-    <h1 class="manifesto-title">biz market değiliz.<br><em>seçiciyiz.</em></h1>
-    <p class="manifesto-sub">Sana meyveyi, sebzeyi satmıyoruz — seçimi satıyoruz. Sen dokunamıyorsun, koklayamıyorsun, elleyemiyorsun. O yüzden biz dokunuyoruz, kokluyoruz, elliyoruz — senin adına.</p>
-    <p class="manifesto-rule mono">İYİ DEĞİLSE BAĞDAM'DA YOK.</p>
+    <span class="eyebrow">{{{site.manifesto.hero.eyebrow}}}</span>
+    <h1 class="manifesto-title">{{{site.manifesto.hero.title}}}</h1>
+    <p class="manifesto-sub">{{{site.manifesto.hero.sub}}}</p>
+    <p class="manifesto-rule mono">{{{site.manifesto.hero.rule}}}</p>
   </section>
 
   <!-- COMPARISON -->
   <section class="compare">
-    <h2>fark <em>ne?</em></h2>
+    <h2>{{{site.manifesto.compare.title}}}</h2>
     <div class="compare-grid">
       <div class="compare-col">
-        <h3>hızlı teslimat uygulamaları</h3>
+        <h3>{{{site.manifesto.compare.col1Title}}}</h3>
         <ul>
-          <li><span class="compare-label mono">Teslimat</span>10–20 dakikada kapında</li>
-          <li><span class="compare-label mono">Ürün seçimi</span>Depodan ne çıkarsa</li>
-          <li><span class="compare-label mono">Kalite kontrolü</span>Şansa bağlı</li>
-          <li><span class="compare-label mono">Kişiselleştirme</span>Yok</li>
+{{#each site.manifesto.compare.col1Items}}
+          <li><span class="compare-label mono">{{{label}}}</span>{{{text}}}</li>
+{{/each}}
         </ul>
       </div>
       <div class="compare-col">
-        <h3>üretici ağı servisleri</h3>
+        <h3>{{{site.manifesto.compare.col2Title}}}</h3>
         <ul>
-          <li><span class="compare-label mono">Teslimat</span>Doğrudan üreticiden</li>
-          <li><span class="compare-label mono">Ürün seçimi</span>Ne gelirse</li>
-          <li><span class="compare-label mono">Kalite kontrolü</span>Kaynak dürüst, kürasyon yok</li>
-          <li><span class="compare-label mono">Kişiselleştirme</span>Yok — eski usul manav gibi</li>
+{{#each site.manifesto.compare.col2Items}}
+          <li><span class="compare-label mono">{{{label}}}</span>{{{text}}}</li>
+{{/each}}
         </ul>
       </div>
       <div class="compare-col compare-col-active">
-        <h3>bağdam</h3>
+        <h3>{{{site.manifesto.compare.col3Title}}}</h3>
         <ul>
-          <li><span class="compare-label mono">Teslimat</span>Urla ve Çeşme'ye, aynı gün toplanan</li>
-          <li><span class="compare-label mono">Ürün seçimi</span>Tattığımız, elediğimiz partiler</li>
-          <li><span class="compare-label mono">Kalite kontrolü</span>Yeterince iyi olmayan hiç satışa girmez</li>
-          <li><span class="compare-label mono">Kişiselleştirme</span>"Nasıl seversin?" sorusu, ona göre seçeriz</li>
+{{#each site.manifesto.compare.col3Items}}
+          <li><span class="compare-label mono">{{{label}}}</span>{{{text}}}</li>
+{{/each}}
         </ul>
       </div>
     </div>
-    <p class="swipe-hint mono" aria-hidden="true">kaydır <span class="swipe-arrow">→</span></p>
+    <p class="swipe-hint mono" aria-hidden="true">{{{site.manifesto.compare.swipeHint}}} <span class="swipe-arrow">→</span></p>
   </section>
 
-  <!-- RIPENESS DEMO -->
+{{!-- SİSTEM ADIMLARI: metinler site.manifesto.steps.items; görsel kartlar sabit — 1. adım olgunluk kartı (RIPENESS DEMO), diğerleri küratör kartı (VISIBLE CURATOR) --}}
+{{#each site.manifesto.steps.items}}
+{{#if @first}}  <!-- RIPENESS DEMO -->{{else}}  <!-- VISIBLE CURATOR -->{{/if}}
   <section class="demo-split">
     <div class="demo-text">
-      <span class="eyebrow">Sistem — 01</span>
-      <h2>nasıl <em>seversin?</em></h2>
-      <p>Manavda "abi bana iki güne yenecek kavun ver" dersin, o da sana göre seçer. Biz bunu online'da soruyoruz — her siparişte.</p>
+      <span class="eyebrow">{{{eyebrow}}}</span>
+      <h2>{{{title}}}</h2>
+      <p>{{{text}}}</p>
     </div>
     <div class="demo-visual">
+{{#if @first}}
       <div class="demo-card">
-        <p class="demo-label">Gülbahçe Kavunu — nasıl seversin?</p>
+        <p class="demo-label">{{{@root.site.manifesto.demo.ripenessLabel}}}</p>
         <div class="toggle-row">
-          <div class="toggle">Diri</div>
-          <div class="toggle active">Tam olgun</div>
+          <div class="toggle">{{{@root.site.manifesto.demo.ripenessOption1}}}</div>
+          <div class="toggle active">{{{@root.site.manifesto.demo.ripenessOption2}}}</div>
         </div>
-        <p class="demo-note mono">YEME ZAMANI: BUGÜN–YARIN</p>
+        <p class="demo-note mono">{{{@root.site.manifesto.demo.ripenessNote}}}</p>
       </div>
-    </div>
-  </section>
-
-  <!-- VISIBLE CURATOR -->
-  <section class="demo-split">
-    <div class="demo-text">
-      <span class="eyebrow">Sistem — 02</span>
-      <h2>seçen kişi <em>görünür</em></h2>
-      <p>Kutunu bir algoritma değil, bir insan hazırlıyor. İçindeki kartta kim olduğunu görürsün.</p>
-    </div>
-    <div class="demo-visual">
+{{else}}
       <div class="demo-card curator-card">
-        <div class="avatar mono">E</div>
+        <div class="avatar mono">{{{@root.site.manifesto.demo.curatorInitial}}}</div>
         <div>
-          <p class="demo-label" style="margin:0;">Bu kutuyu hazırlayan</p>
-          <p class="curator-name">Ece — Bağdam</p>
+          <p class="demo-label" style="margin:0;">{{{@root.site.manifesto.demo.curatorLabel}}}</p>
+          <p class="curator-name">{{{@root.site.manifesto.demo.curatorName}}}</p>
         </div>
       </div>
+{{/if}}
     </div>
   </section>
+{{#unless @last}}
+
+{{/unless}}
+{{/each}}
 
   <!-- GUARANTEE -->
   <section class="guarantee">
     <img class="guarantee-seal" src="assets/logo/logo-icon.svg" alt="">
-    <h2>seçimin riski <em>bizde.</em></h2>
-    <p>Bağdam Seçimi olarak gönderdiğimiz bir ürün beklentini karşılamadıysa bize söyle. Ücretini iade eder ya da sonraki siparişine ekleriz. Basit form, fotoğraf, telefonla uğraşma yok.</p>
+    <h2>{{{site.manifesto.guarantee.title}}}</h2>
+    <p>{{{site.manifesto.guarantee.text}}}</p>
   </section>
 
   <!-- CLOSE -->
   <section class="manifesto-close">
-    <h2>bu hafta <em>iyi olanı</em> gördün mü?</h2>
-    <a class="btn" href="urunler.html">abone ol</a>
+    <h2>{{{site.manifesto.close.title}}}</h2>
+    <a class="btn" href="{{{site.manifesto.close.ctaHref}}}">{{{site.manifesto.close.ctaText}}}</a>
   </section>
 
 </main>
 
-<footer class="site-foot">
-  <div class="site-foot-top">
-    <div class="site-foot-brand">
-      <div class="site-foot-logo-row">
-        <a class="wordmark small" href="index.html" aria-label="Bağdam ana sayfa"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></a>
-      </div>
-    </div>
-    <div class="site-foot-contact-row">
-      <a class="site-foot-contact" href="tel:+905309494093">
-        <img src="assets/icons/mutlu-musteri.png" alt="">
-        <span class="site-foot-contact-text">
-          <span class="site-foot-contact-label mono">mutlu müşteri hattı</span>
-          <span class="site-foot-contact-value">+90 (530) 949 40 93</span>
-        </span>
-      </a>
-      <a class="site-foot-contact site-foot-contact-location" href="https://www.google.com/maps/search/?api=1&query=8034%20Sokak%20No%3A38%20Ku%C5%9F%C3%A7ular%20Urla%20%C4%B0zmir" target="_blank" rel="noopener">
-        <img src="assets/icons/konum.png" alt="">
-        <span class="site-foot-contact-text">
-          <span class="site-foot-contact-label mono">bağdam</span>
-          <span class="site-foot-contact-value">8034 Sokak No:38,<span class="addr-break"> </span>Kuşçular — Urla / İzmir</span>
-        </span>
-      </a>
-    </div>
-    <div class="site-foot-social">
-      <a class="site-foot-ig-link" href="#" aria-label="Instagram">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg>
-      </a>
-      <a class="site-foot-yt-link" href="#" aria-label="YouTube">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l6 3-6 3z" fill="currentColor" stroke="none"/></svg>
-      </a>
-    </div>
-  </div>
-  <div class="site-foot-bottom">
-    <div class="site-foot-left mono">
-      <span class="site-foot-copyright">© 2026 — BAĞDAM. TÜM HAKLARI SAKLIDIR.</span>
-      <span class="site-foot-sep">|</span>
-      <a class="policies-link" href="politikalar.html">Tüm Politikalar</a>
-    </div>
-    <a class="site-foot-credit" href="https://youmedya.com/iletisim/" target="_blank" rel="noopener">
-      <span class="mono">designed and powered by</span>
-      <span class="site-foot-credit-logo" role="img" aria-label="You Medya"></span>
-    </a>
-  </div>
-</footer>
+{{> site_footer}}
 
 {{> bootstrap}}
 </body>

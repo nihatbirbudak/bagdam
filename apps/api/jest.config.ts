@@ -12,6 +12,9 @@ const config: Config = {
   collectCoverageFrom: ['**/*.ts'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
+  // Suite'ler gerçek bagdam_dev DB'sini paylaşır; paralel worker'lar ortak satırlarda
+  // (tier isRecommended, settings cache, audit) yarış yaratıp nadir flake üretiyordu → seri koş.
+  maxWorkers: 1,
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },

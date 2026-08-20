@@ -23,5 +23,13 @@ const ESCAPES: Record<string, string> = {
  * çıktıya hiç yazılmaz — products.js şekliyle alan-alan parite [B6].
  */
 export function toBootstrapJson(payload: BootstrapPayload): string {
-  return JSON.stringify(payload).replace(UNSAFE_IN_SCRIPT, (ch) => ESCAPES[ch] ?? ch);
+  return toScriptJson(payload);
+}
+
+/**
+ * Herhangi bir değeri `<script>` içine ham gömülebilecek JSON metnine çevirir (aynı kaçış kuralı).
+ * F5: toptan.hbs form metinleri (`{{{toptanTextsJson}}}`) gibi küçük JSON parçaları için.
+ */
+export function toScriptJson(value: unknown): string {
+  return JSON.stringify(value).replace(UNSAFE_IN_SCRIPT, (ch) => ESCAPES[ch] ?? ch);
 }

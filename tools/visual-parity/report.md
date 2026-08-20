@@ -1,7 +1,7 @@
 # Görsel parite raporu — F3 (eski statik site vs Nest render)
 
-- Tarih: 2026-08-20T14:15:46.981Z · Sabit sayfa saati (Date.now): 2026-08-20T14:15:46.896Z
-- Eski: `http://127.0.0.1:8080` · Yeni: `http://127.0.0.1:4010`
+- Tarih: 2026-08-20T17:03:46.935Z · Sabit sayfa saati (Date.now): 2026-08-20T17:03:46.850Z
+- Eski: `http://127.0.0.1:8080` · Yeni: `http://127.0.0.1:4043`
 - Araç: Playwright Chromium (headless, DSF 1, reducedMotion: reduce, animasyon/geçiş CSS ile kapalı, `document.fonts.ready` + networkidle + sona kadar kaydırma) · pixelmatch threshold 0.1, includeAA false
 - Kabul: fark piksel oranı ≤ %0.1 (tam sayfa; boyut farkında küçük görüntü beyaz zeminle büyütülür)
 - Çıktılar: `tools/visual-parity/out/<sayfa>--<viewport>--{old,new,diff}.png` (gitignore)

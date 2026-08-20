@@ -20,6 +20,20 @@ const F4_LIVE_PATHS = [
   '/medya',
 ];
 
+/** F5'te gerçek sayfaya bağlanan ekranlar (BACKEND-PLANI §4, 9–15 / 14a). */
+const F5_LIVE_PATHS = [
+  '/icerik/site',
+  '/icerik/promo-footer',
+  '/icerik/gunluk',
+  '/icerik/yasal-metinler',
+  '/toptan-talepleri',
+  '/ayarlar',
+  '/ayarlar/bolgeler',
+  '/ayarlar/e-posta',
+  '/ayarlar/odeme',
+  '/ayarlar/seo',
+];
+
 describe('adminNavConfig (Bağdam menüsü)', () => {
   it('tüm yollar benzersiz ve / ile başlar', () => {
     const leaves = getAllNavLeaves();
@@ -34,25 +48,30 @@ describe('adminNavConfig (Bağdam menüsü)', () => {
     }
   });
 
-  it('F4 ekranları (2–8) gerçek sayfaya bağlı: comingSoon=false; diğerleri yer tutucu', () => {
+  it('F4 (2–8) ve F5 (9–15) ekranları gerçek sayfaya bağlı: comingSoon=false; diğerleri yer tutucu', () => {
     for (const leaf of getAllNavLeaves()) {
       if (F4_LIVE_PATHS.includes(leaf.to)) {
         expect(leaf.phase, leaf.to).toBe('F4');
+        expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(false);
+      } else if (F5_LIVE_PATHS.includes(leaf.to)) {
+        expect(leaf.phase, leaf.to).toBe('F5');
         expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(false);
       } else {
         expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(true);
       }
     }
-    // F4 fazındaki tüm leaf'ler bağlı olmalı (F4'te eksik ekran kalmasın)
+    // F4/F5 fazındaki tüm leaf'ler bağlı olmalı (eksik ekran kalmasın)
     const f4 = getAllNavLeaves().filter((l) => l.phase === 'F4');
     expect(f4.map((l) => l.to).sort()).toEqual([...F4_LIVE_PATHS].sort());
+    const f5 = getAllNavLeaves().filter((l) => l.phase === 'F5');
+    expect(f5.map((l) => l.to).sort()).toEqual([...F5_LIVE_PATHS].sort());
   });
 
   it('BACKEND-PLANI §4 ekranları menüde', () => {
     const labels = getAllNavLeaves().map((l) => l.label);
     for (const expected of [
       'Özet', 'Ürünler', 'Kategoriler', 'Üreticiler', 'Kutular', 'Haftanın Kutusu', 'Medya',
-      'Site İçerikleri', 'Günlük', 'Yasal Metinler', 'Toptan Talepleri', 'Müşteriler', 'Siparişler',
+      'Site İçerikleri', 'Promo / Footer / İletişim', 'Günlük', 'Yasal Metinler', 'Toptan Talepleri', 'Müşteriler', 'Siparişler',
       'Abonelikler', 'Teslimat Günü', 'Ödeme Problemleri', 'Bölgeler', 'Teslimat Tarihleri',
       'E-posta', 'Ödeme', 'SEO', 'Genel', 'Sistem Durumu',
     ]) {

@@ -1,0 +1,47 @@
+{{!-- Alt bilgi — 10 sayfada ortak (website/*.html <footer class="site-foot"> birebir). Bağlam: site.footer (SiteContent "footer",
+     modules/content/site-content.registry.ts). Metinler WebController'da kaçışlanmış gelir, {{{ }}} ile basılır (bkz. featured-product.hbs notu).
+     Sosyal bağlantılar boşsa ikon yine basılır (tasarım; F9'da gizleme kararı). --}}
+<footer class="site-foot">
+  <div class="site-foot-top">
+    <div class="site-foot-brand">
+      <div class="site-foot-logo-row">
+        <a class="wordmark small" href="index.html" aria-label="Bağdam ana sayfa"><img src="assets/logo/logo-vertical.svg" alt="Bağdam"></a>
+      </div>
+    </div>
+    <div class="site-foot-contact-row">
+      <a class="site-foot-contact" href="{{{site.footer.phoneHref}}}">
+        <img src="assets/icons/mutlu-musteri.png" alt="">
+        <span class="site-foot-contact-text">
+          <span class="site-foot-contact-label mono">{{{site.footer.phoneLabel}}}</span>
+          <span class="site-foot-contact-value">{{{site.footer.phone}}}</span>
+        </span>
+      </a>
+      <a class="site-foot-contact site-foot-contact-location" href="{{{site.footer.mapsUrl}}}" target="_blank" rel="noopener">
+        <img src="assets/icons/konum.png" alt="">
+        <span class="site-foot-contact-text">
+          <span class="site-foot-contact-label mono">{{{site.footer.addressLabel}}}</span>
+          <span class="site-foot-contact-value">{{{site.footer.addressLine1}}}<span class="addr-break"> </span>{{{site.footer.addressLine2}}}</span>
+        </span>
+      </a>
+    </div>
+    <div class="site-foot-social">
+      <a class="site-foot-ig-link" href="{{{site.footer.instagramUrl}}}" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg>
+      </a>
+      <a class="site-foot-yt-link" href="{{{site.footer.youtubeUrl}}}" aria-label="YouTube">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l6 3-6 3z" fill="currentColor" stroke="none"/></svg>
+      </a>
+    </div>
+  </div>
+  <div class="site-foot-bottom">
+    <div class="site-foot-left mono">
+      <span class="site-foot-copyright">{{{site.footer.copyright}}}</span>
+      <span class="site-foot-sep">|</span>
+      <a class="policies-link" href="politikalar.html">{{{site.footer.policiesLabel}}}</a>
+    </div>
+    <a class="site-foot-credit" href="{{{site.footer.creditUrl}}}" target="_blank" rel="noopener">
+      <span class="mono">{{{site.footer.creditText}}}</span>
+      <span class="site-foot-credit-logo" role="img" aria-label="You Medya"></span>
+    </a>
+  </div>
+</footer>

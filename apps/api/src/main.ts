@@ -20,6 +20,7 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { APP_VERSION, PARTIALS_DIR, PUBLIC_DIR, VIEWS_DIR, getSiteMode, validateEnv } from './config';
+import { SITEMAP_ROUTES_EXCLUDED_FROM_PREFIX } from './modules/content/sitemap.controller';
 import { resolveUploadsDir } from './modules/media/media.constants';
 import { WEB_ROUTES_EXCLUDED_FROM_PREFIX } from './web/web.routes';
 
@@ -125,8 +126,8 @@ async function bootstrap(): Promise<void> {
   if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
   app.useStaticAssets(uploadsDir, { prefix: '/uploads/', maxAge: '30d', index: false, dotfiles: 'ignore' });
 
-  // Global prefix: REST uçları /api/v1 altında; WebController rotaları (HTML) prefix dışında.
-  app.setGlobalPrefix('api/v1', { exclude: WEB_ROUTES_EXCLUDED_FROM_PREFIX });
+  // Global prefix: REST uçları /api/v1 altında; WebController rotaları (HTML) ve sitemap.xml/robots.txt (F5) prefix dışında.
+  app.setGlobalPrefix('api/v1', { exclude: [...WEB_ROUTES_EXCLUDED_FROM_PREFIX, ...SITEMAP_ROUTES_EXCLUDED_FROM_PREFIX] });
 
   // CORS — credentials: cookie tabanlı oturum (ADR-0009)
   app.enableCors({

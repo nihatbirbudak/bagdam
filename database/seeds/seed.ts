@@ -10,18 +10,22 @@
 //     tek kaynak); admin'in eklediği BAŞKA satırlar dokunulmaz. id'ler korunur.
 //   - DeliveryZone: yoksa oluşturulur; varsa yalnız name/sortOrder eşitlenir (fee/freeThreshold/capacity admin'in).
 //   - DeliveryDate: (zone, date) yoksa oluşturulur; varsa yalnız day/cutoffAt tazelenir (reserved/capacity/status korunur).
-//   - Setting / SiteContent: yalnız yoksa oluşturulur (panelden yapılan değişiklikler ezilmez);
+//   - Setting: yalnız yoksa oluşturulur (panelden yapılan değişiklikler ezilmez);
 //     SEED_OVERWRITE_SETTINGS=true ile seed değerlerine zorla çekilir (yalnız lokal/CI için).
+//   - İçerik (F5 — content/*.json): SiteContent (key), LegalDocument (slug+version=1), Post (slug) yalnız yoksa
+//     oluşturulur; SEED_OVERWRITE_CONTENT=true ile seed değerlerine zorla çekilir. SiteContent şema/etiket
+//     apps/api/src/modules/content/site-content.registry.ts'ten (tek kaynak); F3'ün eski biçimli 3 satırı
+//     (alan adı `key`/`html`) otomatik yeni biçime çekilir.
 //   - Admin User: yoksa oluşturulur; varsa rol/aktiflik/doğrulama eşitlenir, parola env'dekine göre gerekiyorsa güncellenir.
 //
-// Gizli anahtar (mail.smtp, sms.netgsm, iyzico anahtarları) SEED'E KONMAZ [B33]; LegalDocument/Post/diğer
-// SiteContent blokları F5 içerik seed'inde; görsellerin tamamı (58) F4 media:import'ta.
+// Gizli anahtar (mail.smtp, sms.netgsm, iyzico anahtarları) SEED'E KONMAZ [B33]; görsellerin tamamı (58) F4 media:import'ta.
 import './lib/load-env';
 
 import {
   ContentStatus,
   DeliveryDateStatus,
   DeliveryDay,
+  LegalKind,
   Prisma,
   PrismaClient,
   ProductStatus,
@@ -29,8 +33,9 @@ import {
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
-import { relative } from 'path';
+import { relative, resolve } from 'path';
 import {
   COMMERCE_SETTINGS_DEFAULTS,
   DEFAULT_TZ,
@@ -41,10 +46,11 @@ import {
   nextDeliveryDates,
   weekdayOf,
 } from '../../packages/shared/src/index';
+import { SITE_CONTENT_REGISTRY } from '../../apps/api/src/modules/content/site-content.registry';
 import { assertDatabaseUrl } from './lib/load-env';
 import { imageFileInfo } from './lib/media';
-import { CATALOG_JSON, PRODUCERS_JSON, REPO_ROOT } from './lib/paths';
-import type { CatalogJson, CatalogProduct, ProducerJson } from './lib/types';
+import { CATALOG_JSON, CONTENT_DIR, PRODUCERS_JSON, REPO_ROOT } from './lib/paths';
+import type { CatalogJson, CatalogProduct, ContentSeedFiles, LegalSeedDoc, PostSeedDoc, ProducerJson } from './lib/types';
 
 const prisma = new PrismaClient();
 
@@ -64,8 +70,10 @@ const ZONES = [
 const ALL_DELIVERY_DAYS = Object.values(SharedDeliveryDay);
 /** bcrypt maliyeti (apps/api AuthModule ile aynı). */
 const BCRYPT_ROUNDS = 12;
-/** true → Setting/SiteContent satırları seed değerine zorla çekilir (panel değişiklikleri ezilir; yalnız lokal/CI). */
+/** true → Setting satırları seed değerine zorla çekilir (panel değişiklikleri ezilir; yalnız lokal/CI). */
 const OVERWRITE_SETTINGS = process.env.SEED_OVERWRITE_SETTINGS === 'true';
+/** true → SiteContent / LegalDocument v1 / Post satırları seed değerine zorla çekilir (admin içerik değişiklikleri ezilir; yalnız lokal/CI). */
+const OVERWRITE_CONTENT = process.env.SEED_OVERWRITE_CONTENT === 'true';
 
 /** Sayfa başlıkları — apps/api/views/*.hbs <title> (Setting seo.<sayfa> = {title}). */
 const SEO_TITLES: Record<string, string> = {
@@ -419,113 +427,174 @@ async function seedSettings(): Promise<{ created: number; kept: number }> {
   return { created, kept };
 }
 
-/**
- * SiteContent — F5 içerik seed'i tüm blokları (home.*, urunler.trust, kutu.notes, manifesto.*, toptan.*, gunluk.*, sepet/uyelik F9)
- * şemalarıyla dolduracak. Burada yalnız gerçek metinli 3 örnek anahtar (index.html / urunler.html'den):
- * promoBar, footer, urunler.trust. Şema biçimi: @bagdam/shared SiteContentSchema ({fields:[{key,label,type,…}]}).
- */
-async function seedSiteContent(): Promise<{ created: number; kept: number }> {
-  const blocks: Array<{ key: string; label: string; schema: Prisma.InputJsonValue; value: Prisma.InputJsonValue }> = [
-    {
-      key: 'promoBar',
-      label: 'Promosyon şeridi (üst bant)',
-      schema: {
-        fields: [
-          { key: 'enabled', label: 'Göster', type: 'boolean' },
-          { key: 'html', label: 'Metin (HTML)', type: 'html', required: true, help: 'index.html:101 — <b> ve <span class="mono"> serbest' },
-        ],
-      },
-      value: {
-        enabled: true,
-        html: 'Abone ol, ilk <b>2 kutunda %50 indirim</b> kazan — kod: <span class="mono">BAGDAM050</span>',
-      },
-    },
-    {
-      key: 'footer',
-      label: 'Alt bilgi (footer)',
-      schema: {
-        fields: [
-          { key: 'phoneLabel', label: 'Telefon etiketi', type: 'text' },
-          { key: 'phone', label: 'Telefon (görünen)', type: 'text' },
-          { key: 'phoneHref', label: 'Telefon bağlantısı (tel:)', type: 'text' },
-          { key: 'addressLabel', label: 'Adres etiketi', type: 'text' },
-          { key: 'addressLine1', label: 'Adres 1. satır', type: 'text' },
-          { key: 'addressLine2', label: 'Adres 2. satır', type: 'text' },
-          { key: 'mapsUrl', label: 'Harita bağlantısı', type: 'text' },
-          { key: 'instagramUrl', label: 'Instagram', type: 'text' },
-          { key: 'youtubeUrl', label: 'YouTube', type: 'text' },
-          { key: 'copyright', label: 'Telif satırı', type: 'text' },
-          { key: 'policiesLabel', label: 'Politikalar bağlantı metni', type: 'text' },
-          { key: 'creditText', label: 'İmza metni', type: 'text' },
-          { key: 'creditUrl', label: 'İmza bağlantısı', type: 'text' },
-        ],
-      },
-      value: {
-        phoneLabel: 'mutlu müşteri hattı',
-        phone: '+90 (530) 949 40 93',
-        phoneHref: 'tel:+905309494093',
-        addressLabel: 'bağdam',
-        addressLine1: '8034 Sokak No:38,',
-        addressLine2: 'Kuşçular — Urla / İzmir',
-        mapsUrl:
-          'https://www.google.com/maps/search/?api=1&query=8034%20Sokak%20No%3A38%20Ku%C5%9F%C3%A7ular%20Urla%20%C4%B0zmir',
-        instagramUrl: '#',
-        youtubeUrl: '#',
-        copyright: '© 2026 — BAĞDAM. TÜM HAKLARI SAKLIDIR.',
-        policiesLabel: 'Tüm Politikalar',
-        creditText: 'designed and powered by',
-        creditUrl: 'https://youmedya.com/iletisim/',
-      },
-    },
-    {
-      key: 'urunler.trust',
-      label: 'Ürünler — güven satırı (Taze Kutular paneli)',
-      schema: {
-        fields: [
-          {
-            key: 'items',
-            label: 'Öğeler',
-            type: 'list',
-            item: [
-              { key: 'icon', label: 'İkon (assets/icons/…)', type: 'text' },
-              { key: 'label', label: 'Başlık', type: 'text', required: true },
-              { key: 'sub', label: 'Alt metin', type: 'text' },
-            ],
-          },
-        ],
-      },
-      value: {
-        items: [
-          { icon: 'assets/icons/iptal.png', label: 'İstediğin zaman iptal', sub: 'Taahhüt yok, tek tıkla bitir.' },
-          { icon: 'assets/icons/duzenleme.png', label: 'Her hafta düzenle', sub: 'Teslimattan 1 gün öncesine kadar kutunu değiştir.' },
-          { icon: 'assets/icons/haftaatla.png', label: 'Sipariş atlama hakkı', sub: 'İptal etmeden bir sonraki siparişini atlayabilirsin.' },
-          { icon: 'assets/icons/teslimat.png', label: 'Salı, Perşembe, Cumartesi', sub: "Urla ve Çeşme'ye, doğrudan üreticiden teslim." },
-        ],
-      },
-    },
-  ];
+// ── F5 içerik seed'i (database/seeds/content/**) ─────────────────────────────
 
+/** content/*.json okur (yoksa açık hata — içerik seed'i katalogdan bağımsız ama zorunlu). */
+function readContentFiles(): ContentSeedFiles {
+  const siteContent = readJson<{ values: Record<string, Prisma.InputJsonObject> }>(resolve(CONTENT_DIR, 'site-content.json'));
+  const legal = readJson<{ documents: LegalSeedDoc[] }>(resolve(CONTENT_DIR, 'legal.json'));
+  const posts = readJson<{ posts: PostSeedDoc[] }>(resolve(CONTENT_DIR, 'posts.json'));
+  return { siteContent: siteContent.values, legal: legal.documents, posts: posts.posts };
+}
+
+/** content/legal|posts/<slug>.html — LF'ye normalize, sondaki satır sonu atılır (şablon kendi satır sonunu basar). */
+function readBodyHtml(file: string): string {
+  const abs = resolve(CONTENT_DIR, file);
+  if (!existsSync(abs)) throw new Error(`${rel(abs)} yok`);
+  return readFileSync(abs, 'utf8').replace(/\r\n/g, '\n').replace(/\n+$/, '');
+}
+
+/** F3 seed'inin eski şema biçimi (`fields[].key`, tip `html`/`item`) — registry biçimine otomatik çekilir. */
+function isLegacySiteContentSchema(schema: Prisma.JsonValue): boolean {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return true;
+  const fields = (schema as { fields?: unknown }).fields;
+  if (!Array.isArray(fields) || fields.length === 0) return true;
+  return fields.some((f) => typeof f === 'object' && f !== null && !('name' in (f as object)));
+}
+
+/**
+ * SiteContent — değerler content/site-content.json (website/*.html metinleri birebir), şema + etiket registry'den
+ * (apps/api modules/content/site-content.registry.ts; A/C/D sözleşmesi: anlaşmazlıkta registry kaynak).
+ * Yalnız yoksa (ya da eski F3 biçimindeyse) yazılır; SEED_OVERWRITE_CONTENT=true ile ezilir. Registry'de olmayan
+ * anahtar seed'lenmez (uyarı); registry'de olup değeri olmayan anahtar atlanır (admin panelden doldurur).
+ */
+async function seedSiteContent(values: Record<string, Prisma.InputJsonObject>): Promise<{ created: number; kept: number; overwritten: number }> {
+  const registryByKey = new Map(SITE_CONTENT_REGISTRY.map((e) => [e.key, e] as const));
+  for (const key of Object.keys(values)) {
+    if (!registryByKey.has(key)) console.warn(`  UYARI: site-content.json anahtarı registry'de yok, atlandı: ${key}`);
+  }
   let created = 0;
   let kept = 0;
   let overwritten = 0;
-  for (const b of blocks) {
-    const existing = await prisma.siteContent.findUnique({ where: { key: b.key } });
-    if (existing && !OVERWRITE_SETTINGS) {
+  let migrated = 0;
+  for (const entry of SITE_CONTENT_REGISTRY) {
+    const value = values[entry.key];
+    if (!value) {
+      console.warn(`  UYARI: registry anahtarı için seed değeri yok (admin dolduracak): ${entry.key}`);
+      continue;
+    }
+    const schema = entry.schema as unknown as Prisma.InputJsonObject;
+    const existing = await prisma.siteContent.findUnique({ where: { key: entry.key } });
+    const legacy = existing ? isLegacySiteContentSchema(existing.schema) : false;
+    if (existing && !OVERWRITE_CONTENT && !legacy) {
+      // Şema/etiket registry'nin kopyasıdır: değer korunur, şema tazelenir (yeni alan eklendiğinde form güncel kalsın)
+      await prisma.siteContent.update({ where: { key: entry.key }, data: { label: entry.label, schema } });
       kept++;
       continue;
     }
     await prisma.siteContent.upsert({
-      where: { key: b.key },
-      create: { key: b.key, label: b.label, schema: b.schema, value: b.value, updatedBy: null },
-      update: { label: b.label, schema: b.schema, value: b.value, updatedBy: null },
+      where: { key: entry.key },
+      create: { key: entry.key, label: entry.label, schema, value, updatedBy: null },
+      update: { label: entry.label, schema, value, updatedBy: null },
     });
-    if (existing) overwritten++;
-    else created++;
+    if (!existing) created++;
+    else if (legacy) migrated++;
+    else overwritten++;
   }
   console.log(
-    `  SiteContent: ${created} oluşturuldu, ${kept} korundu, ${overwritten} ezildi (${blocks.map((b) => b.key).join(', ')}; kalanı F5)`,
+    `  SiteContent: ${created} oluşturuldu, ${kept} korundu (şema tazelendi), ${migrated} eski biçimden çekildi, ${overwritten} ezildi (registry ${SITE_CONTENT_REGISTRY.length} anahtar)`,
   );
-  return { created, kept };
+  return { created, kept, overwritten };
+}
+
+/**
+ * LegalDocument v1 — content/legal.json + legal/<slug>.html: 8 politika (showInNav, politikalar.html birebir) + 3 nav'sız taslak
+ * (PREINFO / SUBSCRIPTION_CONTRACT / MARKETING_CONSENT; hash/link ile, [B16]). (slug, version=1) yoksa oluşturulur; varsa
+ * yalnız SEED_OVERWRITE_CONTENT ile ezilir (admin yeni sürümleri v2+ olarak açar, seed onlara dokunmaz). contentHash = sha256(bodyHtml).
+ */
+async function seedLegal(docs: LegalSeedDoc[]): Promise<{ created: number; kept: number; overwritten: number }> {
+  let created = 0;
+  let kept = 0;
+  let overwritten = 0;
+  for (const d of docs) {
+    const kind = LegalKind[d.kind as keyof typeof LegalKind];
+    if (!kind) throw new Error(`legal.json: bilinmeyen kind ${d.kind} (${d.slug})`);
+    const bodyHtml = readBodyHtml(d.bodyFile);
+    const contentHash = createHash('sha256').update(bodyHtml, 'utf8').digest('hex');
+    const fields = {
+      kind,
+      title: d.title,
+      leadHtml: d.leadHtml ?? null,
+      bodyHtml,
+      contentHash,
+      effectiveFrom: new Date(d.effectiveFrom),
+      isCurrent: d.isCurrent ?? true,
+      requiresAck: d.requiresAck ?? false,
+      showInNav: d.showInNav ?? false,
+      sortOrder: d.sortOrder ?? 0,
+    };
+    const existing = await prisma.legalDocument.findUnique({ where: { slug_version: { slug: d.slug, version: 1 } } });
+    if (existing && !OVERWRITE_CONTENT) {
+      kept++;
+      continue;
+    }
+    if (existing) {
+      await prisma.legalDocument.update({ where: { id: existing.id }, data: fields });
+      overwritten++;
+    } else {
+      // v1 current olacaksa aynı slug'ın başka current'ı olmamalı (admin sürümleri korunur, yalnız bayrak düşer)
+      if (fields.isCurrent) {
+        await prisma.legalDocument.updateMany({ where: { slug: d.slug, isCurrent: true }, data: { isCurrent: false } });
+      }
+      await prisma.legalDocument.create({ data: { slug: d.slug, version: 1, ...fields } });
+      created++;
+    }
+  }
+  const nav = docs.filter((d) => d.showInNav).length;
+  console.log(`  LegalDocument: ${created} oluşturuldu, ${kept} korundu, ${overwritten} ezildi (v1 × ${docs.length}; nav ${nav}, hash ${docs.length - nav})`);
+  return { created, kept, overwritten };
+}
+
+/**
+ * Post — content/posts.json + posts/<slug>.html: gunluk.html'deki yazılar birebir (slug = #anchor id). Kapak görseli
+ * MediaFile.path ile eşlenir (alt, gunluk.html'deki img alt'ına eşitlenir — byte paritesi). slug yoksa oluşturulur;
+ * varsa yalnız SEED_OVERWRITE_CONTENT ile ezilir.
+ */
+async function seedPosts(posts: PostSeedDoc[]): Promise<{ created: number; kept: number; overwritten: number }> {
+  let created = 0;
+  let kept = 0;
+  let overwritten = 0;
+  for (const p of posts) {
+    const existing = await prisma.post.findUnique({ where: { slug: p.slug } });
+    if (existing && !OVERWRITE_CONTENT) {
+      kept++;
+      continue;
+    }
+    let coverMediaId: string | null = null;
+    if (p.coverPath) {
+      const media = await prisma.mediaFile.findFirst({ where: { path: p.coverPath }, orderBy: { createdAt: 'asc' } });
+      if (!media) {
+        console.warn(`  UYARI: ${p.slug} kapak görseli MediaFile'da yok (${p.coverPath}) — kapaksız`);
+      } else {
+        coverMediaId = media.id;
+        if (p.coverAlt && media.alt !== p.coverAlt) {
+          await prisma.mediaFile.update({ where: { id: media.id }, data: { alt: p.coverAlt } });
+        }
+      }
+    }
+    const status = p.status === 'DRAFT' ? ContentStatus.DRAFT : ContentStatus.PUBLISHED;
+    const fields = {
+      kind: p.kind,
+      readMinutes: p.readMinutes,
+      titleHtml: p.titleHtml,
+      excerpt: p.excerpt ?? null,
+      bodyHtml: readBodyHtml(p.bodyFile),
+      coverMediaId,
+      relatedSlugs: p.relatedSlugs ?? [],
+      status,
+      publishedAt: status === ContentStatus.PUBLISHED ? new Date(p.publishedAt) : null,
+      sortOrder: p.sortOrder ?? 0,
+    };
+    if (existing) {
+      await prisma.post.update({ where: { id: existing.id }, data: fields });
+      overwritten++;
+    } else {
+      await prisma.post.create({ data: { slug: p.slug, ...fields } });
+      created++;
+    }
+  }
+  console.log(`  Post: ${created} oluşturuldu, ${kept} korundu, ${overwritten} ezildi (${posts.map((p) => p.slug).join(', ')})`);
+  return { created, kept, overwritten };
 }
 
 /** Admin kullanıcı — SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD env'den; yoksa uyarı ve atla. */
@@ -579,6 +648,9 @@ async function printSummary(): Promise<void> {
     deliveryDates,
     settings,
     siteContent,
+    legalDocuments,
+    legalNav,
+    posts,
     users,
   ] = await Promise.all([
     prisma.category.count(),
@@ -594,6 +666,9 @@ async function printSummary(): Promise<void> {
     prisma.deliveryDate.count(),
     prisma.setting.count(),
     prisma.siteContent.count(),
+    prisma.legalDocument.count(),
+    prisma.legalDocument.count({ where: { isCurrent: true, showInNav: true } }),
+    prisma.post.count(),
     prisma.user.count(),
   ]);
   console.log('Özet (DB sayımları):');
@@ -601,7 +676,8 @@ async function printSummary(): Promise<void> {
     `  categories=${categories} producers=${producers} products=${products} product_images=${productImages} product_lots=${productLots} media_files=${mediaFiles}`,
   );
   console.log(`  box_tiers=${boxTiers} box_templates=${boxTemplates} box_template_items=${boxTemplateItems}`);
-  console.log(`  delivery_zones=${deliveryZones} delivery_dates=${deliveryDates} settings=${settings} site_content=${siteContent} users=${users}`);
+  console.log(`  delivery_zones=${deliveryZones} delivery_dates=${deliveryDates} settings=${settings} users=${users}`);
+  console.log(`  site_content=${siteContent} legal_documents=${legalDocuments} (nav ${legalNav}) posts=${posts}`);
 }
 
 // ── Giriş ────────────────────────────────────────────────────────────────────
@@ -637,7 +713,11 @@ async function main(): Promise<void> {
   const zones = await seedZones(catalog.deliveryFee);
   await seedDeliveryDates(zones, now);
   await seedSettings();
-  await seedSiteContent();
+  // F5 içerik seed'i (content/*.json) — SiteContent + LegalDocument v1 + Post (yalnız yoksa; SEED_OVERWRITE_CONTENT ile ezilir)
+  const content = readContentFiles();
+  await seedSiteContent(content.siteContent);
+  await seedLegal(content.legal);
+  await seedPosts(content.posts);
   await seedAdmin(now);
   await printSummary();
   console.log('seed: tamamlandı');

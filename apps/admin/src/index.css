@@ -118,3 +118,21 @@
     scrollbar-width: none;
   }
 }
+
+@layer components {
+  /* RichTextLite icerik alani: preflight'in sifirladigi baslik/liste/baglanti bicimleri (F5 CMS, gunluk, yasal) */
+  .rich-text-content p { margin: 0 0 0.6em; }
+  .rich-text-content p:last-child { margin-bottom: 0; }
+  .rich-text-content h2 { font-size: 1.125rem; font-weight: 600; margin: 0.8em 0 0.4em; }
+  .rich-text-content h3 { font-size: 1rem; font-weight: 600; margin: 0.7em 0 0.3em; }
+  .rich-text-content ul { list-style: disc; padding-left: 1.4em; margin: 0 0 0.6em; }
+  .rich-text-content ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.6em; }
+  .rich-text-content li { margin: 0.15em 0; }
+  .rich-text-content a { color: var(--color-accent); text-decoration: underline; }
+  .rich-text-content b, .rich-text-content strong { font-weight: 600; }
+  .rich-text-content em, .rich-text-content i { font-style: italic; }
+  .rich-text-content blockquote { border-left: 3px solid var(--color-brand-300); padding-left: 0.75em; color: var(--color-brand-600); margin: 0.6em 0; }
+  .rich-text-content code { font-family: var(--font-mono); font-size: 0.85em; background: var(--color-brand-100); padding: 0 0.25em; border-radius: 0.2rem; }
+  .rich-text-content table { border-collapse: collapse; margin: 0.6em 0; }
+  .rich-text-content td, .rich-text-content th { border: 1px solid var(--color-brand-300); padding: 0.25em 0.5em; }
+}

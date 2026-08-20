@@ -1,0 +1,13 @@
+{{!-- gunluk.hbs yazı kartı (website/gunluk.html <article class="journal-post"> birebir). Bağlam: PostView (src/web/content-view.ts):
+     slug/meta/coverPath/coverAlt kaçışlı, titleHtml/bodyHtml ham HTML (admin zengin metin). bodyHtml satırları 6 boşluk girintilidir
+     (seed: database/seeds/content/posts/<slug>.html) — render byte paritesi. --}}
+  <article class="journal-post" id="{{{slug}}}">
+    <p class="journal-post-meta mono">{{{meta}}}</p>
+    <h2>{{{titleHtml}}}</h2>
+{{#if hasCover}}
+    <div class="journal-post-img"><img src="{{{coverPath}}}" alt="{{{coverAlt}}}"></div>
+{{/if}}
+    <div class="journal-post-body">
+{{{bodyHtml}}}
+    </div>
+  </article>

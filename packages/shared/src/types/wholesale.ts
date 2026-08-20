@@ -26,3 +26,25 @@ export interface WholesaleLeadPatch {
   status?: LeadStatus;
   note?: string | null;
 }
+
+// ── F5 ekleri (WholesaleModule) — yalnız EKLEME ───────────────────────────────
+
+/** `POST /wholesale-leads` → 201. */
+export interface WholesaleLeadCreated {
+  id: Id;
+}
+
+/** Admin `GET /admin/wholesale-leads?status&page&limit`. */
+export interface WholesaleLeadListQuery {
+  status?: LeadStatus;
+  page?: number;
+  limit?: number;
+}
+
+/** Admin liste yanıtı (`AdminPage` ile aynı zarf). */
+export interface WholesaleLeadList {
+  items: WholesaleLead[];
+  total: number;
+  page: number;
+  limit: number;
+}

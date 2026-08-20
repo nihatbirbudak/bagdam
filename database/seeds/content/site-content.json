@@ -1,0 +1,333 @@
+{
+  "$comment": "SiteContent başlangıç değerleri — website/*.html metinleri BİREBİR (ADR-0003 byte/piksel paritesi). Şema + etiket: apps/api/src/modules/content/site-content.registry.ts (tek kaynak; seed oradan okur). Seed yalnız yoksa yazar; SEED_OVERWRITE_CONTENT=true ile ezer.",
+  "values": {
+    "promoBar": {
+      "enabled": true,
+      "html": "Abone ol, ilk <b>2 kutunda %50 indirim</b> kazan — kod: <span class=\"mono\">BAGDAM050</span>"
+    },
+    "footer": {
+      "phoneLabel": "mutlu müşteri hattı",
+      "phone": "+90 (530) 949 40 93",
+      "phoneHref": "tel:+905309494093",
+      "addressLabel": "bağdam",
+      "addressLine1": "8034 Sokak No:38,",
+      "addressLine2": "Kuşçular — Urla / İzmir",
+      "mapsUrl": "https://www.google.com/maps/search/?api=1&query=8034%20Sokak%20No%3A38%20Ku%C5%9F%C3%A7ular%20Urla%20%C4%B0zmir",
+      "instagramUrl": "#",
+      "youtubeUrl": "#",
+      "copyright": "© 2026 — BAĞDAM. TÜM HAKLARI SAKLIDIR.",
+      "policiesLabel": "Tüm Politikalar",
+      "creditText": "designed and powered by",
+      "creditUrl": "https://youmedya.com/iletisim/"
+    },
+    "home.hero": {
+      "title": "biz market değiliz.<br><em>seçiciyiz.</em>",
+      "sub": "Urla'nın Kuşçular, Yağcılar gibi birkaç köyündeki 6 üreticiden doğrudan sofranıza — aynı gün toplanır. Bu hafta bardacık inciri tam kıvamında.",
+      "ctaText": "kutunu oluştur",
+      "ctaHref": "urunler.html",
+      "bgImage": "assets/images/hero-crate.jpg"
+    },
+    "home.pillars": {
+      "items": [
+        {
+          "title": "Mevsiminde",
+          "text": "Yılın her ürünü her zaman olmaz. Biz de satmayız."
+        },
+        {
+          "title": "Şeffaf",
+          "text": "Hangi bahçeden, kim tarafından, ne zaman toplandığını biliyoruz."
+        },
+        {
+          "title": "Seçilmiş",
+          "text": "Haftanın en iyisini biz seçeriz, olgunluğunu ve boyutunu sen — manavdaki gibi."
+        },
+        {
+          "title": "Garantili",
+          "text": "Memnun kalmadığın ürünü söyle — telafi ederiz."
+        }
+      ]
+    },
+    "home.showcase": {
+      "image": "assets/images/urunler/sezon.jpg",
+      "imageAlt": "10'lu Sezon Kutusu",
+      "eyebrow": "Şu An Sezonda",
+      "title": "bardacık inciri, <em>tam kıvamında.</em>",
+      "text": "Kuşçular'ın taş bahçelerinde, ağustos sıcağında olgunlaşan bardacık inciri yılın yalnızca birkaç haftasında bu kadar iyi oluyor. İnce kabuğu, yoğun aroması ve az bulunan tatlılığıyla Urla'nın en kısa ömürlü lezzetlerinden biri.",
+      "ctaText": "kutunu oluştur",
+      "ctaHref": "urunler.html",
+      "productsTitle": "Tüm Ürünler"
+    },
+    "home.cloud": {
+      "lines": [
+        {
+          "html": "indirim&nbsp; sebze&nbsp; <em>meyve</em>&nbsp; bakliyat"
+        },
+        {
+          "html": "<em>süt ürünleri</em>&nbsp; fırın"
+        }
+      ],
+      "ctaText": "ürünleri keşfet",
+      "ctaHref": "urunler.html"
+    },
+    "home.featured": {
+      "items": [
+        {
+          "type": "product",
+          "ref": "zeytinyagi",
+          "order": 1
+        },
+        {
+          "type": "product",
+          "ref": "beyazpeynir",
+          "order": 2
+        },
+        {
+          "type": "product",
+          "ref": "ekmek",
+          "order": 3
+        },
+        {
+          "type": "tier",
+          "ref": "sezon",
+          "order": 4
+        },
+        {
+          "type": "product",
+          "ref": "zeytin",
+          "order": 5
+        },
+        {
+          "type": "product",
+          "ref": "yogurt",
+          "order": 6
+        },
+        {
+          "type": "product",
+          "ref": "tereyagi",
+          "order": 7
+        },
+        {
+          "type": "product",
+          "ref": "salca",
+          "order": 8
+        }
+      ]
+    },
+    "home.blocks": {
+      "offersTitle": "öne <em>çıkanlar</em>",
+      "offersText": "Süt ürünleri, fırın ve kilerden en çok tercih edilenler — taze, doğrudan üreticiden.",
+      "offersMoreText": "tümünü gör",
+      "journalEyebrow": "Blog",
+      "journalTitle": "son <em>yazılar</em>",
+      "journalCtaText": "tümünü oku",
+      "journalCtaHref": "gunluk.html",
+      "swipeHint": "kaydır",
+      "solidEyebrow": "Restoranlar İçin",
+      "solidTitle": "toptan tedarik — <em>yakında</em>",
+      "solidText": "Şefler ve restoranlar için doğrudan tedarik hattımızı hazırlıyoruz.",
+      "solidCtaText": "haberdar ol",
+      "solidCtaHref": "toptan.html",
+      "illustImage": "assets/images/crate.jpg",
+      "illustImageAlt": "Urla'dan gelen sandık",
+      "illustCtaText": "hikayemiz",
+      "illustCtaHref": "nasil-seciyoruz.html"
+    },
+    "home.faq": {
+      "items": [
+        {
+          "q": "haftalık kutu",
+          "a": "Her hafta tattığımız, seçtiğimiz ürünleri Salı, Perşembe ve Cumartesi günleri kapına kadar getiriyoruz. Abonelik dışında tek tek satış yapmıyoruz."
+        },
+        {
+          "q": "teslimat",
+          "a": "Şu an yalnızca Urla ve Çeşme'ye teslimat yapıyoruz. Sipariş toplandığı gün, seçtiğin teslimat gününde kapında."
+        },
+        {
+          "q": "kaynağımız",
+          "a": "Urla'nın birkaç köyündeki 6 üreticiyle doğrudan çalışıyoruz. Her ürünün kim tarafından, nereden geldiğini biliyoruz."
+        },
+        {
+          "q": "üyelik",
+          "a": "Bağdam Seçkisi üyeleri her hafta önce haber alır, önce seçer."
+        }
+      ]
+    },
+    "urunler.trust": {
+      "items": [
+        {
+          "icon": "assets/icons/iptal.png",
+          "label": "İstediğin zaman iptal",
+          "sub": "Taahhüt yok, tek tıkla bitir."
+        },
+        {
+          "icon": "assets/icons/duzenleme.png",
+          "label": "Her hafta düzenle",
+          "sub": "Teslimattan 1 gün öncesine kadar kutunu değiştir."
+        },
+        {
+          "icon": "assets/icons/haftaatla.png",
+          "label": "Sipariş atlama hakkı",
+          "sub": "İptal etmeden bir sonraki siparişini atlayabilirsin."
+        },
+        {
+          "icon": "assets/icons/teslimat.png",
+          "label": "Salı, Perşembe, Cumartesi",
+          "sub": "Urla ve Çeşme'ye, doğrudan üreticiden teslim."
+        }
+      ]
+    },
+    "kutu.notes": {
+      "crumbText": "← kutulara dön",
+      "pairsLabel": "bu kutu ile alabilecekleriniz",
+      "typeSubscribeLabel": "abone ol",
+      "typeOnetimeLabel": "tek seferlik sipariş",
+      "typeTipTitle": "Abonelere: ilk 2 kutu %50 indirimli, kargo bizden. Tek seferlik alışverişe: indirim yok, kargo ücreti (49 TL) sana ait.",
+      "typeTipHtml": "Abonelere: ilk 2 kutu %50 indirimli, kargo bizden.<br>Tek seferlik alışverişe: indirim yok, kargo ücreti (49 TL) sana ait.",
+      "editorNote": "Dokunmazsan bu hafta iyi olanlardan otomatik seçtiğimiz haliyle kutunu doldururuz. İstersen her ürünü aşağıdan değiştirebilirsin.",
+      "editorNoteSubtle": "Doğada iki gün birbirinin aynı olmuyor — bu yüzden kutun her hafta sezondaki en iyi ürünleri sana sunmak için değişiklik gösterebilir. Her hafta senin için seçtiğimiz ürünleri e-posta ve/veya telefonla sana bildiririz.",
+      "freqLabel": "gönderim sıklığı",
+      "contentsTitle": "bu haftaki <em>içerik</em>",
+      "extrasTitle": "kutuna <em>ekstra</em> ekle",
+      "extrasBadge": "SINIRSIZ EKLEME HAKKI",
+      "extrasNote": "Kutunun üzerine dilediğin kadar meyve ve sebzeyi gramajını seçerek ekle — ücreti kutu fiyatının üzerine eklenir. Ekstralar yalnızca bu siparişin için geçerlidir: abonelik yenilendiğinde sonraki kutun ekstrasız gider, istersen her hafta yeniden eklersin.",
+      "dayLabel": "teslimat günü"
+    },
+    "manifesto.hero": {
+      "eyebrow": "Bağdam Nasıl Çalışır",
+      "title": "biz market değiliz.<br><em>seçiciyiz.</em>",
+      "sub": "Sana meyveyi, sebzeyi satmıyoruz — seçimi satıyoruz. Sen dokunamıyorsun, koklayamıyorsun, elleyemiyorsun. O yüzden biz dokunuyoruz, kokluyoruz, elliyoruz — senin adına.",
+      "rule": "İYİ DEĞİLSE BAĞDAM'DA YOK."
+    },
+    "manifesto.compare": {
+      "title": "fark <em>ne?</em>",
+      "col1Title": "hızlı teslimat uygulamaları",
+      "col1Items": [
+        {
+          "label": "Teslimat",
+          "text": "10–20 dakikada kapında"
+        },
+        {
+          "label": "Ürün seçimi",
+          "text": "Depodan ne çıkarsa"
+        },
+        {
+          "label": "Kalite kontrolü",
+          "text": "Şansa bağlı"
+        },
+        {
+          "label": "Kişiselleştirme",
+          "text": "Yok"
+        }
+      ],
+      "col2Title": "üretici ağı servisleri",
+      "col2Items": [
+        {
+          "label": "Teslimat",
+          "text": "Doğrudan üreticiden"
+        },
+        {
+          "label": "Ürün seçimi",
+          "text": "Ne gelirse"
+        },
+        {
+          "label": "Kalite kontrolü",
+          "text": "Kaynak dürüst, kürasyon yok"
+        },
+        {
+          "label": "Kişiselleştirme",
+          "text": "Yok — eski usul manav gibi"
+        }
+      ],
+      "col3Title": "bağdam",
+      "col3Items": [
+        {
+          "label": "Teslimat",
+          "text": "Urla ve Çeşme'ye, aynı gün toplanan"
+        },
+        {
+          "label": "Ürün seçimi",
+          "text": "Tattığımız, elediğimiz partiler"
+        },
+        {
+          "label": "Kalite kontrolü",
+          "text": "Yeterince iyi olmayan hiç satışa girmez"
+        },
+        {
+          "label": "Kişiselleştirme",
+          "text": "\"Nasıl seversin?\" sorusu, ona göre seçeriz"
+        }
+      ],
+      "swipeHint": "kaydır"
+    },
+    "manifesto.steps": {
+      "items": [
+        {
+          "eyebrow": "Sistem — 01",
+          "title": "nasıl <em>seversin?</em>",
+          "text": "Manavda \"abi bana iki güne yenecek kavun ver\" dersin, o da sana göre seçer. Biz bunu online'da soruyoruz — her siparişte."
+        },
+        {
+          "eyebrow": "Sistem — 02",
+          "title": "seçen kişi <em>görünür</em>",
+          "text": "Kutunu bir algoritma değil, bir insan hazırlıyor. İçindeki kartta kim olduğunu görürsün."
+        }
+      ]
+    },
+    "manifesto.demo": {
+      "ripenessLabel": "Gülbahçe Kavunu — nasıl seversin?",
+      "ripenessOption1": "Diri",
+      "ripenessOption2": "Tam olgun",
+      "ripenessNote": "YEME ZAMANI: BUGÜN–YARIN",
+      "curatorInitial": "E",
+      "curatorLabel": "Bu kutuyu hazırlayan",
+      "curatorName": "Ece — Bağdam"
+    },
+    "manifesto.guarantee": {
+      "title": "seçimin riski <em>bizde.</em>",
+      "text": "Bağdam Seçimi olarak gönderdiğimiz bir ürün beklentini karşılamadıysa bize söyle. Ücretini iade eder ya da sonraki siparişine ekleriz. Basit form, fotoğraf, telefonla uğraşma yok."
+    },
+    "manifesto.close": {
+      "title": "bu hafta <em>iyi olanı</em> gördün mü?",
+      "ctaText": "abone ol",
+      "ctaHref": "urunler.html"
+    },
+    "toptan.hero": {
+      "eyebrow": "Restoranlar & Şefler İçin",
+      "title": "toptan tedarik<br><em>yakında.</em>",
+      "text": "Aynı kürasyonu, aynı üretici ağını — bu sefer mutfağınız için hazırlıyoruz. Şefler ve restoranlar için doğrudan tedarik hattımız çok yakında açılıyor."
+    },
+    "toptan.form": {
+      "emailPlaceholder": "e-posta adresin",
+      "submitText": "haberdar ol",
+      "successMessage": "Teşekkürler — toptan hattı açıldığında ilk sana haber vereceğiz.",
+      "errorMessage": "Şu an kaydedemedik — lütfen birkaç saniye sonra yeniden dene.",
+      "invalidEmailMessage": "Lütfen geçerli bir e-posta adresi yaz."
+    },
+    "toptan.details": {
+      "items": [
+        {
+          "title": "Aynı üretici ağı",
+          "text": "Kutularda kullandığımız aynı Urla üreticilerinden, mutfak hacminde tedarik."
+        },
+        {
+          "title": "Urla ve Çeşme içi, ertesi sabah",
+          "text": "Siparişten sonraki gün sabah 7'den önce mutfağınızda. Urla ve Çeşme içi tüm restoranlara aynı teslimat penceresi."
+        },
+        {
+          "title": "Şeffaf fiyatlandırma",
+          "text": "Sezona ve hacme göre önceden bilinen, sabit bir fiyat listesi."
+        }
+      ]
+    },
+    "gunluk.hero": {
+      "eyebrow": "Blog",
+      "title": "üreticiler, mevsimler<br>ve bir <em>kutunun</em> hikayesi.",
+      "sub": "Bağdam'ın içinde ne oluyor — kimden alıyoruz, neden bazen az ürün var, bir kutu nasıl hazırlanıyor. Kısa, dürüst yazılar."
+    },
+    "gunluk.close": {
+      "title": "bu hafta <em>ne var,</em> gör.",
+      "ctaText": "kutunu oluştur",
+      "ctaHref": "urunler.html"
+    }
+  }
+}

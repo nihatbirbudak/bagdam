@@ -113,3 +113,50 @@ export interface ProducerJson {
   /** Bu üreticiye bağlı ürün slug'ları (bilgi amaçlı; seed Product.producerId'yi catalog.json'dan kurar). */
   productSlugs: string[];
 }
+
+// ── F5 içerik seed'i (database/seeds/content/*.json) ─────────────────────────
+
+/** legal.json `documents[]` öğesi — gövde ayrı dosyada (bodyFile, CONTENT_DIR'e göreli). */
+export interface LegalSeedDoc {
+  slug: string;
+  /** Prisma LegalKind adı (PRIVACY, TERMS, … MARKETING_CONSENT). */
+  kind: string;
+  title: string;
+  leadHtml?: string | null;
+  bodyFile: string;
+  /** ISO an (ör. 2026-08-18T00:00:00+03:00). */
+  effectiveFrom: string;
+  isCurrent?: boolean;
+  showInNav?: boolean;
+  requiresAck?: boolean;
+  sortOrder?: number;
+  /** Kaynak sayfadaki "SON GÜNCELLEME" etiketi (bilgi amaçlı). */
+  sourceUpdatedLabel?: string;
+}
+
+/** posts.json `posts[]` öğesi — gövde ayrı dosyada (bodyFile). */
+export interface PostSeedDoc {
+  slug: string;
+  /** Görünen tür etiketi ("Söyleşi", "Mevsim"); gunluk meta'da büyük harfle basılır. */
+  kind: string;
+  readMinutes: number;
+  titleHtml: string;
+  excerpt?: string | null;
+  bodyFile: string;
+  /** MediaFile.path (assets/images/…); seed alt'ı coverAlt'a eşitler. */
+  coverPath?: string | null;
+  coverAlt?: string | null;
+  relatedSlugs?: string[];
+  status?: 'DRAFT' | 'PUBLISHED';
+  /** ISO an; PUBLISHED için zorunlu. */
+  publishedAt: string;
+  sortOrder?: number;
+}
+
+/** readContentFiles() çıktısı. */
+export interface ContentSeedFiles {
+  /** key → değer (şema/etiket registry'den). */
+  siteContent: Record<string, import('@prisma/client').Prisma.InputJsonObject>;
+  legal: LegalSeedDoc[];
+  posts: PostSeedDoc[];
+}

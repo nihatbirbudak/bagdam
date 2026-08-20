@@ -1,0 +1,7 @@
+{{!-- Promosyon şeridi (index/urunler/kutu <header> içinde). Bağlam: site.promoBar (SiteContent "promoBar": enabled, html).
+     enabled=false → şerit hiç basılmaz; html richtext olduğu için ham basılır. Markup website/index.html:100-102 ile birebir. --}}
+{{#if site.promoBar.enabled}}
+  <div class="promo-bar">
+  <span>{{{site.promoBar.html}}}</span>
+</div>
+{{/if}}

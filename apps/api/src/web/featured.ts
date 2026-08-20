@@ -37,9 +37,9 @@ export type FeaturedView =
   | { tier: FeaturedTierView; product?: undefined };
 
 /**
- * SiteContent `home.featured` seed'de henüz yok (F5 içerik seed'i) — o gelene kadar WebController
- * website/index.html satır 180-267'deki sırayı bu sabitten üretir (7 ürün + 1 tier, aynı sıra).
- * F5'te SiteContent `home.featured` okunur; bu sabit yalnız yedek olarak kalır.
+ * Yedek sıra — F5'ten itibaren WebController SiteContent `home.featured` (`{items:[{type,ref,order}]}`,
+ * content-view.ts resolveFeaturedItems) okur; anahtar yoksa/boşsa/bozuksa website/index.html satır 180-267'deki
+ * bu sıra kullanılır (7 ürün + 1 tier). Seed değeri bu sabitle aynıdır (database/seeds/content/site-content.json).
  */
 export const DEFAULT_FEATURED: readonly HomeFeaturedItem[] = [
   { type: 'product', ref: 'zeytinyagi', order: 1 },

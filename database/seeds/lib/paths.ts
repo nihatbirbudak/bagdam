@@ -18,3 +18,6 @@ export const URUNLER_HTML = resolve(WEBSITE_DIR, 'urunler.html');
 export const API_PUBLIC_DIR = resolve(REPO_ROOT, 'apps', 'api', 'public');
 export const API_ENV = resolve(REPO_ROOT, 'apps', 'api', '.env');
 export const ROOT_ENV = resolve(REPO_ROOT, '.env');
+
+/** F5 içerik seed'i: site-content.json, legal.json + legal/*.html, posts.json + posts/*.html. */
+export const CONTENT_DIR = resolve(REPO_ROOT, 'database', 'seeds', 'content');

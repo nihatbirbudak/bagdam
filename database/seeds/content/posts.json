@@ -1,0 +1,54 @@
+{
+  "$comment": "Post seed'i — gunluk.html'deki 3 yazı BİREBİR (slug = #anchor id; bodyFile 6 boşluk girintili <p> satırları; kind görünen etiket: Söyleşi/Mevsim; coverPath → MediaFile.path (seed alt'ı gunluk.html'deki img alt'ına eşitler); publishedAt = meta tarihi). Seed yalnız slug yoksa yazar; SEED_OVERWRITE_CONTENT=true ile ezer.",
+  "posts": [
+    {
+      "slug": "cavdar-ekmegi",
+      "kind": "Söyleşi",
+      "readMinutes": 5,
+      "titleHtml": "bir annenin ekmeği, <em>iki sofrada</em>",
+      "excerpt": "Urla'nın Kuşçular'daki gastronomi rotasında, MICHELIN Rehberi'nin önerdiği restoranlardan Levan'ın mutfağında yıllardır aynı fırın kokusu var: şef Onur Canbulat'ın annesi Nurdan Canbulat'ın elleriyle yoğurduğu tava çavdar ekmeği.",
+      "bodyFile": "posts/cavdar-ekmegi.html",
+      "coverPath": "assets/images/urunler/sadeekmek.jpg",
+      "coverAlt": "Tava Çavdar Ekmeği",
+      "relatedSlugs": [
+        "sadeekmek",
+        "cevizliekmek"
+      ],
+      "status": "PUBLISHED",
+      "publishedAt": "2026-08-16T12:00:00+03:00",
+      "sortOrder": 0
+    },
+    {
+      "slug": "zeytinyagi",
+      "kind": "Söyleşi",
+      "readMinutes": 6,
+      "titleHtml": "dürüst bir zeytinyağını <em>ne yapar?</em>",
+      "excerpt": "Kuşçular'da, üç kuşaktır aynı bahçede zeytin toplayan Mehmet Usta'ya sorduk: iyi zeytinyağı neden bu kadar nadir? Cevap sandığımızdan daha basitti.",
+      "bodyFile": "posts/zeytinyagi.html",
+      "coverPath": "assets/images/urunler/zeytinyagi.jpg",
+      "coverAlt": "Zeytinyağı",
+      "relatedSlugs": [
+        "zeytinyagi"
+      ],
+      "status": "PUBLISHED",
+      "publishedAt": "2026-08-10T12:00:00+03:00",
+      "sortOrder": 1
+    },
+    {
+      "slug": "incir",
+      "kind": "Mevsim",
+      "readMinutes": 4,
+      "titleHtml": "bardacık inciri neden bu kadar <em>kısa ömürlü?</em>",
+      "excerpt": "Yılda dört sezon var — ama bardacık inciri bunlardan sadece birinde, o da birkaç hafta boyunca gerçekten iyi. Ağustos sıcağı arttıkça Kuşçular'ın taş bahçelerindeki incir ağaçları bir anda olgunlaşmaya başlıyor, ve pencere hızla kapanıyor.",
+      "bodyFile": "posts/incir.html",
+      "coverPath": "assets/images/scene-originals/fig.jpg",
+      "coverAlt": "Bardacık İnciri",
+      "relatedSlugs": [
+        "incir"
+      ],
+      "status": "PUBLISHED",
+      "publishedAt": "2026-08-07T12:00:00+03:00",
+      "sortOrder": 2
+    }
+  ]
+}

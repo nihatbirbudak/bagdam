@@ -17,9 +17,11 @@ export * from './types/content';
 export * from './types/wholesale';
 export * from './types/order';
 export * from './types/subscription';
+export * from './types/coupon'; // F7: minimal kupon şeması (Coupon / CouponRedemption; admin/checkout UI P2)
 export * from './types/pricing';
 export * from './types/admin'; // F4: admin panel DTO'ları (katalog CRUD + medya)
 export * from './types/mail'; // F6: MailModule (şablon slug'ları, Notifier olayları, MailLog admin DTO'ları)
+export * from './types/payment'; // F7: PaymentProvider / ChargeStrategy sözleşmesi (apps/api modules/payments)
 
 // Durum makineleri (Order / Subscription / Cycle / Payment / Cancellation) — docs/state-machines.md ile aynı
 export * from './state-machines';

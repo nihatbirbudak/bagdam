@@ -1,9 +1,10 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Put, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put, Req, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { MeAddress, MeConsent, MeOrderList } from '@bagdam/shared';
+import type { MeAddress, MeConsent, MeOrderListResponse, Order } from '@bagdam/shared';
 import type { Response } from 'express';
 import { Audited, setAuditValues } from '../../common/decorators/audit.decorator';
 import { AuthenticatedRequest, CurrentUser } from '../../common/decorators/current-user.decorator';
+import { OrderNoParamDto } from '../orders/dto/order-no-param.dto';
 import { UpsertAddressDto } from './dto/address.dto';
 import { MeConsentDto } from './dto/consent.dto';
 import { MeService } from './me.service';
@@ -11,7 +12,7 @@ import { MeService } from './me.service';
 /**
  * MeController — önek /api/v1/me (BACKEND-PLANI §3 me satırı; CUSTOMER/STAFF/ADMIN oturumlu — JwtAuthGuard zorunlu,
  * @Roles yok). Mutasyonlar CSRF'li (çerezli istek) ve audit'li (`@Audited('me')`: ad/telefon/adres interceptor'da redakte).
- *  GET/PUT /me/address · GET /me/orders · GET /me/cards · GET/POST /me/consents
+ *  GET/PUT /me/address · GET /me/orders · GET /me/orders/:orderNo (F7/B2: OrdersService) · GET /me/cards · GET/POST /me/consents
  */
 @Controller('me')
 export class MeController {
@@ -34,8 +35,14 @@ export class MeController {
   }
 
   @Get('orders')
-  listOrders(): MeOrderList {
-    return this.me.listOrders();
+  listOrders(@CurrentUser('id') userId: string): Promise<MeOrderListResponse> {
+    return this.me.listOrders(userId);
+  }
+
+  /** Sipariş detayı (satırlar dahil; ödemeler müşteriye dönmez) — başkasının siparişi 404. */
+  @Get('orders/:orderNo')
+  getOrder(@CurrentUser('id') userId: string, @Param() params: OrderNoParamDto): Promise<Order> {
+    return this.me.getOrder(userId, params.orderNo);
   }
 
   @Get('cards')

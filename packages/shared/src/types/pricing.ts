@@ -186,3 +186,71 @@ export interface CycleChargeQuote {
   due: Money;
   discountKind: 'FIRST_BOXES' | 'RETENTION' | null;
 }
+
+// ── F7 ekleri (api PricingService giriş sözleşmesi) — yalnız EKLEME ────────────────────────────────────────────────
+// `PricingService.quote(input)` ve `PricingService.cycleCharge(input)` (apps/api/modules/pricing) bu tipleri alır;
+// hesap yine yukarıdaki saf fonksiyonlarda (computeQuote / computeCycleCharge). DB'ye bağlı alan yok.
+
+/**
+ * Fiyatlama için kullanıcı bağlamı — PricingService `userId`'den DB'den çözer; çağıran biliyorsa `QuoteInput.context`
+ * ile ezebilir (ör. abonelik modülü kendi Subscription kaydını verir). Eksik alan → DB çözümü / varsayılan.
+ */
+export interface QuoteUserContext {
+  /** Canlı abonelik (ACTIVE | PAST_DUE | CANCEL_REQUESTED) var mı → tekil üründe kargo 0 (`subscriberFreeShipping`). */
+  hasActiveSubscription: boolean;
+  /** Kalan ilk-kutu hakkı: yeni abonelikte `User.firstBoxesPromoUsedAt` yoksa Setting `firstBoxDiscount.boxes`, varsa 0. Misafir: hak var sayılır. */
+  firstBoxesLeft: number;
+  /** Retention indirimi (`Subscription.nextBoxDiscountPct`); yeni checkout'ta null. */
+  retentionPct: number | null;
+}
+
+/**
+ * `PricingService.quote(input)` girdisi — satırlar ÇÖZÜLMÜŞ gelir (unitPrice/vatRate katalogdan; B2/F8 checkout dönüştürür).
+ * Bölge: `zoneId` ya da `zoneSlug` (biri zorunlu; aktif DeliveryZone — değilse 400 `ZONE_INVALID`).
+ * `couponCode` F8'de uygulanır (şimdilik yok sayılır). `skipThisWeek` → BOX/EXTRA 0 TL (ADR-0007).
+ */
+export interface QuoteInput {
+  lines: PricingLineInput[];
+  zoneId?: string | null;
+  zoneSlug?: string | null;
+  userId?: string | null;
+  /** BOX/EXTRA satırları tekrarlayan aboneliğe mi ait (kutu.html type "subscription"). */
+  isSubscriptionCheckout: boolean;
+  couponCode?: string | null;
+  skipThisWeek?: boolean;
+  /** Çağıranın bildiği bağlam (kısmi); verilmeyen alanlar DB'den çözülür. */
+  context?: Partial<QuoteUserContext>;
+}
+
+/** `PricingService.cycleCharge({cycleId})` — cycle + abonelik + tier + bölge + EXTRA/CART_MERGE öğeleri DB'den okunur. */
+export interface CycleChargeByIdRequest {
+  cycleId: string;
+}
+
+/**
+ * `PricingService.cycleCharge({...})` açık biçim — çağıran her değeri kendisi verir (test / önizleme / kayıt elde).
+ * Bölge: `zone` (kargo kuralı) ya da `zoneId`/`zoneSlug` (DB'den çözülür; tek seferlik kutuda kargo için gerekir).
+ */
+export interface CycleChargeExplicitRequest {
+  /** Kilit anındaki tier fiyatı. */
+  boxPrice: Money;
+  /** EXTRA + CART_MERGE öğeleri: birim fiyat × çarpan (tam TL'ye yuvarlanır). */
+  extras: readonly { unitPrice: Money; factor: number }[];
+  /** Tek seferlik kutu mu (BOX_ONE_TIME: indirim yok, kargo bölge kuralı). */
+  isOneTime: boolean;
+  zone?: ZoneShippingRule | null;
+  zoneId?: string | null;
+  zoneSlug?: string | null;
+  /** `Subscription.discountBoxesLeft`. */
+  firstBoxesLeft: number;
+  /** `Subscription.nextBoxDiscountPct`. */
+  retentionPct: number | null;
+  /** cycle#1: checkout'ta peşin ödenen tutar; cycle#n: 0. */
+  prepaidAmount: Money;
+}
+
+export type CycleChargeRequest = CycleChargeByIdRequest | CycleChargeExplicitRequest;
+
+export function isCycleChargeByIdRequest(input: CycleChargeRequest): input is CycleChargeByIdRequest {
+  return typeof (input as CycleChargeByIdRequest).cycleId === 'string';
+}

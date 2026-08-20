@@ -17,10 +17,15 @@ import { ContentModule } from './modules/content/content.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
+import { JobsModule } from './modules/jobs/jobs.module';
 import { MailModule } from './modules/mail/mail.module';
 import { MeModule } from './modules/me/me.module';
 import { MediaModule } from './modules/media/media.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { PricingModule } from './modules/pricing/pricing.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { WholesaleModule } from './modules/wholesale/wholesale.module';
 import { WebModule } from './web/web.module';
 
@@ -61,8 +66,13 @@ new Logger('AppModule').log(
     MediaModule, // F4: POST/GET/PATCH/DELETE /api/v1/admin/media (ADMIN/STAFF, @Audited('media')); /uploads statik main.ts'te
     ContentModule, // F5: site-content/posts/legal/consents (+ /admin/*) + sitemap.xml/robots.txt; WebModule ContentService'i kullanır
     SettingsModule, // F5: /api/v1/admin/settings (registry şemalı gruplar, sırlar AES-256-GCM); DeliveryModule Setting'i buradan okur
-    DeliveryModule, // F5: /api/v1/delivery/* (public) + /admin/delivery/* (bölge CRUD, tarih üretimi); bootstrap cache'i düşürür
+    DeliveryModule, // F5: /api/v1/delivery/* (public) + /admin/delivery/* (bölge CRUD, tarih üretimi); bootstrap cache'i düşürür · F7: DeliveryDatesService (atomik rezerv/iade, findOrCreateFor/nextFor, isLocked) — OrdersModule ORDERS_DEPS ve abonelik motoru bunu kullanır
+    PricingModule, // F7: PricingService (quote / cycleCharge — shared computeQuote + Setting commerce.* kuralları + DeliveryZone kargo + kullanıcı bağlamı); checkout (F8), manuel checkout ve abonelik motoru kullanır
+    PaymentsModule, // F7: PaymentProvider (ManualProvider; PayTR F8 — ADR-0019) + ChargeStrategy (MIT / PAYMENT_LINK) + PaymentsService (Payment/Refund/WebhookEvent) + GET /api/v1/pay/:linkToken (JSON; ödeme sayfası F8)
+    OrdersModule, // F7/B2: /api/v1/orders/* (müşteri iptal/durum) + /admin/orders (ekran 17) + OrdersService (F8 checkout, motor cycle Order'ları); ORDERS_DEPS = DeliveryDatesService
     WholesaleModule, // F5: POST /api/v1/wholesale-leads (3/dk/IP) + /admin/wholesale-leads
+    SubscriptionsModule, // F7: /api/v1/me/subscription* + /admin/subscriptions|cycles|ops/* (motor; SUBSCRIPTIONS_DEPS = SubscriptionsDepsAdapter → Pricing/Payments/Orders/Delivery) + POST /admin/subscriptions (manuel checkout)
+    JobsModule, // F7: cron kayıt defteri + CronLog + @Cron (yalnız scheduler instance) + GET/POST /admin/jobs (run {now?} yalnız geliştirme/test)
     WebModule,
   ],
   providers: [

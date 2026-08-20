@@ -1,4 +1,6 @@
 // ── Abonelik / cycle DTO'ları + frontend `sub` DTO'su ────────────────────────
+// F7 (0003_commerce): Subscription / SubscriptionCycle / CycleItem / SubscriptionEvent / SubscriptionCancellation alanları
+// database/schema.prisma ile birebir (Prisma kaynak); DTO yalnız join kolaylığı alanları (tierSlug, deliveryOn …) ekler.
 import type {
   CancelOutcome,
   CancelReason,
@@ -333,4 +335,119 @@ export interface PackingListEntry {
   status: CycleStatus;
   items: Array<{ name: string; label: string | null; pref: string | null; source: CycleItemSource; lotCode: string | null }>;
   note: string | null;
+}
+
+// ── F7 ekleri (SubscriptionsModule / JobsModule) — yalnız EKLEME ─────────────────────────────────────────────
+
+/** Admin `GET /admin/subscriptions?status&q&page&limit` yanıtı. */
+export interface SubscriptionList {
+  items: SubscriptionListItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** Admin `GET /admin/cycles?date&status&zone` satırı — cycle + abonelik/müşteri/sipariş özeti (ekran 21). */
+export interface AdminCycleListItem extends SubscriptionCycle {
+  userEmail: string;
+  userName: string | null;
+  tierSlug: string;
+  zoneName: string;
+  isOneTime: boolean;
+  subscriptionStatus: SubscriptionStatus;
+  orderNo: number | null;
+  orderStatus: string | null;
+  deltaOrderNo: number | null;
+}
+
+/**
+ * Abonelik motoru bildirim olayları (F7 stub — `SubscriptionNotifier`; F10'da MailNotifier şablonlarına bağlanır).
+ * `subscription.cutoff-reminder`: `reminders:cutoff` job'ı (kesimden ~24 s önce).
+ */
+export type SubscriptionNotifierEvent =
+  | 'subscription.activated'
+  | 'cycle.charged'
+  | 'cycle.payment-failed'
+  | 'cycle.awaiting-payment'
+  | 'subscription.cancelled'
+  | 'subscription.cutoff-reminder';
+
+/** Stub bildiriminin kaydı (testler ve admin teşhisi için son N olay bellekte tutulur). */
+export interface SubscriptionNotification {
+  event: SubscriptionNotifierEvent;
+  subscriptionId: Id;
+  userId: Id;
+  cycleId: Id | null;
+  data: Record<string, unknown>;
+  at: IsoDateTime;
+}
+
+/** Job (cron) adları — JobsService kayıt defteri + `POST /admin/jobs/:name/run`. kvkk:purge / logs:cleanup F10. */
+export type JobName =
+  | 'delivery-dates:generate'
+  | 'cycles:ensure'
+  | 'cycles:lock-and-charge'
+  | 'cycles:expire-payment-links'
+  | 'payments:retry'
+  | 'reminders:cutoff';
+export const JOB_NAME_VALUES: readonly JobName[] = [
+  'delivery-dates:generate',
+  'cycles:ensure',
+  'cycles:lock-and-charge',
+  'cycles:expire-payment-links',
+  'payments:retry',
+  'reminders:cutoff',
+];
+
+/** Bir job koşusunun sonucu (CronLog satırıyla aynı alanlar). */
+export interface JobRunResult {
+  name: JobName;
+  status: 'SUCCESS' | 'FAILED';
+  itemsProcessed: number;
+  errors: number;
+  details: Record<string, unknown> | null;
+  startedAt: IsoDateTime;
+  finishedAt: IsoDateTime;
+  durationMs: number;
+  cronLogId: Id | null;
+}
+
+/** Admin `GET /admin/jobs` satırı: kayıtlı job + cron ifadesi + son koşu. */
+export interface JobInfo {
+  name: JobName;
+  cron: string;
+  description: string;
+  lastRun: JobRunResult | null;
+}
+
+// ── F7/E ekleri — admin manuel checkout (`POST /admin/subscriptions`) — yalnız EKLEME ──────────────────────────
+// Ofis/havale/nakit siparişi: admin müşteri adına abonelik ya da tek seferlik kutu açar; fiyat PricingService.quote,
+// Order PAID (MANUAL ödeme), Subscription ACTIVE + cycle#1. F8 checkout'un sunucu tarafı iskeletiyle aynı orkestrasyon.
+
+export interface AdminCreateSubscriptionRequest {
+  userId: Id;
+  tierSlug: string;
+  isOneTime?: boolean;
+  /** Yoksa 1 (tek seferlikte yok sayılır). */
+  frequencyWeeks?: number;
+  deliveryDay: DeliveryDay;
+  /** İlk teslimat günü (YYYY-MM-DD); yoksa bölge+gün için kesimi geçmemiş ilk tarih. */
+  deliveryOn?: IsoDate;
+  /** Yoksa müşterinin varsayılan adresi. */
+  addressId?: Id;
+  paymentMethodId?: Id;
+  /** Yoksa Setting commerce.chargeStrategy. */
+  chargeStrategy?: ChargeStrategy;
+  /** Kutu içeriği (ürün slug'ları); yoksa haftanın yayınlanmış şablonu. */
+  items?: string[];
+  extras?: SubExtra[];
+  itemPrefs?: Record<string, string>;
+  note?: string;
+}
+
+export interface AdminCreateSubscriptionResult {
+  subscription: Subscription;
+  cycle: SubscriptionCycle;
+  order: { id: Id; orderNo: number; status: string; grandTotal: Money; prepaidAmount: Money };
+  payment: { id: Id; status: string; amount: Money };
 }

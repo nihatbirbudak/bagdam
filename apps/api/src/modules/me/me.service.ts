@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import type { MeAddress, MeConsent, MeOrderList } from '@bagdam/shared';
+import type { MeAddress, MeConsent, MeOrderListResponse, Order } from '@bagdam/shared';
 import { IysStatus, Prisma } from '@prisma/client';
 import { DEFAULT_CONSENT_SOURCE } from '../content/content.constants';
+import { OrdersService } from '../orders/orders.service';
 import type { UpsertAddressDto } from './dto/address.dto';
 import type { MeConsentDto } from './dto/consent.dto';
 import { latestConsentPerKind, toMeAddress, toMeConsent } from './me.mapper';
@@ -25,7 +26,10 @@ export interface MeRequestContext {
 export class MeService {
   private readonly logger = new Logger(MeService.name);
 
-  constructor(private readonly repo: MeRepository) {}
+  constructor(
+    private readonly repo: MeRepository,
+    private readonly orders: OrdersService,
+  ) {}
 
   // ── Adres ───────────────────────────────────────────────────────────────────
 
@@ -78,12 +82,19 @@ export class MeService {
     return toMeConsent(row);
   }
 
-  // ── F8 yer tutucuları ───────────────────────────────────────────────────────
+  // ── Siparişler (F7/B2: OrdersService) ──────────────────────────────────────
 
-  /** `GET /me/orders` — F8'de Order tablosundan dolar. */
-  listOrders(): MeOrderList {
-    return { items: [], total: 0 };
+  /** `GET /me/orders` — kullanıcının siparişleri (OrderSummary[], yeni → eski); zarf `{items,total}`. */
+  listOrders(userId: string): Promise<MeOrderListResponse> {
+    return this.orders.listForUser(userId);
   }
+
+  /** `GET /me/orders/:orderNo` — sahip değilse 404 ORDER_NOT_FOUND. */
+  getOrder(userId: string, orderNo: number): Promise<Order> {
+    return this.orders.getForUser(userId, orderNo);
+  }
+
+  // ── F8 yer tutucuları ───────────────────────────────────────────────────────
 
   /** `GET /me/cards` — F8'de PaymentMethod'dan dolar. */
   listCards(): unknown[] {

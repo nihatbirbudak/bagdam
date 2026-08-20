@@ -220,6 +220,18 @@ export interface CartBoxInput {
   extras: Array<{ id: string; factor: number; label: string }>;
 }
 
+/**
+ * Cart (DB `carts`) — üye sepeti; şema-var/kullanım P2 (ADR-0016 "üye sepeti merge"; `GET/PUT /me/cart` P2).
+ * `items` = CartLineInput[] · `boxDraft` = CartBoxInput | null (localStorage `bahceden_cart` / `bahceden_sub` taslağının DB kopyası).
+ */
+export interface Cart {
+  id: Id;
+  userId: Id;
+  items: CartLineInput[];
+  boxDraft: CartBoxInput | null;
+  updatedAt: IsoDateTime;
+}
+
 /** `POST /checkout/quote` — fiyat özeti (PricingService tek kaynak). */
 export interface CheckoutQuoteRequest {
   lines: CartLineInput[];
@@ -271,3 +283,90 @@ export interface CheckoutResponse {
   /** Saklı kartla anında başarıysa doğrudan PAID. */
   status: OrderStatus;
 }
+
+// ── F7/B2 ekleri (OrdersModule) — yalnız EKLEME (BACKEND-PLANI §3 checkout/orders satırı; docs/state-machines.md §1) ──
+
+/** Order.deliveryOn/paidAt vb. okunurken kullanılan aktör — SubscriptionEvent.actor ile aynı küme (USER | SYSTEM | ADMIN | OPS | PSP). */
+export type OrderActor = 'USER' | 'SYSTEM' | 'ADMIN' | 'OPS' | 'PSP';
+
+/**
+ * Sipariş satırı snapshot girdisi — `OrdersService.createFromQuote(input).lines[]`.
+ * PricedLine (shared computeQuote çıktısı) + snapshot alanları: `name` zorunlu, `unit/lotCode/metadata` isteğe bağlı.
+ * EXTRA: `qty` = çarpan (factor), `lineTotal` tam TL; BOX: `tierSlug` dolu, `metadata.items` kutu içeriği; PRODUCT: adet.
+ */
+export interface OrderLineSnapshotInput {
+  kind: OrderLineKind;
+  productId?: Id | null;
+  tierSlug?: string | null;
+  name: string;
+  unit?: string | null;
+  qty: number;
+  unitPrice: Money;
+  lineTotal: Money;
+  vatRate: number;
+  pref?: string | null;
+  lotCode?: string | null;
+  metadata?: OrderLineBoxMetadata | Record<string, unknown> | null;
+}
+
+/** `GET /me/orders` — F7/B2: gerçek veri (`MeOrderList` ile aynı zarf; `items` artık OrderSummary). */
+export interface MeOrderListResponse {
+  items: OrderSummary[];
+  total: number;
+}
+
+/** Admin `GET /admin/orders?status&kind&from&to&deliveryOn&q&page&limit` sorgusu (from/to: createdAt, Europe/Istanbul takvim günü, dahil). */
+export interface AdminOrderListQuery {
+  status?: OrderStatus;
+  kind?: OrderKind;
+  from?: IsoDate;
+  to?: IsoDate;
+  /** Teslimat günü (YYYY-MM-DD) — ops günü filtresi. */
+  deliveryOn?: IsoDate;
+  /** orderNo (sayı) ya da ad/e-posta/telefon içerir. */
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** Admin `GET /admin/orders` zarfı (liste satırı OrderSummary + müşteri alanları dolu). */
+export interface AdminOrderList {
+  items: OrderSummary[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** Admin `POST /admin/orders/:id/notes {adminNote}` — nota zaman damgalı satır EKLENİR (silinmez; telafi kaydı da burada [B19]). */
+export interface OrderNoteRequest {
+  adminNote: string;
+}
+
+/** Müşteri `POST /orders/:orderNo/cancel {reason?}` — yalnız PENDING_PAYMENT | PAID | PAYMENT_FAILED ve kesimden önce (abonelik siparişi: /me/subscription/cancel). */
+export interface OrderCancelRequest {
+  reason?: string;
+}
+
+/**
+ * Orders hata kodları (409/400/404 `{error}`):
+ * DAY_FULL · DAY_LOCKED · ORDER_TRANSITION_INVALID · ORDER_STATE_CHANGED · ORDER_NOT_FOUND · ORDER_CUTOFF_PASSED ·
+ * ORDER_NOT_CANCELLABLE · ORDER_SUBSCRIPTION_MANAGED · ORDER_REASON_REQUIRED · ORDER_EMPTY · ZONE_MISMATCH ·
+ * CYCLE_NOT_FOUND · CYCLE_ORDER_EXISTS · CYCLE_DELTA_EXISTS · DELTA_NOTHING_DUE · BILLING_CORPORATE_FIELDS_REQUIRED
+ */
+export type OrdersErrorCode =
+  | 'DAY_FULL'
+  | 'DAY_LOCKED'
+  | 'ORDER_TRANSITION_INVALID'
+  | 'ORDER_STATE_CHANGED'
+  | 'ORDER_NOT_FOUND'
+  | 'ORDER_CUTOFF_PASSED'
+  | 'ORDER_NOT_CANCELLABLE'
+  | 'ORDER_SUBSCRIPTION_MANAGED'
+  | 'ORDER_REASON_REQUIRED'
+  | 'ORDER_EMPTY'
+  | 'ZONE_MISMATCH'
+  | 'CYCLE_NOT_FOUND'
+  | 'CYCLE_ORDER_EXISTS'
+  | 'CYCLE_DELTA_EXISTS'
+  | 'DELTA_NOTHING_DUE'
+  | 'BILLING_CORPORATE_FIELDS_REQUIRED';

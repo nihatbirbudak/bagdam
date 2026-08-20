@@ -308,18 +308,20 @@ rows = SELECT … FROM subscription_cycles WHERE status='UNPAID' AND next_retry_
 for each cycle:
   attempt = cycle.retryCount + 1
   MIT: P(kind RETRY, conversationId=`cyc_${id}_${attempt+1}`, attemptNo=attempt+1) → chargeStoredCard
-  LINK: yeni P(kind LINK) + yeni link e-postası (eski link EXPIRED)            -- DOĞRULANMADI
+  LINK (ya da saklı kart yok): now >= teslimat günü 08:00 (sınır, §14 #1) → cycle SKIPPED(UNPAID) (aşağıdaki FAILED/tükendi yolu ile aynı);
+        değilse eski açık linkler EXPIRED + yeni P(kind LINK, `lnk_<cycleId>_<n>`) + yeni link e-postası; cycle UNPAID kalır,
+        nextRetryAt = min(link süresi, lockedAt + retryHours[i], 08:00 sınırı) (F7 E: uygulandı)
   SE RETRY
   SUCCEEDED → cycle CHARGED (SE CHARGED), O PAID, failedCycles=0, PAST_DUE→ACTIVE; E tahsilat alındı
   FAILED    → retryCount=attempt
-              retryCount < retryHours.length → nextRetryAt = lockedAt + retryHours[retryCount] h
+              retryCount < retryHours.length VE lockedAt + retryHours[retryCount] h <= teslimat günü 08:00 → nextRetryAt = o an
               else → cycle SKIPPED(skipSource=UNPAID, skippedAt=now) (SE UNPAID), O CANCELLED, DD iade,
                      sub.failedCycles++ ; failedCycles >= pastDueAfterUnpaid → sub PAST_DUE (SE UNPAID); E "kutu atlandı" / "abonelik askıda"
-Kart güncellendi (POST /me/cards/add-session → PaymentMethod): SE CARD_UPDATED; açık UNPAID cycle varsa nextRetryAt=now (anında retry).
+Kart güncellendi (PATCH /me/subscription {paymentMethodId} → SE CARD_UPDATED; F8: POST /me/cards/add-session → PaymentMethod): açık UNPAID cycle varsa nextRetryAt=now (anında retry).
 PAST_DUE'de motor çalışmaya devam eder (kural #19); sonraki başarılı tahsilat → ACTIVE.
 ```
 
-**Teslimat sınırı uyarısı:** kesim teslimat günü−1 12:00 → +24 s = teslimat günü 12:00, +72 s = teslimat günü+2. Yani retry'lar teslimat günü geçtikten sonra başarılı olabilir; **ödenmeyen kutu teslim edilmez** ilkesiyle çelişir (tahsil edilip teslim edilmeyen kutu olmamalı). Bkz. açık soru #1 — F7 spike'ında retry penceresi teslimat gününe sıkıştırılmalı (öneri: `retryHours [2, 12]` ya da "teslimat günü 08:00'e kadar", sonrası SKIPPED(UNPAID)). Durum makinesi her iki seçenekte de aynıdır.
+**Teslimat sınırı (KARAR, §14 #1):** kesim teslimat günü−1 12:00 → +24 s = teslimat günü 12:00, +72 s = teslimat günü+2 — varsayılan `[24,72]` ile denemeler teslimat gününü aşar; **ödenmeyen kutu teslim edilmez** ilkesi gereği denemeler teslimat günü **08:00 Europe/Istanbul** ile sınırlandı (`DUNNING_RETRY_DEADLINE_TIME`, `dunningDeadlineFor`): sınırı aşan deneme atlanır, cycle hemen SKIPPED(UNPAID). Varsayılan ayarla kesimdeki ilk başarısız MIT tahsilatı doğrudan SKIPPED(UNPAID) olur (reason `retry_after_deadline`); lansman için admin'den `commerce.dunning.retryHours = [2,12]` (ya da `[2,8]`) önerilir — e2e F7 bu değerle koştu (+2 s ve +12 s denemeleri, ardından SKIPPED). Durum makinesi değişmedi.
 
 ---
 
@@ -371,12 +373,13 @@ Kesimden sonra atlama yok (cycle LOCKED). Atlanan hafta: `lock-and-charge` SKIPP
   - **Payment:** PENDING→REQUIRES_3DS|SUCCEEDED|FAILED|EXPIRED · REQUIRES_3DS→SUCCEEDED|FAILED|EXPIRED · SUCCEEDED→REFUNDED|PARTIAL_REFUNDED · PARTIAL_REFUNDED→REFUNDED
   - **Cancellation:** PENDING→RETENTION_ACCEPTED|CANCELLED|ABANDONED
 - F7 DoD testleriyle eşleme: "atla→geri al→kesim" (§10), "cycle#1 peşin + DELTA" (§8), "tek seferlik → COMPLETED" (§12), "iptal: kilitli cycle teslim" (§11), "UNPAID×2 → PAST_DUE" (§9), "PAYMENT_LINK süre dolunca UNPAID" (§8/6), "gün dolu → 409" (§10 unskip, checkout).
+- **Uygulama haritası (F7, 2026-08-20 — E entegrasyonu):** Order makinesi `modules/orders/orders.service.ts#transition` (409 `ORDER_TRANSITION_INVALID`; abonelik siparişinde DD iadesi kapalı — rezervin sahibi motor) · Subscription/Cycle/Cancellation makineleri `modules/subscriptions/services/{subscriptions,cycles,cancellation}.service.ts` (`assertOr409` → 409 `SUBSCRIPTION|CYCLE|CANCELLATION_TRANSITION_INVALID`) · Payment makinesi `modules/payments/payments.service.ts` (409 `INVALID_TRANSITION`). Motorun dış kapıları (`SUBSCRIPTIONS_DEPS`) `subscriptions-deps.adapter.ts` ile gerçek servislere bağlı: PricingService.cycleCharge · DeliveryDatesService.reserve/release/findOrCreateFor/nextFor/isLocked · OrdersService.createForCycle/createDeltaForCycle/transition · MerchantInitiatedCharge.charge / PaymentLinkCharge.issue / PaymentsService.markExpired (Payment `cyc_<cycleId>_<n>` idempotent: aynı numara SUCCEEDED ise çift tahsilat yok; FAILED ise sonraki boş numara). Checkout (F8) öncesi tek açılış yolu: admin `POST /admin/subscriptions` (`ManualCheckoutService`: quote → Order → MANUAL ödeme → Subscription + cycle#1 → activate — §2 PENDING→ACTIVE aynı yan etkilerle). Job'lar `modules/jobs` (`JobsService.runOnce(name, now)`; admin `POST /admin/jobs/:name/run {now?}` yalnız geliştirme/test). Doğrulama: jest `__tests__/subscriptions/*` + `tools/e2e-admin/run-f7.mjs` (rapor `report-f7.md`).
 
 ---
 
 ## 14. Açık sorular (F7 1. gün spike'ında kapanacak; karar kuyruğu ≤3 kuralı için önceliklendirildi)
 
-1. **Dunning penceresi vs. teslimat günü (öncelikli):** `retryHours [24,72]` teslimat gününü aşar; retry başarılı olsa kutu teslim edilmez. Seçenekler: (A) pencereyi teslimat günü 08:00'e sıkıştır (`[2,12]` gibi) ve sonrası SKIPPED(UNPAID); (B) retry'lar devam etsin ama kutu teslim edilmesin — tahsilat yalnız "borç" olur (MVP için hayır). **Öneri A**; ADR-0006 sayıları Setting'de kalır, varsayılan değişir (yeni ADR satırı).
+1. **Dunning penceresi vs. teslimat günü — KARAR (F7, 2026-08-20):** Yeniden deneme anları teslimat gününü **aşmaz**: sıradaki deneme `lockedAt + retryHours[i]` teslimat günü **08:00 Europe/Istanbul** (paketleme başlangıcı; `DUNNING_RETRY_DEADLINE_TIME`) sonrasına düşüyorsa o ve sonraki denemeler **atlanır**, cycle hemen **UNPAID → SKIPPED(skipSource=UNPAID)** olur (Order CANCELLED, DD iade, `failedCycles++`; 2 ardışık → PAST_DUE — §9). Setting `commerce.dunning.retryHours` değerleri aynen kalır, yalnız sınır uygulanır; varsayılan `[24,72]` ile kesimdeki ilk başarısız tahsilat doğrudan SKIPPED(UNPAID) demektir → lansman için admin'den `[2,12]` (ya da `[2,8]`) önerilir (ADR-0006'ya not). PAYMENT_LINK dunning'i aynı sınırla: link süresi / takvim / 08:00 hangisi önceyse; **sınır geçildiğinde yeni link üretilmez, cycle SKIPPED(UNPAID)** (F7 E entegrasyonunda uygulandı — öncesinde LINK kolu süresiz yeni link üretiyordu). Durum makinesi değişmedi. Uygulama: `apps/api/src/modules/subscriptions/services/cycles.service.ts#scheduleRetryOrSkip` (MIT) ve `#retryCycle` LINK kolu. Doğrulama: `__tests__/subscriptions/engine.spec.ts` + e2e `tools/e2e-admin/run-f7.mjs` (adım g/h).
 2. **PAST_DUE'den iptal:** üye PAST_DUE iken `POST …/cancel` serbest mi (teklifsiz)? Şu an makinede PAST_DUE→CANCEL_REQUESTED yok; öneri: doğrudan `cancel/confirm` izinli (PAST_DUE→CANCELLED).
 3. **PAST_DUE otomatik iptal:** N hafta sonra (ör. 4 ardışık UNPAID) otomatik CANCELLED + e-posta? MVP'de yok; admin listesi.
 4. **Retention "sunuldu" vs "kullanıldı":** `User.retentionOfferUsedAt` teklif sunulduğunda mı kabul edildiğinde mi yazılacak? Prototip: sunulduğunda (ikinci akışta teklif yok). Alan adı yanıltıcı; öneri: sunulduğunda yaz, dokümante et.
@@ -385,6 +388,6 @@ Kesimden sonra atlama yok (cycle LOCKED). Atlanan hafta: `lock-and-charge` SKIPP
 7. **Şablon güncellendi:** BoxTemplate yayınlandıktan sonra düzenlenirse SCHEDULED cycle'lar güncellenmeli mi? Öneri: hayır (müşteri swap'ı bozulur); admin "şablonu cycle'lara uygula" düğmesi P2.
 8. **`payments:reconcile`:** sağlayıcı zaman aşımında PENDING kalan Payment'lar için sorgulama job'ı (iyzico retrieve) — jobs listesinde yok; öneri: `cycles:expire-payment-links` içine 30 dk'lık PENDING temizliği.
 9. **PAID→CANCELLED vs REFUNDED:** ödenmiş Order iptalinde iade zorunlu; CANCELLED terminal olduğu için iade sonrası REFUNDED'a geçilemiyor. Öneri: müşteri iptali doğrudan `PAID→REFUNDED` (iade başarılı olunca), CANCELLED yalnız MANUAL ödeme/iade gerekmeyen hâller; ya da CANCELLED→REFUNDED eklensin.
-10. **MIT stratejisinde saklı kart yoksa:** (kart silindi) PAYMENT_LINK'e otomatik düşülsün mü? Öneri: evet + SE ADMIN_NOTE/log.
+10. ~~**MIT stratejisinde saklı kart yoksa:** (kart silindi) PAYMENT_LINK'e otomatik düşülsün mü?~~ → **KARAR (F7): evet** — kesimde/retry'da saklı kart yok ya da pasif ise PAYMENT_LINK'e düşülür + SE ADMIN_NOTE ("Saklı kart yok — PAYMENT_LINK stratejisine düşüldü"); `ChargeStrategyResolver` de aynı kuralla (`fallbackReason: 'NO_STORED_CARD'`). Uygulama: `cycles.service.ts#chargeLocked` / `#retryCycle`.
 11. **Abandon zaman aşımı:** CANCEL_REQUESTED 24 s sonra otomatik ABANDONED + ACTIVE (job) — gerekli mi, yoksa kesime kadar CANCEL_REQUESTED kalıp motor normal çalışmaya devam mı etsin (zaten ediyor)?
 12. **Ops "teslim edilemedi" cycle tarafında:** Order DELIVERY_FAILED yeterli mi, CycleStatus'e DELIVERY_FAILED eklensin mi? Öneri: eklenmesin (ops Order üzerinden yönetir).

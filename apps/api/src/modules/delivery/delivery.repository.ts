@@ -4,6 +4,9 @@ import { PrismaService } from '../../common/prisma.service';
 
 export type ZoneRecord = DeliveryZone;
 
+/** İşlem istemcisi — `$transaction` içinden `tx` ya da PrismaService (yapısal olarak uyumlu). */
+export type DbClient = Prisma.TransactionClient;
+
 export const DATE_WITH_ZONE_INCLUDE = { zone: { select: { slug: true, name: true } } } satisfies Prisma.DeliveryDateInclude;
 export type DateWithZoneRecord = Prisma.DeliveryDateGetPayload<{ include: typeof DATE_WITH_ZONE_INCLUDE }>;
 export type DateRecord = DeliveryDate;
@@ -113,5 +116,53 @@ export class DeliveryRepository {
       ...toUpdate.map((u) => this.prisma.deliveryDate.update({ where: { id: u.id }, data: { day: u.day, cutoffAt: u.cutoffAt } })),
     ]);
     return { created: toCreate.length, updated: toUpdate.length };
+  }
+
+  // ── F7: atomik rezerv / iade, tekil tarih bulma-oluşturma (DeliveryDatesService) ────────────────────────────────
+  // Ham SQL yalnız burada ve yalnız sayaç güncellemesi için; now() YOK (ADR-0004). Kolon adları camelCase değil,
+  // tek sözcük (id, reserved, capacity, status) — BACKEND-PLANI §2 "Migration dosyaları" notuyla uyumlu.
+
+  /**
+   * Atomik rezerv: `UPDATE delivery_dates SET reserved = reserved + 1 WHERE id = $1 AND reserved < capacity AND status = 'OPEN'`
+   * → etkilenen satır sayısı (0 = dolu / kapalı / yok; karar DeliveryDatesService'te). İsteğe bağlı işlem istemcisi (`tx`).
+   */
+  reserve(id: string, tx?: DbClient): Promise<number> {
+    const db = tx ?? this.prisma;
+    return db.$executeRaw`UPDATE "delivery_dates" SET "reserved" = "reserved" + 1 WHERE "id" = ${id} AND "reserved" < "capacity" AND "status" = 'OPEN'`;
+  }
+
+  /** Rezerv iadesi: reserved = max(reserved − 1, 0) (eksiye düşmez). → etkilenen satır (0 = tarih yok). */
+  release(id: string, tx?: DbClient): Promise<number> {
+    const db = tx ?? this.prisma;
+    return db.$executeRaw`UPDATE "delivery_dates" SET "reserved" = GREATEST("reserved" - 1, 0) WHERE "id" = ${id}`;
+  }
+
+  findDateByZoneAndDate(zoneId: string, date: Date, tx?: DbClient): Promise<DateWithZoneRecord | null> {
+    const db = tx ?? this.prisma;
+    return db.deliveryDate.findUnique({ where: { zoneId_date: { zoneId, date } }, include: DATE_WITH_ZONE_INCLUDE });
+  }
+
+  findDateByIdTx(id: string, tx?: DbClient): Promise<DateWithZoneRecord | null> {
+    const db = tx ?? this.prisma;
+    return db.deliveryDate.findUnique({ where: { id }, include: DATE_WITH_ZONE_INCLUDE });
+  }
+
+  /** Tek tarih oluşturur (yarışta unique(zoneId,date) P2002 → çağıran var olanı yeniden okur). */
+  createDate(data: { zoneId: string; day: DeliveryDay; date: Date; cutoffAt: Date; capacity: number }, tx?: DbClient): Promise<DateWithZoneRecord> {
+    const db = tx ?? this.prisma;
+    return db.deliveryDate.create({
+      data: { zoneId: data.zoneId, day: data.day, date: data.date, cutoffAt: data.cutoffAt, capacity: data.capacity, reserved: 0, status: 'OPEN' },
+      include: DATE_WITH_ZONE_INCLUDE,
+    });
+  }
+
+  /** Bölge + gün için kesimi `after` anından SONRA olan en yakın tarih satırı (varsa). */
+  findNextDateFor(zoneId: string, day: DeliveryDay, after: Date, tx?: DbClient): Promise<DateWithZoneRecord | null> {
+    const db = tx ?? this.prisma;
+    return db.deliveryDate.findFirst({
+      where: { zoneId, day, cutoffAt: { gt: after } },
+      orderBy: { date: 'asc' },
+      include: DATE_WITH_ZONE_INCLUDE,
+    });
   }
 }

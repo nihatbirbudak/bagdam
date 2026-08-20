@@ -1,14 +1,19 @@
 // database/schema.prisma — Bağdam v2 (PostgreSQL 14+, Prisma 6)
-// Kaynak: docs/BACKEND-PLANI.md §2 (F2a kapsamı) · ADR-0004 (Timestamptz) · ADR-0013 (F2a/F2b, additive migration)
+// Kaynak: docs/BACKEND-PLANI.md §2 (F2a + F2b) · ADR-0004 (Timestamptz) · ADR-0013 (F2a/F2b, additive migration)
+//         · ADR-0006 (tahsilat/DELTA) · ADR-0007 (indirim/atlama/retention) · ADR-0008 (abonelik modeli) · ADR-0010 (ödeme)
 //
 // İlkeler:
 // - Tüm an alanları `@db.Timestamptz(3)`, takvim günleri `@db.Date` (ADR-0004).
 // - Her değerin tek sahibi; "şema-var/UI-yok" alanlar yorumla etiketli (ADR-0013).
 // - F2b modelleri (Cart, Order, OrderLine, PaymentMethod, Payment, Refund, WebhookEvent,
 //   Subscription, SubscriptionCycle, CycleItem, SubscriptionEvent, SubscriptionCancellation)
-//   F7 1. gününde `0003_commerce` ile eklenir; bu dosyadaki `// F2b:` yorumları ilişki yer tutucusudur.
-// - Enum'lar F2b dahil TAMAMI burada (packages/shared/src/enums.ts ile birebir).
-// - Migration zinciri: 0000_extensions (citext) → 0001_init_core → 0002_raw_core (addresses_one_default).
+//   F7 1. gününde `0003_commerce` ile eklendi (BACKEND-PLANI §2 F2b bloğu birebir); F2a modellerindeki
+//   karşı ilişkiler (User.orders … BoxTier.subscriptions) ve Consent.orderId → Order FK aynı migration'da additive.
+// - Coupon + CouponRedemption: kullanıcı kararıyla minimal kupon şeması (F7); admin/checkout UI P2 (ADR-0016) —
+//   Order.couponCode snapshot, FK CouponRedemption'da.
+// - Enum'lar TAMAMI burada — 29 enum (F7: CouponKind, CouponScope) — packages/shared/src/enums.ts ile birebir.
+// - Migration zinciri: 0000_extensions (citext) → 0001_init_core → 0002_raw_core (addresses_one_default)
+//   → 0003_commerce (F2b + Coupon) → 0004_raw_commerce ("orders_orderNo_seq" RESTART 1001, "payments_provider_pid_succeeded").
 // - Client çıktısı: varsayılan — @prisma/client 6.19.2 kökte ve apps/api'de aynı pnpm store girdisine
 //   çözümlenir (node_modules/.pnpm/@prisma+client@…/node_modules/.prisma/client); `pnpm db:generate` yeterli.
 // - Migration üretimi: `pnpm db:migrate --create-only --name <ad>` (pnpm 9'da `--` KULLANMA: prisma'ya
@@ -161,6 +166,19 @@ enum WebhookStatus {
   IGNORED
 }
 
+/// Kupon türü: PERCENT yüzde · AMOUNT sabit TL (F7, minimal kupon şeması)
+enum CouponKind {
+  PERCENT
+  AMOUNT
+}
+
+/// Kupon kapsamı: ALL · SINGLE (tekil ürün) · BOX (kutu / abonelik)
+enum CouponScope {
+  ALL
+  SINGLE
+  BOX
+}
+
 enum LeadStatus {
   NEW
   CONTACTED
@@ -260,37 +278,41 @@ enum MailStatus {
 // ───────── F2a: KULLANICI / ADRES / BÖLGE / TESLİMAT TARİHİ ─────────
 
 model User {
-  id                    String    @id @default(cuid())
+  id                    String             @id @default(cuid())
   /// FE #loginEmail / #signupEmail — citext: büyük/küçük harf duyarsız benzersiz
-  email                 String    @unique @db.Citext
+  email                 String             @unique @db.Citext
   passwordHash          String
-  name                  String?   @db.VarChar(120)
+  name                  String?            @db.VarChar(120)
   /// opsiyonel; zorunlu telefon Address/Order'da [B10]
-  phone                 String?   @db.VarChar(30)
-  role                  UserRole  @default(CUSTOMER)
-  isActive              Boolean   @default(true)
-  emailVerifiedAt       DateTime? @db.Timestamptz(3)
+  phone                 String?            @db.VarChar(30)
+  role                  UserRole           @default(CUSTOMER)
+  isActive              Boolean            @default(true)
+  emailVerifiedAt       DateTime?          @db.Timestamptz(3)
   refreshTokenHash      String?
-  passwordResetToken    String?   @unique
-  passwordResetExpires  DateTime? @db.Timestamptz(3)
-  failedLoginAttempts   Int       @default(0)
-  lockedUntil           DateTime? @db.Timestamptz(3)
+  passwordResetToken    String?            @unique
+  passwordResetExpires  DateTime?          @db.Timestamptz(3)
+  failedLoginAttempts   Int                @default(0)
+  lockedUntil           DateTime?          @db.Timestamptz(3)
   /// FE bahceden_prefs
   prefs                 Json?
   /// FE bahceden_retention_offered (üye başına 1)
-  retentionOfferUsedAt  DateTime? @db.Timestamptz(3)
+  retentionOfferUsedAt  DateTime?          @db.Timestamptz(3)
   /// ilk 2 kutu %50 (üye başına 1 abonelik)
-  firstBoxesPromoUsedAt DateTime? @db.Timestamptz(3)
-  marketingOptIn        Boolean   @default(false)
-  lastLoginAt           DateTime? @db.Timestamptz(3)
+  firstBoxesPromoUsedAt DateTime?          @db.Timestamptz(3)
+  marketingOptIn        Boolean            @default(false)
+  lastLoginAt           DateTime?          @db.Timestamptz(3)
   /// KVKK anonimleştirme [B43]
-  anonymizedAt          DateTime? @db.Timestamptz(3)
-  createdAt             DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt             DateTime  @updatedAt @db.Timestamptz(3)
-  deletedAt             DateTime? @db.Timestamptz(3)
+  anonymizedAt          DateTime?          @db.Timestamptz(3)
+  createdAt             DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
+  deletedAt             DateTime?          @db.Timestamptz(3)
   addresses             Address[]
   consents              Consent[]
-  // F2b: orders Order[] · subscriptions Subscription[] · paymentMethods PaymentMethod[] · cart Cart?
+  orders                Order[]
+  subscriptions         Subscription[]
+  paymentMethods        PaymentMethod[]
+  cart                  Cart?
+  couponRedemptions     CouponRedemption[]
 
   @@map("users")
 }
@@ -310,25 +332,27 @@ model DeliveryZone {
   sortOrder      Int            @default(0)
   addresses      Address[]
   dates          DeliveryDate[]
-  // F2b: subscriptions Subscription[] · orders Order[]
+  subscriptions  Subscription[]
+  orders         Order[]
 
   @@map("delivery_zones")
 }
 
 /// TEK kesim+kapasite kaynağı; cron 8 hafta ileri üretir
 model DeliveryDate {
-  id       String             @id @default(cuid())
+  id       String              @id @default(cuid())
   zoneId   String
-  zone     DeliveryZone       @relation(fields: [zoneId], references: [id])
+  zone     DeliveryZone        @relation(fields: [zoneId], references: [id])
   day      DeliveryDay
-  date     DateTime           @db.Date
+  date     DateTime            @db.Date
   /// zonedTimeToUtc(date-1 12:00, Europe/Istanbul) [B34]
-  cutoffAt DateTime           @db.Timestamptz(3)
+  cutoffAt DateTime            @db.Timestamptz(3)
   capacity Int
   /// UPDATE … WHERE reserved < capacity (atomik)
-  reserved Int                @default(0)
-  status   DeliveryDateStatus @default(OPEN)
-  // F2b: cycles SubscriptionCycle[] · orders Order[]
+  reserved Int                 @default(0)
+  status   DeliveryDateStatus  @default(OPEN)
+  cycles   SubscriptionCycle[]
+  orders   Order[]
 
   @@unique([zoneId, date])
   @@index([date, status])
@@ -337,22 +361,22 @@ model DeliveryDate {
 
 /// FE bahceden_address + #addressForm (MVP tek adres)
 model Address {
-  id        String       @id @default(cuid())
-  userId    String
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName  String       @db.VarChar(120)
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName      String         @db.VarChar(120)
   /// zorunlu [B10]
-  phone     String       @db.VarChar(30)
-  line      String       @db.VarChar(500)
-  zoneId    String
-  zone      DeliveryZone @relation(fields: [zoneId], references: [id])
-  zip       String?      @db.VarChar(10)
+  phone         String         @db.VarChar(30)
+  line          String         @db.VarChar(500)
+  zoneId        String
+  zone          DeliveryZone   @relation(fields: [zoneId], references: [id])
+  zip           String?        @db.VarChar(10)
   /// şema-var/UI-yok (çoklu adres P2)
-  isDefault Boolean      @default(true)
-  createdAt DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
-  deletedAt DateTime?    @db.Timestamptz(3)
-  // F2b: subscriptions Subscription[]
+  isDefault     Boolean        @default(true)
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(3)
+  deletedAt     DateTime?      @db.Timestamptz(3)
+  subscriptions Subscription[]
   // raw (0002_raw_core): CREATE UNIQUE INDEX addresses_one_default ON addresses("userId") WHERE "isDefault" AND "deletedAt" IS NULL;
   // (kolon adları camelCase — alanlarda @map yok; plandaki snake_case yazımı buna göre uyarlandı)
 
@@ -439,7 +463,8 @@ model Product {
   /// why = lots(isCurrent).tastingNote [B11]
   lots          ProductLot[]
   templateItems BoxTemplateItem[]
-  // F2b: orderLines OrderLine[] · cycleItems CycleItem[]
+  orderLines    OrderLine[]
+  cycleItems    CycleItem[]
   createdAt     DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime          @updatedAt @db.Timestamptz(3)
   deletedAt     DateTime?         @db.Timestamptz(3)
@@ -465,20 +490,20 @@ model ProductImage {
 
 /// FE batch + why (parti sürümü) — her ürünün ≥1 lot'u seed'lenir
 model ProductLot {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   productId   String
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   producerId  String?
-  producer    Producer? @relation(fields: [producerId], references: [id], onDelete: SetNull)
+  producer    Producer?   @relation(fields: [producerId], references: [id], onDelete: SetNull)
   /// FE batch
-  lotCode     String    @db.VarChar(40)
-  harvestDate DateTime? @db.Date
-  bestBefore  DateTime? @db.Date
+  lotCode     String      @db.VarChar(40)
+  harvestDate DateTime?   @db.Date
+  bestBefore  DateTime?   @db.Date
   /// FE why — TEK SAHİP
   tastingNote String?
-  isCurrent   Boolean   @default(true)
-  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
-  // F2b: cycleItems CycleItem[]
+  isCurrent   Boolean     @default(true)
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  cycleItems  CycleItem[]
 
   @@unique([productId, lotCode])
   @@map("product_lots")
@@ -488,20 +513,20 @@ model ProductLot {
 
 /// FE SUB_TIERS
 model BoxTier {
-  id            String        @id @default(cuid())
+  id            String         @id @default(cuid())
   /// small | sezon
-  slug          String        @unique @db.VarChar(40)
-  label         String        @db.VarChar(80)
+  slug          String         @unique @db.VarChar(40)
+  label         String         @db.VarChar(80)
   itemCount     Int
-  price         Decimal       @db.Decimal(12, 2)
-  note          String?       @db.VarChar(160)
+  price         Decimal        @db.Decimal(12, 2)
+  note          String?        @db.VarChar(160)
   imageMediaId  String?
-  imageMedia    MediaFile?    @relation("TierImage", fields: [imageMediaId], references: [id], onDelete: SetNull)
-  isRecommended Boolean       @default(false)
-  isActive      Boolean       @default(true)
-  sortOrder     Int           @default(0)
+  imageMedia    MediaFile?     @relation("TierImage", fields: [imageMediaId], references: [id], onDelete: SetNull)
+  isRecommended Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  sortOrder     Int            @default(0)
   templates     BoxTemplate[]
-  // F2b: subscriptions Subscription[]
+  subscriptions Subscription[]
 
   @@map("box_tiers")
 }
@@ -535,10 +560,409 @@ model BoxTemplateItem {
   @@map("box_template_items")
 }
 
-// ───────── F2b: SEPET / SİPARİŞ / ÖDEME / ABONELİK MOTORU → F7 (0003_commerce) ─────────
-// Cart, Order, OrderLine, PaymentMethod, Payment, Refund, WebhookEvent,
-// Subscription, SubscriptionCycle, CycleItem, SubscriptionEvent, SubscriptionCancellation
-// (bkz. docs/BACKEND-PLANI.md §2 — additive olarak eklenir, ADR-0013)
+// ───────── F2b: SEPET / SİPARİŞ (F7 · 0003_commerce) ─────────
+
+/// şema-var/kullanım P2 (üye sepeti merge — ADR-0016); misafir sepeti localStorage'da kalır
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// CartLineInput[] — tekil ürün satırları {id: slug, qty, pref}
+  items     Json     @default("[]")
+  /// CartBoxInput — kutu taslağı (tier/type/freq/deliveryDay/items/itemPrefs/extras)
+  boxDraft  Json?
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("carts")
+}
+
+/// Ödendikten sonra DEĞİŞMEZ (snapshot) [B25]; kesim sonrası eklemeler ayrı DELTA Order (ADR-0006)
+model Order {
+  id               String             @id @default(cuid())
+  /// raw (0004_raw_commerce): ALTER SEQUENCE "orders_orderNo_seq" RESTART WITH 1001
+  orderNo          Int                @unique @default(autoincrement())
+  kind             OrderKind
+  status           OrderStatus        @default(PENDING_PAYMENT)
+  userId           String?
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subscriptionId   String?
+  subscription     Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  customerName     String             @db.VarChar(120)
+  /// = User.email (checkout'ta readonly) [B15]
+  customerEmail    String             @db.VarChar(160)
+  /// zorunlu [B10]
+  customerPhone    String             @db.VarChar(30)
+  zoneId           String?
+  zone             DeliveryZone?      @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  deliveryDateId   String?
+  deliveryDate     DeliveryDate?      @relation(fields: [deliveryDateId], references: [id], onDelete: SetNull)
+  deliveryDay      DeliveryDay
+  deliveryOn       DateTime           @db.Date
+  /// AddressSnapshot {fullName, phone, line, zoneId, zoneName, zip}
+  addressSnapshot  Json
+  /// billing*: şema-var/UI-yok — kurumsal fatura talebi admin'den girilir (TR mevzuat) [B20]
+  billingParty     BillingParty       @default(INDIVIDUAL)
+  billingName      String?            @db.VarChar(200)
+  billingTaxNo     String?            @db.VarChar(11)
+  billingTaxOffice String?            @db.VarChar(100)
+  subtotal         Decimal            @db.Decimal(12, 2)
+  /// ilk-kutu %50 / retention / kupon — grandTotal'a YANSIR
+  discountTotal    Decimal            @default(0) @db.Decimal(12, 2)
+  shippingFee      Decimal            @default(0) @db.Decimal(12, 2)
+  vatTotal         Decimal            @default(0) @db.Decimal(12, 2)
+  grandTotal       Decimal            @db.Decimal(12, 2)
+  /// uygulanan kupon kodu (snapshot; Coupon'a FK yok — CouponRedemption bağlar)
+  couponCode       String?            @db.VarChar(40)
+  paidAt           DateTime?          @db.Timestamptz(3)
+  /// manuel GİB e-Arşiv; Invoice tablosu P2
+  invoiceNo        String?            @db.VarChar(40)
+  invoicePdfPath   String?            @db.VarChar(255)
+  note             String?
+  /// telafi (ayıplı ürün) kaydı MVP'de burada [B19]
+  adminNote        String?
+  ipAddress        String?            @db.VarChar(64)
+  userAgent        String?            @db.VarChar(255)
+  cancelledAt      DateTime?          @db.Timestamptz(3)
+  cancelReason     String?            @db.VarChar(200)
+  lines            OrderLine[]
+  payments         Payment[]
+  consents         Consent[]
+  /// cycle#1: checkout Order'ı · cycle#n: kesimde üretilen Order
+  cycle            SubscriptionCycle? @relation("CycleMainOrder")
+  /// peşin sonrası eklenen ekstralar: ayrı küçük DELTA Order [B25]
+  deltaCycle       SubscriptionCycle? @relation("CycleDeltaOrder")
+  couponRedemption CouponRedemption?
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @db.Timestamptz(3)
+  deletedAt        DateTime?          @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([status])
+  @@index([deliveryOn, status])
+  @@map("orders")
+}
+
+model OrderLine {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind      OrderLineKind
+  productId String?
+  product   Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  /// BOX satırında BoxTier.slug (small | sezon)
+  tierSlug  String?       @db.VarChar(40)
+  name      String        @db.VarChar(160)
+  unit      String?       @db.VarChar(40)
+  /// PRODUCT: adet · BOX: 1 · EXTRA: çarpan (factor)
+  qty       Decimal       @db.Decimal(8, 3)
+  unitPrice Decimal       @db.Decimal(12, 2)
+  lineTotal Decimal       @db.Decimal(12, 2)
+  vatRate   Int           @default(1)
+  pref      String?       @db.VarChar(60)
+  lotCode   String?       @db.VarChar(40)
+  /// BOX: {items:[{productId,name,pref,boxAmount,lotCode}]}
+  metadata  Json?
+
+  @@index([orderId])
+  @@map("order_lines")
+}
+
+// ───────── F2b: ÖDEME (F7 · 0003_commerce) ─────────
+
+/// yalnız PSP token'ı — kart verisi bizde yok (ADR-0010)
+model PaymentMethod {
+  id                  String          @id @default(cuid())
+  userId              String
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider            PaymentProvider
+  providerCustomerKey String          @db.VarChar(120)
+  providerCardToken   String          @db.VarChar(120)
+  bin                 String?         @db.VarChar(8)
+  last4               String          @db.VarChar(4)
+  brand               String?         @db.VarChar(30)
+  holderName          String?         @db.VarChar(120)
+  expMonth            Int?
+  expYear             Int?
+  isDefault           Boolean         @default(true)
+  isActive            Boolean         @default(true)
+  createdAt           DateTime        @default(now()) @db.Timestamptz(3)
+  deletedAt           DateTime?       @db.Timestamptz(3)
+  subscriptions       Subscription[]
+  payments            Payment[]
+
+  @@index([userId])
+  @@map("payment_methods")
+}
+
+model Payment {
+  id                  String          @id @default(cuid())
+  orderId             String
+  order               Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider            PaymentProvider
+  kind                PaymentKind     @default(CHECKOUT)
+  /// idempotency anahtarı (`chk_<orderId>`, `cyc_<cycleId>_<attemptNo>` …)
+  conversationId      String          @unique @db.VarChar(80)
+  providerPaymentId   String?         @db.VarChar(120)
+  providerToken       String?         @db.VarChar(160)
+  paymentMethodId     String?
+  paymentMethod       PaymentMethod?  @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  amount              Decimal         @db.Decimal(12, 2)
+  status              PaymentStatus   @default(PENDING)
+  is3ds               Boolean         @default(true)
+  isMerchantInitiated Boolean         @default(false)
+  /// PAYMENT_LINK stratejisi — `GET /pay/:linkToken` [B27]
+  linkToken           String?         @unique @db.VarChar(64)
+  linkExpiresAt       DateTime?       @db.Timestamptz(3)
+  attemptNo           Int             @default(1)
+  failureCode         String?         @db.VarChar(40)
+  failureMessage      String?         @db.VarChar(255)
+  rawResponse         Json?
+  paidAt              DateTime?       @db.Timestamptz(3)
+  refunds             Refund[]
+  createdAt           DateTime        @default(now()) @db.Timestamptz(3)
+  // raw (0004_raw_commerce): CREATE UNIQUE INDEX "payments_provider_pid_succeeded" ON "payments"("provider","providerPaymentId") WHERE "status"='SUCCEEDED';
+
+  @@index([orderId])
+  @@index([providerPaymentId])
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+model Refund {
+  id               String        @id @default(cuid())
+  paymentId        String
+  payment          Payment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount           Decimal       @db.Decimal(12, 2)
+  reason           String?       @db.VarChar(255)
+  providerRefundId String?       @db.VarChar(120)
+  status           PaymentStatus @default(PENDING)
+  /// admin User.id (FK yok — audit amaçlı)
+  requestedBy      String?
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@map("refunds")
+}
+
+/// PSP webhook idempotency: (provider, eventType, providerRef) benzersiz → ikinci teslim IGNORED
+model WebhookEvent {
+  id             String          @id @default(cuid())
+  provider       PaymentProvider
+  eventType      String          @db.VarChar(80)
+  providerRef    String          @db.VarChar(160)
+  payload        Json
+  signatureValid Boolean
+  status         WebhookStatus   @default(RECEIVED)
+  error          String?
+  receivedAt     DateTime        @default(now()) @db.Timestamptz(3)
+  processedAt    DateTime?       @db.Timestamptz(3)
+
+  @@unique([provider, eventType, providerRef])
+  @@map("webhook_events")
+}
+
+// ───────── F2b: ABONELİK MOTORU (F7 · 0003_commerce) ─────────
+
+/// FE bahceden_sub (purchased) — abonelik VE tek seferlik kutu (isOneTime) [B2] (ADR-0008)
+model Subscription {
+  id                 String                     @id @default(cuid())
+  userId             String
+  user               User                       @relation(fields: [userId], references: [id])
+  tierId             String
+  tier               BoxTier                    @relation(fields: [tierId], references: [id])
+  /// FE type onetime → tek cycle, sonra COMPLETED
+  isOneTime          Boolean                    @default(false)
+  status             SubscriptionStatus         @default(PENDING)
+  /// 1|2|4 (isOneTime'da anlamsız)
+  frequencyWeeks     Int                        @default(1)
+  deliveryDay        DeliveryDay
+  zoneId             String
+  zone               DeliveryZone               @relation(fields: [zoneId], references: [id])
+  addressId          String?
+  address            Address?                   @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  paymentMethodId    String?
+  paymentMethod      PaymentMethod?             @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  /// FE itemPrefs {productSlug: option} — KALICI olan yalnız bu [B4]
+  itemPrefs          Json                       @default("{}")
+  /// Setting commerce.chargeStrategy'den kopya (abonelik başına) [B27]
+  chargeStrategy     ChargeStrategy             @default(MERCHANT_INITIATED)
+  /// ilk-2-kutu %50 hakkı (ADR-0007)
+  discountBoxesLeft  Int                        @default(2)
+  /// retention %50 (1 kutu)
+  nextBoxDiscountPct Int?
+  /// un-skip iade eder; reset = startedAt yıl dönümü [B14]
+  skipsUsed          Int                        @default(0)
+  skipsResetAt       DateTime?                  @db.Timestamptz(3)
+  /// ardışık tahsil edilemeyen cycle sayısı; >= dunning.pastDueAfterUnpaid → PAST_DUE
+  failedCycles       Int                        @default(0)
+  /// onaylanan abonelik sözleşmesi (LegalDocument.id; FK yok — sürüm arşivi silinmez)
+  contractDocId      String?
+  startedAt          DateTime?                  @db.Timestamptz(3)
+  nextDeliveryOn     DateTime?                  @db.Date
+  nextCutoffAt       DateTime?                  @db.Timestamptz(3)
+  cancelRequestedAt  DateTime?                  @db.Timestamptz(3)
+  cancelledAt        DateTime?                  @db.Timestamptz(3)
+  completedAt        DateTime?                  @db.Timestamptz(3)
+  cycles             SubscriptionCycle[]
+  orders             Order[]
+  events             SubscriptionEvent[]
+  /// 1:N — her iptal akışı bir satır [B8]
+  cancellations      SubscriptionCancellation[]
+  createdAt          DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                   @updatedAt @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([status, nextCutoffAt])
+  @@map("subscriptions")
+}
+
+/// Haftalık dönem; kesimde (DeliveryDate.cutoffAt) kilitlenir, fiyat snapshot'ı buraya kopyalanır
+model SubscriptionCycle {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  cycleNo        Int
+  deliveryDateId String
+  deliveryDate   DeliveryDate @relation(fields: [deliveryDateId], references: [id])
+  status         CycleStatus  @default(SCHEDULED)
+  skipSource     SkipSource?
+  /// lock snapshot
+  boxPrice       Decimal?     @db.Decimal(12, 2)
+  extrasTotal    Decimal?     @db.Decimal(12, 2)
+  discount       Decimal?     @db.Decimal(12, 2)
+  shippingFee    Decimal?     @db.Decimal(12, 2)
+  /// FE "Bu haftaki ödeme"
+  total          Decimal?     @db.Decimal(12, 2)
+  /// cycle#1: checkout'ta peşin ödenen tutar (ADR-0006)
+  prepaidAmount  Decimal      @default(0) @db.Decimal(12, 2)
+  /// cycle#1 → checkout Order'ı; diğerleri lock'ta üretilen Order
+  orderId        String?      @unique
+  order          Order?       @relation("CycleMainOrder", fields: [orderId], references: [id], onDelete: SetNull)
+  /// peşin sonrası eklenen ekstralar: AYRI küçük Order [B25]
+  deltaOrderId   String?      @unique
+  deltaOrder     Order?       @relation("CycleDeltaOrder", fields: [deltaOrderId], references: [id], onDelete: SetNull)
+  lockedAt       DateTime?    @db.Timestamptz(3)
+  skippedAt      DateTime?    @db.Timestamptz(3)
+  /// PAYMENT_LINK: link süresi (= Payment.linkExpiresAt)
+  paymentDueAt   DateTime?    @db.Timestamptz(3)
+  retryCount     Int          @default(0)
+  nextRetryAt    DateTime?    @db.Timestamptz(3)
+  items          CycleItem[]
+
+  @@unique([subscriptionId, cycleNo])
+  @@index([status, deliveryDateId])
+  @@map("subscription_cycles")
+}
+
+/// Cycle içeriği — TEMPLATE (yayınlanmış BoxTemplate) / SWAP / EXTRA / CART_MERGE (ADR-0008)
+model CycleItem {
+  id              String            @id @default(cuid())
+  cycleId         String
+  cycle           SubscriptionCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  source          CycleItemSource
+  productId       String
+  product         Product           @relation(fields: [productId], references: [id])
+  lotId           String?
+  lot             ProductLot?       @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  /// SWAP: yerine geçtiği şablon ürününün id'si
+  swapOfProductId String?           @db.VarChar(40)
+  pref            String?           @db.VarChar(60)
+  /// EXTRA: çarpan (factor) · diğerleri 1
+  qty             Decimal           @default(1) @db.Decimal(8, 3)
+  unit            String?           @db.VarChar(40)
+  label           String?           @db.VarChar(80)
+  /// lock snapshot; telafi = EXTRA unitPrice 0 [B19]
+  unitPrice       Decimal?          @db.Decimal(12, 2)
+  lotCode         String?           @db.VarChar(40)
+  sortOrder       Int               @default(0)
+
+  @@index([cycleId])
+  @@map("cycle_items")
+}
+
+/// Abonelik olay günlüğü — SubEventType; actor USER | SYSTEM | ADMIN | OPS | PSP
+model SubscriptionEvent {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  /// ilgili cycle (FK yok — cycle silinse de günlük kalır)
+  cycleId        String?
+  type           SubEventType
+  actor          String       @db.VarChar(10)
+  data           Json?
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([subscriptionId, createdAt])
+  @@map("subscription_events")
+}
+
+/// Her iptal AKIŞI bir satır [B8]; Abonelik Sözleşmeleri Yön. md.24-25 (fesih ≤7 g, iade ≤15 g — ADR-0007)
+model SubscriptionCancellation {
+  id               String        @id @default(cuid())
+  subscriptionId   String
+  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  reason           CancelReason?
+  reasonText       String?
+  retentionOffered Boolean       @default(false)
+  outcome          CancelOutcome @default(PENDING)
+  requestedAt      DateTime      @default(now()) @db.Timestamptz(3)
+  /// feshin yürürlük anı — en geç requestedAt + 7 gün
+  effectiveAt      DateTime?     @db.Timestamptz(3)
+  confirmedAt      DateTime?     @db.Timestamptz(3)
+  refundAmount     Decimal?      @db.Decimal(12, 2)
+  /// iade son tarihi — en geç effectiveAt + 15 gün
+  refundDueAt      DateTime?     @db.Timestamptz(3)
+
+  @@index([subscriptionId, requestedAt])
+  @@map("subscription_cancellations")
+}
+
+// ───────── F2b: KUPON (F7 · 0003_commerce — kullanıcı kararı: minimal şema; admin/checkout UI P2, ADR-0016) ─────────
+
+/// Kupon tanımı — şema-var/UI-yok; `code` citext (büyük/küçük harf duyarsız benzersiz)
+model Coupon {
+  id           String             @id @default(cuid())
+  code         String             @unique @db.Citext
+  kind         CouponKind
+  /// PERCENT: yüzde (0–100) · AMOUNT: TL
+  value        Decimal            @db.Decimal(12, 2)
+  /// indirim öncesi ara toplam alt sınırı (null = yok)
+  minSubtotal  Decimal?           @db.Decimal(12, 2)
+  /// ALL · SINGLE (tekil ürün) · BOX (kutu / abonelik)
+  appliesTo    CouponScope        @default(ALL)
+  startsAt     DateTime?          @db.Timestamptz(3)
+  endsAt       DateTime?          @db.Timestamptz(3)
+  /// toplam kullanım sınırı (null = sınırsız)
+  usageLimit   Int?
+  /// üye başına kullanım sınırı (null = sınırsız)
+  perUserLimit Int?
+  usedCount    Int                @default(0)
+  isActive     Boolean            @default(true)
+  note         String?
+  createdAt    DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime           @updatedAt @db.Timestamptz(3)
+  deletedAt    DateTime?          @db.Timestamptz(3)
+  redemptions  CouponRedemption[]
+
+  @@map("coupons")
+}
+
+/// Kupon kullanımı — sipariş başına en fazla 1 (orderId unique); Order.couponCode snapshot, FK burada
+model CouponRedemption {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id])
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// uygulanan indirim tutarı (TL)
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([couponId])
+  @@index([userId])
+  @@map("coupon_redemptions")
+}
 
 // ───────── F2a: TOPTAN / İÇERİK / YASAL / AYAR / MEDYA / LOG ─────────
 
@@ -607,8 +1031,9 @@ model Consent {
   userId      String?
   user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   guestKey    String?        @db.VarChar(64)
-  /// F2b: Order FK (onDelete: SetNull) F7'de additive eklenir; şimdilik ilişkisiz
+  /// checkout onayları siparişe bağlanır (F7 0003_commerce: FK additive, onDelete SetNull)
   orderId     String?
+  order       Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
   kind        ConsentKind
   documentId  String?
   document    LegalDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)

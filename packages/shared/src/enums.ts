@@ -334,6 +334,33 @@ export const WEBHOOK_STATUS_LABELS: Readonly<Record<WebhookStatus, string>> = {
   IGNORED: 'Yok sayıldı (çift teslim)',
 };
 
+// ── Kupon (F7 minimal şema; admin/checkout UI P2 — ADR-0016) ─────────────────
+/** Kupon türü: PERCENT yüzde (0–100) · AMOUNT sabit TL (KDV dahil). */
+export const CouponKind = {
+  PERCENT: 'PERCENT',
+  AMOUNT: 'AMOUNT',
+} as const;
+export type CouponKind = (typeof CouponKind)[keyof typeof CouponKind];
+export const COUPON_KIND_VALUES: readonly CouponKind[] = Object.values(CouponKind);
+export const COUPON_KIND_LABELS: Readonly<Record<CouponKind, string>> = {
+  PERCENT: 'Yüzde indirim',
+  AMOUNT: 'Tutar indirimi (TL)',
+};
+
+/** Kupon kapsamı: ALL tüm sepet · SINGLE tekil ürün satırları · BOX kutu / abonelik satırı. */
+export const CouponScope = {
+  ALL: 'ALL',
+  SINGLE: 'SINGLE',
+  BOX: 'BOX',
+} as const;
+export type CouponScope = (typeof CouponScope)[keyof typeof CouponScope];
+export const COUPON_SCOPE_VALUES: readonly CouponScope[] = Object.values(CouponScope);
+export const COUPON_SCOPE_LABELS: Readonly<Record<CouponScope, string>> = {
+  ALL: 'Tüm sepet',
+  SINGLE: 'Tekil ürünler',
+  BOX: 'Kutu / abonelik',
+};
+
 // ── Toptan / içerik / yasal ───────────────────────────────────────────────────
 export const LeadStatus = {
   NEW: 'NEW',

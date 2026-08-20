@@ -3,20 +3,22 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AdminLoginPage } from '../pages/auth/AdminLoginPage';
 import { AdminDashboardPage } from '../pages/dashboard/AdminDashboardPage';
+import { AdminUrunlerListePage } from '../pages/urunler/AdminUrunlerListePage';
+import { AdminUrunFormPage } from '../pages/urunler/AdminUrunFormPage';
+import { AdminKategorilerPage } from '../pages/kategoriler/AdminKategorilerPage';
+import { AdminUreticilerPage } from '../pages/ureticiler/AdminUreticilerPage';
+import { AdminKutularPage } from '../pages/kutular/AdminKutularPage';
+import { AdminHaftaninKutusuPage } from '../pages/haftanin-kutusu/AdminHaftaninKutusuPage';
+import { AdminMedyaPage } from '../pages/medya/AdminMedyaPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { ADMIN_ROOT, getAllNavLeaves } from '../lib/adminNavConfig';
 
-/**
- * Route kapısı. F1: `VITE_AUTH_DISABLED=true` (yalnız dev) iken geçirir;
- * aksi halde oturum yoksa /login'e yönlendirir. F4'te AuthModule ile gerçek kapı.
- */
+/** Route kapısı: oturum yoksa /login'e (`?next=`); yüklenirken bekletir. */
 export function RequireAdminAuth({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading, authDisabled } = useAdminAuth();
+  const { isAuthenticated, loading } = useAdminAuth();
   const location = useLocation();
-
-  if (authDisabled) return <>{children}</>;
 
   if (loading) {
     return (
@@ -35,8 +37,8 @@ export function RequireAdminAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Menüdeki her ekran F1'de yer tutucu sayfaya bağlanır; gerçek sayfalar fazlarında buraya eklenir. */
-const placeholderLeaves = getAllNavLeaves().filter((leaf) => leaf.to !== ADMIN_ROOT);
+/** Menüde yer tutucu kalan ekranlar (F5+); F4 ekranları aşağıda gerçek sayfaya bağlı. */
+const placeholderLeaves = getAllNavLeaves().filter((leaf) => leaf.to !== ADMIN_ROOT && leaf.comingSoon);
 
 export function AdminRouter() {
   return (
@@ -52,6 +54,16 @@ export function AdminRouter() {
         }
       >
         <Route index element={<AdminDashboardPage />} />
+
+        {/* F4 — Katalog */}
+        <Route path="/katalog/urunler" element={<AdminUrunlerListePage />} />
+        <Route path="/katalog/urunler/yeni" element={<AdminUrunFormPage />} />
+        <Route path="/katalog/urunler/:id" element={<AdminUrunFormPage />} />
+        <Route path="/katalog/kategoriler" element={<AdminKategorilerPage />} />
+        <Route path="/katalog/ureticiler" element={<AdminUreticilerPage />} />
+        <Route path="/katalog/kutular" element={<AdminKutularPage />} />
+        <Route path="/katalog/haftanin-kutusu" element={<AdminHaftaninKutusuPage />} />
+        <Route path="/medya" element={<AdminMedyaPage />} />
 
         {placeholderLeaves.map((leaf) => (
           <Route key={leaf.to} path={leaf.to} element={<PlaceholderPage />} />

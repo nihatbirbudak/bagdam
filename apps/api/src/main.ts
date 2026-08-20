@@ -13,13 +13,14 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import hbs from 'hbs';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { APP_VERSION, PARTIALS_DIR, PUBLIC_DIR, VIEWS_DIR, getSiteMode, validateEnv } from './config';
+import { resolveUploadsDir } from './modules/media/media.constants';
 import { WEB_ROUTES_EXCLUDED_FROM_PREFIX } from './web/web.routes';
 
 /** Production'da CORS allow-list'e sabit eklenen alan adları (ADR-0012). */
@@ -117,6 +118,12 @@ async function bootstrap(): Promise<void> {
     PUBLIC_DIR,
     isProduction ? { maxAge: '365d', immutable: true, index: false } : { maxAge: 0, etag: true, index: false },
   );
+  // uploads/: admin yüklemeleri (F4 MediaModule → <uploads>/<klasör>/<ad>-<damga>.webp + -thumb.webp).
+  // Dosya adları damgalı (içerik değişmez) → 30 gün cache; prod'da nginx aynı dizini `/uploads/` ile servis eder.
+  // UPLOADS_DIR env ile taşınabilir (media.constants#resolveUploadsDir — yükleme ile aynı kaynak).
+  const uploadsDir = resolveUploadsDir();
+  if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads/', maxAge: '30d', index: false, dotfiles: 'ignore' });
 
   // Global prefix: REST uçları /api/v1 altında; WebController rotaları (HTML) prefix dışında.
   app.setGlobalPrefix('api/v1', { exclude: WEB_ROUTES_EXCLUDED_FROM_PREFIX });

@@ -70,12 +70,12 @@ Amaç: çalışan iskelet — **lokalde** (ADR-0017: sunucu kurulumu ve yayın F
 - [x] `products.js` repodan silinir; nginx `location /assets/` immutable + `cart.js?v=` *(✓ public/assets/products.js silindi; website/ referansı duruyor; nginx kısmı F10b)*
 - **Bitti sayılır (lokal):** HTML diff 8/10 byte-byte + 2 kabul edilen satır (urunler.hbs RECOMMENDED_TIER, kutu.hbs pairIds) ✓; **Playwright 30/30 çift 0 px fark** (10 sayfa × 390/820/1440) ✓; sepet/kutu duman testi 14/14 ✓; bootstrap ≡ products.js ✓; DB'de fiyat/şablon değişince sayfada (60 s cache) ✓. Rapor: `tools/visual-parity/report.md`.
 
-### F4 — Admin iskeleti + admin auth + katalog CRUD + medya import (6 gün) → **ilk görünür teslim**
-- [ ] `AuthModule` çekirdeği (cookie path=/, CSRF, kilit) + UA admin iskeleti (same-origin, `credentials:'include'`)
-- [ ] Ekranlar 1–8: Giriş · Ürünler liste · Ürün formu (Genel/Fiyat-KDV/Kutu/Tercih/Metinler/**Partiler**/Görseller) · Kategoriler · Üreticiler · Tier'lar · Haftanın Kutusu (yayınla/kopyala) · Medya
-- [ ] `MediaModule` (multer 20 MB → sharp webp+thumb yeni yüklemelerde) + `media:import` (58 mevcut görsel, orijinal yol, ProductImage/BoxTier bağları)
-- [ ] `AuditLogInterceptor` (redaksiyon)
-- **Bitti sayılır:** admin'den ürün/parti/görsel/şablon değişikliği staging'de görünür; audit satırı. *(~17. iş günü)*
+### F4 — Admin iskeleti + admin auth + katalog CRUD + medya import (6 gün) → **ilk görünür teslim** — ✅ LOKAL TAMAM (2026-08-20)
+- [x] `AuthModule` çekirdeği (cookie path=/, CSRF, kilit) + UA admin iskeleti (same-origin, `credentials:'include'`) *(✓ access 15 dk + refresh 30 gün rotasyon (bcrypt(sha256) hash, yarış güvenli), `csrf_token` double-submit, 5 hata → 30 dk 423, roller; guard zinciri Throttler → JwtAuth → Csrf → Roles; admin `lib/api.ts`: 401 → bir kez refresh, 403 CSRF → token yenile; auth jest 15 test)*
+- [x] Ekranlar 1–8: Giriş · Ürünler liste · Ürün formu (Genel/Fiyat-KDV/Kutu/Tercih/Metinler/**Partiler**/Görseller) · Kategoriler · Üreticiler · Tier'lar · Haftanın Kutusu (yayınla/kopyala) · Medya *(✓ `apps/admin` — tsc + eslint + build + 32 vitest; `/api` `/assets` `/uploads` proxy; Özet sayfası sayılar + sağlık + son audit)*
+- [x] `MediaModule` (multer 20 MB → sharp webp+thumb yeni yüklemelerde) + `media:import` (58 mevcut görsel, orijinal yol, ProductImage/BoxTier bağları) *(✓ `POST/GET/PATCH/DELETE /admin/media`, `/uploads/*` statik (main.ts), URL kuralı tek yerde (`media.mapper`); `media:import` 85 görsel (images 40 · sahne 13 · logo 5 · ikonlar 27), idempotent; **sharp workspace'e eklenecek** — bkz. SISTEM-DURUMU açık notlar)*
+- [x] `AuditLogInterceptor` (redaksiyon) *(✓ `@Audited(module)` + APP_INTERCEPTOR: actor/action/module/entityId/summary/new-oldValues (e-posta/telefon/adres/parola `[redacted]`), `GET /admin/audit-logs` (ADMIN))*
+- **Bitti sayılır:** admin'den ürün/parti/görsel/şablon değişikliği staging'de görünür; audit satırı. *(~17. iş günü)* → **lokal (ADR-0017):** `tools/e2e-admin/run.mjs` Playwright 12/12 — fiyat/parti/görsel/şablon değişikliği `GET /bootstrap` + `/urun.html` + `/kutu.html`'de anında (cache invalidation), audit satırları (LOGIN/UPDATE/CREATE/PUBLISH/UPLOAD), çıkış 401 + CSRF'siz 403; değişiklikler geri alındı (bootstrap ≡ baseline). API jest 6 suite/107 test ✓. Staging görünürlüğü F10b'de.
 
 ### F5 — CMS içerik + günlük + yasal + toptan + ayarlar (6 gün)
 - [ ] `ContentModule` (SiteContent + schema, Post, LegalDocument versiyonlu + showInNav/requiresAck), `WholesaleModule` (form fetch, 3/dk/IP), `SettingsModule` (şifreli; zone CRUD; generic grup formu), sitemap/robots

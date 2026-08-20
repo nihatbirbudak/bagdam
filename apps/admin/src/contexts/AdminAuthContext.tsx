@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, AUTH_DISABLED, ensureCsrf } from '../lib/api';
+import { api, ensureCsrf } from '../lib/api';
 import type { AuthUser, LoginResponse } from '../lib/apiTypes';
 
 /*
- * Kimlik bağlamı — cookie tabanlı oturum (ADR-0009): API httpOnly `access_token` cookie'sini
- * set eder; panel token saklamaz. Mutasyonlar CSRF header'ı ile gider (lib/api.ts).
- * F1: AuthModule yok; `/auth/me` 404 dönerse sessizce anonim kalınır (hata fırlatılmaz).
+ * Kimlik bağlamı — cookie tabanlı oturum (ADR-0009): API httpOnly `access_token` (path=/) ve
+ * `refresh_token` (path=/api/v1/auth) çerezlerini set eder; panel token saklamaz.
+ * Mutasyonlar CSRF header'ı ile gider (lib/api.ts). Akış: GET /auth/csrf → POST /auth/login → GET /auth/me.
+ * Access 15 dk; 401'de lib/api.ts bir kez POST /auth/refresh dener (rotasyon), olmazsa `/login?next=` yönlendirir.
  */
 
 const PANEL_ROLES = new Set(['ADMIN', 'STAFF']);
@@ -14,7 +15,7 @@ function hasPanelAccess(user: AuthUser | null | undefined): user is AuthUser {
   return !!user && PANEL_ROLES.has(String(user.role).toUpperCase());
 }
 
-/** `/auth/me` ya da `/auth/login` yanıtı `{ user }` zarfı ya da doğrudan kullanıcı olabilir. */
+/** `/auth/login` yanıtı `{ user }` zarfı; `/auth/me` doğrudan kullanıcı. İkisi de kabul edilir. */
 function unwrapUser(payload: unknown): AuthUser | null {
   if (!payload || typeof payload !== 'object') return null;
   const p = payload as { user?: AuthUser; id?: unknown; email?: unknown };
@@ -30,8 +31,8 @@ interface AuthState {
 }
 
 export interface AdminAuthContextValue extends AuthState {
-  /** F1 geçici kapı (VITE_AUTH_DISABLED=true, yalnız dev). */
-  authDisabled: boolean;
+  /** ADMIN rolü (STAFF değil) — audit/sistem ekranları yalnız ADMIN'e. */
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<AuthUser | null>;
@@ -39,6 +40,13 @@ export interface AdminAuthContextValue extends AuthState {
 
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null);
 const ANON: AuthState = { user: null, isAuthenticated: false, loading: false };
+
+export class PanelAccessError extends Error {
+  constructor() {
+    super('Bu hesabın yönetim paneline erişim yetkisi yok.');
+    this.name = 'PanelAccessError';
+  }
+}
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, isAuthenticated: false, loading: true });
@@ -53,7 +61,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       setState({ user: me, isAuthenticated: true, loading: false });
       return me;
     } catch {
-      // 404 (F1: uç yok) · 401 (oturum yok) · ağ hatası → anonim; hata fırlatma.
+      // 401 (oturum yok) · ağ hatası → anonim; hata fırlatma (route kapısı /login'e yollar).
       setState(ANON);
       return null;
     }
@@ -79,7 +87,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     if (!user) throw new Error('Beklenmeyen sunucu yanıtı');
     if (!hasPanelAccess(user)) {
       await api.post('/auth/logout').catch(() => undefined);
-      throw new Error('Bu hesabın yönetim paneline erişim yetkisi yok.');
+      throw new PanelAccessError();
     }
     setState({ user, isAuthenticated: true, loading: false });
     return user;
@@ -95,7 +103,13 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AdminAuthContextValue>(
-    () => ({ ...state, authDisabled: AUTH_DISABLED, login, logout, refreshMe }),
+    () => ({
+      ...state,
+      isAdmin: String(state.user?.role ?? '').toUpperCase() === 'ADMIN',
+      login,
+      logout,
+      refreshMe,
+    }),
     [state, login, logout, refreshMe],
   );
 

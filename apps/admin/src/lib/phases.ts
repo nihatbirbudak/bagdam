@@ -13,14 +13,14 @@ export interface PhaseInfo {
 }
 
 /** Şu anki faz; faz bitince güncellenir (SISTEM-DURUMU ile birlikte). */
-export const CURRENT_PHASE: PhaseKey = 'F1';
+export const CURRENT_PHASE: PhaseKey = 'F4';
 
 export const PHASES: PhaseInfo[] = [
-  { key: 'F0', title: 'Karar sprinti', summary: '16 ADR; Cloudflare, iyzico sandbox, e-posta sağlayıcısı kararları.', days: 2, status: 'active' },
-  { key: 'F1', title: 'Walking skeleton', summary: 'Monorepo, API health, .hbs site, admin kabuğu, sunucu/nginx/SSL, CI/CD, yedek.', days: 4, status: 'active' },
-  { key: 'F2', title: 'Şema-a + seed + paylaşılan kurallar', summary: 'Prisma F2a modelleri, migration, seed, packages/shared pricing.', days: 3, status: 'planned' },
-  { key: 'F3', title: 'Inline bootstrap + katalog dinamik', summary: 'GET /bootstrap, bootstrap partial, cart.js yaması.', days: 2, status: 'planned' },
-  { key: 'F4', title: 'Admin iskeleti + auth + katalog CRUD + medya', summary: 'AuthModule, ekranlar 1–8, MediaModule, audit.', days: 6, status: 'planned' },
+  { key: 'F0', title: 'Karar sprinti', summary: '16 ADR; Cloudflare, iyzico sandbox, e-posta sağlayıcısı kararları.', days: 2, status: 'done' },
+  { key: 'F1', title: 'Walking skeleton', summary: 'Monorepo, API health, .hbs site, admin kabuğu, deploy dosyaları.', days: 4, status: 'done' },
+  { key: 'F2', title: 'Şema-a + seed + paylaşılan kurallar', summary: 'Prisma F2a modelleri, migration, seed, packages/shared pricing.', days: 3, status: 'done' },
+  { key: 'F3', title: 'Inline bootstrap + katalog dinamik', summary: 'GET /bootstrap, bootstrap partial, cart.js yaması.', days: 2, status: 'done' },
+  { key: 'F4', title: 'Admin iskeleti + auth + katalog CRUD + medya', summary: 'AuthModule, ekranlar 1–8, MediaModule, audit.', days: 6, status: 'active' },
   { key: 'F5', title: 'CMS içerik + günlük + yasal + toptan + ayarlar', summary: 'Content / Wholesale / Settings modülleri, ekranlar 9–15.', days: 6, status: 'planned' },
   { key: 'F6', title: 'Üyelik + hesap + adres + e-posta', summary: 'Müşteri auth, MeModule, MailModule, ekran 16.', days: 4, status: 'planned' },
   { key: 'F7', title: 'Şema-b + fiyatlama + abonelik motoru', summary: 'Commerce şeması, PricingService, cycles:*, testler.', days: 9, status: 'planned' },

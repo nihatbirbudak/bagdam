@@ -1,3 +1,4 @@
+import { USER_ROLE_LABELS, type UserRole } from '@bagdam/shared';
 import { Home, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ADMIN_ROOT } from '../lib/adminNavConfig';
@@ -10,13 +11,19 @@ interface Props {
   onToggleSidebar: () => void;
 }
 
+/** `/auth/me` → `{name, email, role}`; ad yoksa e-posta. */
 function displayName(user: AuthUser): string {
-  return [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+  return (user.name ?? '').trim() || user.email;
+}
+
+function roleLabel(role: AuthUser['role']): string {
+  const key = String(role).toUpperCase() as UserRole;
+  return USER_ROLE_LABELS[key] ?? String(role);
 }
 
 export function AdminTopBar({ sidebarOpen, onToggleSidebar }: Props) {
   const navigate = useNavigate();
-  const { user, logout, authDisabled } = useAdminAuth();
+  const { user, logout } = useAdminAuth();
 
   async function handleLogout() {
     await logout();
@@ -53,19 +60,14 @@ export function AdminTopBar({ sidebarOpen, onToggleSidebar }: Props) {
           <SidebarIcon size={20} aria-hidden />
         </button>
 
-        {/* Sağ: durum + kullanıcı + aksiyonlar */}
+        {/* Sağ: kullanıcı + aksiyonlar */}
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          {authDisabled && (
-            <span
-              className="hidden rounded-full border border-butter-deep/30 bg-butter/50 px-2 py-0.5 text-[11px] font-medium text-butter-deep md:inline"
-              title="VITE_AUTH_DISABLED=true — yalnız geliştirme; F4'te gerçek kimlik kapısı"
-            >
-              Geliştirme modu · kimlik kapısı kapalı
-            </span>
-          )}
           {user && (
-            <span className="hidden text-xs text-brand-500 xl:inline" title={user.email}>
-              {displayName(user)}
+            <span className="hidden items-center gap-1.5 text-xs text-brand-500 md:inline-flex" title={user.email}>
+              <span className="max-w-[14rem] truncate">{displayName(user)}</span>
+              <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[10px] font-semibold uppercase tracking-wide text-brand-500">
+                {roleLabel(user.role)}
+              </span>
             </span>
           )}
           <a

@@ -20,6 +20,7 @@ import {
   type ProductLot,
   type SubTier,
 } from '@bagdam/shared';
+import { toSiteMediaPath } from '../media/media.mapper';
 import { COMMERCE_SETTING_PREFIX, FREQ_OPTION_NOTE } from './catalog.constants';
 import type {
   DeliveryDateRecord,
@@ -65,9 +66,14 @@ export function producerMeta(
   return { meta, location };
 }
 
-/** Görsel yolları (kapak önce — repository sıralaması isCover desc, sortOrder asc). */
+/** Görsel yolları (kapak önce — repository sıralaması isCover desc, sortOrder asc); site-göreli (`assets/...` | `uploads/...`). */
 function imagePaths(p: ProductRecord): string[] {
-  return p.images.map((img) => img.media.path);
+  return p.images.map((img) => siteMediaPath(img.media.path));
+}
+
+/** MediaFile.path → site-göreli kaynak (media.mapper tek kural); boş/null → ''. */
+function siteMediaPath(path: string | null | undefined): string {
+  return toSiteMediaPath(path) ?? '';
 }
 
 /**
@@ -114,7 +120,7 @@ export function toSubTier(t: TierRecord): SubTier {
     count: t.itemCount,
     price: toMoney(t.price),
     note: t.note ?? '',
-    img: t.imageMedia?.path ?? '',
+    img: siteMediaPath(t.imageMedia?.path),
   };
 }
 
@@ -195,8 +201,8 @@ function toProductImageDto(img: ProductRecord['images'][number]): ProductImage {
     id: img.id,
     productId: img.productId,
     mediaId: img.mediaId,
-    url: img.media.path,
-    thumbUrl: img.media.thumbPath,
+    url: siteMediaPath(img.media.path),
+    thumbUrl: toSiteMediaPath(img.media.thumbPath),
     alt: img.alt,
     isCover: img.isCover,
     sortOrder: img.sortOrder,
@@ -269,7 +275,7 @@ export function toBoxTierDto(t: TierRecord): BoxTier {
     price: toMoney(t.price),
     note: t.note,
     imageMediaId: t.imageMediaId,
-    imageUrl: t.imageMedia?.path ?? null,
+    imageUrl: toSiteMediaPath(t.imageMedia?.path),
     isRecommended: t.isRecommended,
     isActive: t.isActive,
     sortOrder: t.sortOrder,
@@ -320,7 +326,7 @@ export function toProducerDto(p: ProducerRecord): Producer {
     district: p.district,
     story: p.story,
     photoMediaId: p.photoMediaId,
-    photoUrl: p.photoMedia?.path ?? null,
+    photoUrl: toSiteMediaPath(p.photoMedia?.path),
     isActive: p.isActive,
     sortOrder: p.sortOrder,
     productCount: p._count.products,

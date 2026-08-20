@@ -9,7 +9,7 @@ export type AdminNavLeaf = {
   label: string;
   to: string;
   phase?: AdminPhase;
-  /** F1'de tüm ekranlar yer tutucu; gerçek sayfa bağlanınca false yapılır. */
+  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: ekranlar 1–8 bağlı). */
   comingSoon?: boolean;
   /** Yer tutucu sayfada gösterilen kısa kapsam notu (BACKEND-PLANI §4). */
   hint?: string;
@@ -46,21 +46,21 @@ export const adminNavItems: AdminNavItem[] = [
         label: 'Ürünler',
         to: '/katalog/urunler',
         phase: 'F4',
-        comingSoon: true,
+        comingSoon: false,
         hint: 'Liste: filtre, sürükle-sırala, eş ürün (pair), stok durumu. Form: Genel · Fiyat/KDV · Kutu · Tercih · Metinler · Partiler · Görseller.',
       },
-      { label: 'Kategoriler', to: '/katalog/kategoriler', phase: 'F4', comingSoon: true, hint: 'Ad, panel notu, sıra (ikon statik).' },
-      { label: 'Üreticiler', to: '/katalog/ureticiler', phase: 'F4', comingSoon: true, hint: 'Ad / köy / ilçe; hikâye ve foto alanı.' },
-      { label: 'Kutular', to: '/katalog/kutular', phase: 'F4', comingSoon: true, hint: 'Kutu boyları (tier): fiyat, kapasite, görsel.' },
+      { label: 'Kategoriler', to: '/katalog/kategoriler', phase: 'F4', comingSoon: false, hint: 'Ad, panel notu, sıra (ikon statik).' },
+      { label: 'Üreticiler', to: '/katalog/ureticiler', phase: 'F4', comingSoon: false, hint: 'Ad / köy / ilçe; hikâye ve foto alanı.' },
+      { label: 'Kutular', to: '/katalog/kutular', phase: 'F4', comingSoon: false, hint: 'Kutu boyları (tier): fiyat, kapasite, görsel.' },
       {
         label: 'Haftanın Kutusu',
         to: '/katalog/haftanin-kutusu',
         phase: 'F4',
-        comingSoon: true,
+        comingSoon: false,
         hint: 'Hafta → tier başına içerik; swap; küratör notu; kopyala; yayınla (yayınlanınca kutu.html şablonu basar).',
       },
       { divider: 'Dosyalar' },
-      { label: 'Medya', to: '/medya', phase: 'F4', comingSoon: true, hint: 'Görsel kütüphanesi: import edilen 58 görsel, klasörler, seçici.' },
+      { label: 'Medya', to: '/medya', phase: 'F4', comingSoon: false, hint: 'Görsel kütüphanesi: import edilen 58 görsel, klasörler, seçici.' },
     ],
   },
   {

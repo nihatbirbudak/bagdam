@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { AlertCircle, Loader2, Lock } from 'lucide-react';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { PanelAccessError, useAdminAuth } from '../../contexts/AdminAuthContext';
 import { ApiError } from '../../lib/api';
+import { cn } from '../../lib/utils';
 
 /** `?next=` yalnız aynı origin içi göreli yol olabilir (açık yönlendirme koruması). */
 function safeNext(raw: string | null): string {
@@ -10,23 +11,38 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
-function loginErrorMessage(err: unknown): string {
+interface LoginError {
+  message: string;
+  locked?: boolean;
+}
+
+/** API hata zarfını kullanıcı metnine çevirir (ADR-0009: 401 / 423 kilit / 429). */
+export function loginErrorFromApi(err: unknown): LoginError {
+  if (err instanceof PanelAccessError) return { message: err.message };
   if (err instanceof ApiError) {
-    if (err.kind === 'not-found') return 'Giriş servisi henüz etkin değil (F4 fazında bağlanacak).';
-    if (err.kind === 'auth') return 'E-posta veya şifre hatalı.';
-    if (err.kind === 'rate-limit') return 'Çok fazla deneme. Lütfen biraz sonra tekrar deneyin.';
-    if (err.kind === 'network') return err.message;
-    return err.message;
+    if (err.kind === 'locked') {
+      return {
+        locked: true,
+        message: err.message && !/^locked$/i.test(err.message) ? err.message : 'Çok fazla hatalı deneme. Hesap 30 dakika kilitlendi.',
+      };
+    }
+    if (err.kind === 'auth') return { message: err.message || 'E-posta veya parola hatalı' };
+    if (err.kind === 'rate-limit') return { message: 'Çok fazla deneme. Lütfen biraz sonra tekrar deneyin.' };
+    if (err.kind === 'not-found') return { message: 'Giriş servisi bulunamadı (API /auth/login).' };
+    if (err.kind === 'validation') return { message: 'E-posta ve parola zorunludur.' };
+    if (err.kind === 'network') return { message: err.message };
+    if (err.kind === 'server') return { message: 'Sunucu hatası. Lütfen tekrar deneyin.' };
+    return { message: err.message };
   }
-  return err instanceof Error ? err.message : 'Giriş başarısız';
+  return { message: err instanceof Error ? err.message : 'Giriş başarısız' };
 }
 
 /**
- * Giriş sayfası — UI hazır; API F4'te (AuthModule) bağlanır.
- * Akış: POST /auth/login → httpOnly cookie → /auth/me → panel.
+ * Giriş (ekran 1) — GET /auth/csrf → POST /auth/login → httpOnly cookie → GET /auth/me → panel.
+ * 401: "E-posta veya parola hatalı" · 423: 30 dk kilit · 429: throttle.
  */
 export function AdminLoginPage() {
-  const { login, isAuthenticated, loading: authLoading, authDisabled } = useAdminAuth();
+  const { login, isAuthenticated, loading: authLoading } = useAdminAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = safeNext(params.get('next'));
@@ -34,20 +50,22 @@ export function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoginError | null>(null);
 
   // Oturum zaten varsa panele geç
   if (!authLoading && isAuthenticated) return <Navigate to={next} replace />;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
       await login(email.trim(), password);
       navigate(next, { replace: true });
     } catch (err) {
-      setError(loginErrorMessage(err));
+      setError(loginErrorFromApi(err));
+      setPassword('');
     } finally {
       setLoading(false);
     }
@@ -68,22 +86,16 @@ export function AdminLoginPage() {
           <p className="mt-1 text-sm text-brand-500">Yönetim Paneli</p>
         </div>
 
-        {authDisabled && (
-          <div className="mb-4 rounded-md border border-butter-deep/30 bg-butter/40 px-3 py-2 text-xs text-butter-deep">
-            Geliştirme modu: kimlik kapısı kapalı (<code className="font-mono">VITE_AUTH_DISABLED=true</code>).{' '}
-            <Link to={next} className="inline-flex items-center gap-1 font-semibold underline-offset-2 hover:underline">
-              Panele geç <ArrowRight size={12} aria-hidden />
-            </Link>
-          </div>
-        )}
-
         {error && (
           <div
             role="alert"
-            className="mb-4 flex items-center gap-2 rounded-md border border-accent/30 bg-accent-light px-3 py-2 text-xs text-accent-dark"
+            className={cn(
+              'mb-4 flex items-start gap-2 rounded-md border px-3 py-2 text-xs',
+              error.locked ? 'border-butter-deep/40 bg-butter/40 text-butter-deep' : 'border-accent/30 bg-accent-light text-accent-dark',
+            )}
           >
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            {error}
+            {error.locked ? <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> : <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />}
+            <span>{error.message}</span>
           </div>
         )}
 
@@ -108,7 +120,7 @@ export function AdminLoginPage() {
 
           <div className="mb-6">
             <label htmlFor="login-password" className="mb-1 block text-xs font-medium text-brand-600">
-              Şifre
+              Parola
             </label>
             <input
               id="login-password"
@@ -133,7 +145,7 @@ export function AdminLoginPage() {
         </form>
 
         <p className="mt-6 text-center text-[11px] text-brand-400">
-          Yalnız yetkili personel. Oturum çerez tabanlıdır; 5 hatalı denemede 30 dk kilit.
+          Yalnız yetkili personel (ADMIN / STAFF). Oturum çerez tabanlıdır; 5 hatalı denemede 30 dk kilit.
         </p>
       </div>
     </div>

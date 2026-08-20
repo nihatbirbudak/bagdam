@@ -1,10 +1,10 @@
 /**
- * API sözleşmesi tipleri (F1: yalnız çekirdek). Alan tipleri F2'den itibaren
- * `@bagdam/shared` paketinden import edilir; burada yalnız panelin kendi
- * ihtiyaç duyduğu zarflar tutulur.
+ * API sözleşmesi zarfları (panelin kendi ihtiyaç duyduğu şekiller). Alan/enum tipleri
+ * `@bagdam/shared`'dan; admin DTO şekilleri `lib/adminTypes.ts`'te.
  */
+import type { UserRole } from '@bagdam/shared';
 
-/** Global hata zarfı (HttpExceptionFilter): `{ statusCode, message, requestId }`. */
+/** Global hata zarfı (AllExceptionsFilter): `{ statusCode, message, error, requestId, timestamp, path }`. */
 export interface ApiErrorEnvelope {
   statusCode: number;
   /** class-validator hatalarında dizi gelebilir. */
@@ -15,37 +15,37 @@ export interface ApiErrorEnvelope {
   timestamp?: string;
 }
 
-/** Roller (ADR-0009). Panele yalnız ADMIN ve STAFF girer. */
-export type UserRole = 'CUSTOMER' | 'STAFF' | 'ADMIN';
+export type { UserRole };
 
+/** `POST /auth/login` → `{ user }` ve `GET /auth/me` gövdesi (ADR-0009). */
 export interface AuthUser {
   id: string;
   email: string;
-  firstName: string | null;
-  lastName: string | null;
+  name: string | null;
   role: UserRole | string;
+  emailVerifiedAt?: string | null;
+  createdAt?: string;
 }
 
 /** `POST /auth/login` yanıtı (cookie set edilir; gövdede kullanıcı döner). */
 export interface LoginResponse {
   user?: AuthUser;
-  /** Bearer yalnız testlerde; panel cookie kullanır, bu alan yok sayılır. */
-  accessToken?: string;
 }
 
-/** `GET /health` (F1 HealthController). */
+/** `GET /health` (HealthController). */
 export interface HealthResponse {
   status: string;
   timestamp?: string;
   uptime?: number;
   version?: string;
+  db?: string;
   [key: string]: unknown;
 }
 
-/** Ortak sayfalama zarfı (common/pagination). */
+/** Ortak sayfalama zarfı — admin liste uçları `{ items, total, page, limit }` döner. */
 export interface Paginated<T> {
   items: T[];
   total: number;
   page: number;
-  pageSize: number;
+  limit: number;
 }

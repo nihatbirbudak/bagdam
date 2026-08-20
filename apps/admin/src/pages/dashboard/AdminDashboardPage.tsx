@@ -1,22 +1,25 @@
-import { Activity, CheckCircle2, Circle, CircleDot, KeyRound, LayoutGrid, RefreshCw, XCircle } from 'lucide-react';
+import { Activity, Boxes, CheckCircle2, Gift, History, ImageIcon, Package, RefreshCw, Tractor, XCircle, type LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useApi } from '../../hooks/useApi';
-import { API_BASE } from '../../lib/api';
-import type { HealthResponse } from '../../lib/apiTypes';
-import { getAllNavLeaves, ADMIN_ROOT, type AdminNavLeaf } from '../../lib/adminNavConfig';
-import { getAdminLinkIcon } from '../../lib/adminNavIcons';
-import { CURRENT_PHASE, PHASES, PHASE_STATUS_LABEL, type PhaseStatus } from '../../lib/phases';
-import { cn } from '../../lib/utils';
-import { PhaseBadge } from '../../components/AdminSidebar';
+import { API_BASE, api, errorMessage } from '../../lib/api';
+import type { AdminAuditLog } from '../../lib/adminTypes';
+import type { HealthResponse, Paginated } from '../../lib/apiTypes';
+import { boxTemplatesApi, producersApi } from '../../features/catalog/api';
+import { CURRENT_PHASE } from '../../lib/phases';
+import { cn, formatDateTime } from '../../lib/utils';
+import { addDays, currentWeekStart } from '../../lib/week';
+import { AdminPageHeader } from '../../features/components/AdminPageHeader';
 
-const STATUS_STYLE: Record<PhaseStatus, { icon: typeof Circle; cls: string }> = {
-  done: { icon: CheckCircle2, cls: 'text-olive' },
-  active: { icon: CircleDot, cls: 'text-accent' },
-  planned: { icon: Circle, cls: 'text-brand-300' },
-};
+interface Counts {
+  products: number | null;
+  producers: number | null;
+  templates: number | null;
+  media: number | null;
+}
 
-function Card({ title, icon: Icon, children, className }: { title: string; icon: typeof Circle; children: React.ReactNode; className?: string }) {
+function Card({ title, icon: Icon, children, className }: { title: string; icon: LucideIcon; children: React.ReactNode; className?: string }) {
   return (
     <section className={cn('rounded-lg border border-brand-200 bg-white', className)}>
       <header className="flex items-center gap-2 border-b border-brand-200 bg-brand-50 px-4 py-3">
@@ -28,36 +31,112 @@ function Card({ title, icon: Icon, children, className }: { title: string; icon:
   );
 }
 
-/** F1 iskelet özeti: faz durumu, API sağlığı, kimlik durumu, ekran listesi. Gerçek Özet ekranı F9'da. */
-export function AdminDashboardPage() {
-  const { user, isAuthenticated, authDisabled } = useAdminAuth();
-  const health = useApi<HealthResponse>('/health');
-  const leaves = getAllNavLeaves().filter((l) => l.to !== ADMIN_ROOT);
+function StatTile({ label, value, to, icon: Icon, hint }: { label: string; value: number | null; to: string; icon: LucideIcon; hint?: string }) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-3 rounded-lg border border-brand-200 bg-white p-4 transition-colors hover:border-accent"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+        <Icon className="h-5 w-5" aria-hidden />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-2xl font-semibold tabular-nums text-brand-900">{value === null ? '—' : value}</span>
+        <span className="block text-xs text-brand-600">{label}</span>
+        {hint && <span className="block text-[10px] text-brand-400">{hint}</span>}
+      </span>
+    </Link>
+  );
+}
 
-  // Faz bazında ekran sayıları
-  const byPhase = leaves.reduce<Record<string, AdminNavLeaf[]>>((acc, leaf) => {
-    const key = leaf.phase ?? '—';
-    (acc[key] ??= []).push(leaf);
-    return acc;
-  }, {});
+/** Özet (F4 sürümü): sayılar (GET uçlarının total'ı) + API sağlığı + son audit satırları (ADMIN). */
+export function AdminDashboardPage() {
+  const { user, isAdmin } = useAdminAuth();
+  const health = useApi<HealthResponse>('/health');
+  const [counts, setCounts] = useState<Counts>({ products: null, producers: null, templates: null, media: null });
+  const [countsError, setCountsError] = useState<string | null>(null);
+  const [audit, setAudit] = useState<AdminAuditLog[] | null>(null);
+
+  const loadCounts = useCallback(async () => {
+    setCountsError(null);
+    const week = currentWeekStart();
+    const results = await Promise.allSettled([
+      api.get<Paginated<unknown>>('/admin/products?page=1&limit=1'),
+      producersApi.list(),
+      boxTemplatesApi.list({ from: week, to: addDays(week, 6) }),
+      api.get<Paginated<unknown>>('/admin/media?page=1&limit=1'),
+    ]);
+    const [p, pr, t, m] = results;
+    setCounts({
+      products: p.status === 'fulfilled' ? p.value.total : null,
+      producers: pr.status === 'fulfilled' ? pr.value.length : null,
+      templates: t.status === 'fulfilled' ? t.value.length : null,
+      media: m.status === 'fulfilled' ? m.value.total : null,
+    });
+    const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    if (failed) setCountsError(errorMessage(failed.reason, 'Sayılar alınamadı'));
+  }, []);
+
+  useEffect(() => {
+    void loadCounts();
+  }, [loadCounts]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    api
+      .get<Paginated<AdminAuditLog>>('/admin/audit-logs?page=1&limit=8')
+      .then((res) => {
+        if (!cancelled) setAudit(res.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setAudit([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
+  const weekLabel = currentWeekStart();
 
   return (
-    <div className="space-y-6 px-4 py-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-brand-900 sm:text-xl">Bağdam Yönetim — F1 iskelet</h1>
-          <p className="text-sm text-brand-600">
-            Boş ama canlı kabuk: menü, kimlik bağlamı, API istemcisi ve yer tutucu ekranlar. Gerçek Özet ekranı{' '}
-            <strong>F9</strong>’da gelir.
-          </p>
-        </div>
-        <span className="rounded-full border border-accent/30 bg-accent-light px-3 py-1 text-xs font-semibold text-accent-dark">
-          Şu anki faz: {CURRENT_PHASE}
-        </span>
+    <div className="px-4 py-4">
+      <AdminPageHeader
+        title="Özet"
+        description={
+          <>
+            Hoş geldiniz{user?.name ? `, ${user.name}` : ''}. Faz <strong>{CURRENT_PHASE}</strong>: katalog, haftanın kutusu ve medya yönetimi açık; sipariş/abonelik
+            göstergeleri F9'da.
+          </>
+        }
+        actions={
+          <button
+            type="button"
+            onClick={() => {
+              void loadCounts();
+              health.refetch();
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-brand-300 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 hover:border-accent hover:text-accent"
+          >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+            Yenile
+          </button>
+        }
+      />
+
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Ürün" value={counts.products} to="/katalog/urunler" icon={Package} />
+        <StatTile label="Üretici" value={counts.producers} to="/katalog/ureticiler" icon={Tractor} />
+        <StatTile label="Bu haftanın şablonu" value={counts.templates} to="/katalog/haftanin-kutusu" icon={Gift} hint={`hafta: ${weekLabel}`} />
+        <StatTile label="Medya dosyası" value={counts.media} to="/medya" icon={ImageIcon} />
       </div>
+      {countsError && (
+        <p className="mb-4 text-xs text-accent-dark" role="alert">
+          Bazı sayılar alınamadı: {countsError}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* ── API sağlığı ── */}
         <Card title="API sağlığı" icon={Activity}>
           <div className="flex items-start gap-3">
             {health.loading ? (
@@ -72,120 +151,58 @@ export function AdminDashboardPage() {
                 <code className="rounded bg-brand-100 px-1.5 py-0.5 font-mono text-xs">GET {API_BASE}/health</code>
               </p>
               {health.loading && <p className="mt-1 text-brand-500">Kontrol ediliyor…</p>}
-              {health.error && (
-                <p className="mt-1 text-accent-dark">
-                  Ulaşılamadı: {health.error}. Dev’de API (:4010) çalışıyor mu? Vite proxy <code>/api</code> → API.
-                </p>
-              )}
+              {health.error && <p className="mt-1 text-accent-dark">Ulaşılamadı: {health.error}</p>}
               {health.data && (
                 <p className="mt-1 text-brand-600">
                   Durum: <span className="font-semibold text-olive-deep">{String(health.data.status)}</span>
+                  {health.data.db ? ` · db: ${String(health.data.db)}` : ''}
                   {health.data.version ? ` · v${health.data.version}` : ''}
                 </p>
               )}
-              <button
-                type="button"
-                onClick={() => health.refetch()}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-brand-300 px-2.5 py-1 text-xs font-medium text-brand-700 hover:border-accent hover:text-accent"
-              >
-                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-                Yeniden dene
-              </button>
             </div>
           </div>
         </Card>
 
-        {/* ── Kimlik ── */}
-        <Card title="Kimlik ve oturum" icon={KeyRound}>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-brand-500">Route kapısı</dt>
-              <dd className="font-medium text-brand-900">{authDisabled ? 'Kapalı (geliştirme)' : 'Açık'}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-brand-500">Oturum</dt>
-              <dd className="font-medium text-brand-900">
-                {isAuthenticated && user ? `${user.email} (${String(user.role)})` : 'Anonim'}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-brand-500">Yöntem</dt>
-              <dd className="text-right text-brand-700">httpOnly cookie + CSRF (same-origin)</dd>
-            </div>
-          </dl>
-          <p className="mt-3 text-xs text-brand-500">
-            F4’te AuthModule gelince <code>VITE_AUTH_DISABLED</code> kaldırılır; login sayfası bugünkü haliyle bağlanır.
-          </p>
-        </Card>
-
-        {/* ── Ekranlar ── */}
-        <Card title="Ekranlar (faza göre)" icon={LayoutGrid}>
-          <ul className="space-y-1.5 text-sm">
-            {Object.entries(byPhase)
-              .sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)))
-              .map(([phase, items]) => (
-                <li key={phase} className="flex items-center justify-between gap-3">
-                  <span className="font-mono text-xs font-semibold text-brand-700">{phase}</span>
-                  <span className="text-brand-600">{items.length} ekran</span>
-                </li>
-              ))}
-          </ul>
-          <p className="mt-3 text-xs text-brand-500">Toplam {leaves.length} ekran menüde yer tutucu olarak bağlı.</p>
-        </Card>
-      </div>
-
-      {/* ── Faz durumu ── */}
-      <Card title="Yol haritası — faz durumu" icon={CircleDot}>
-        <ol className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
-          {PHASES.map((p) => {
-            const { icon: Icon, cls } = STATUS_STYLE[p.status];
-            return (
-              <li key={p.key} className="flex items-start gap-3 rounded-md px-2 py-1.5 hover:bg-brand-50">
-                <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', cls)} aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm">
-                    <span className="font-mono text-xs font-semibold text-brand-700">{p.key}</span>{' '}
-                    <span className="font-medium text-brand-900">{p.title}</span>
-                    <span className="text-brand-400"> · {p.days} g</span>
-                  </p>
-                  <p className="text-xs text-brand-500">{p.summary}</p>
-                </div>
-                <span
-                  className={cn(
-                    'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold',
-                    p.status === 'active' && 'bg-accent-light text-accent-dark',
-                    p.status === 'done' && 'bg-olive-soft text-olive-deep',
-                    p.status === 'planned' && 'bg-brand-100 text-brand-500',
-                  )}
-                >
-                  {PHASE_STATUS_LABEL[p.status]}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </Card>
-
-      {/* ── Hızlı erişim ── */}
-      <Card title="Menü — yer tutucu ekranlar" icon={LayoutGrid}>
-        <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-3">
-          {leaves.map((leaf) => {
-            const Icon = getAdminLinkIcon(leaf.to);
-            return (
-              <li key={leaf.to}>
-                <Link
-                  to={leaf.to}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-brand-700 transition-colors hover:bg-brand-50 hover:text-accent"
-                >
-                  <Icon className="h-4 w-4 shrink-0 text-brand-400" aria-hidden />
-                  <span className="flex-1 truncate">{leaf.label}</span>
-                  <PhaseBadge leaf={leaf} />
+        <Card title="Hızlı erişim" icon={Boxes}>
+          <ul className="grid grid-cols-1 gap-1 text-sm">
+            {[
+              { to: '/katalog/urunler/yeni', label: 'Yeni ürün ekle' },
+              { to: '/katalog/haftanin-kutusu', label: 'Haftanın kutusunu düzenle' },
+              { to: '/medya', label: 'Görsel yükle' },
+              { to: '/katalog/kutular', label: 'Kutu boyları ve fiyatlar' },
+            ].map((l) => (
+              <li key={l.to}>
+                <Link to={l.to} className="block rounded-md px-2 py-1.5 text-brand-700 transition-colors hover:bg-brand-50 hover:text-accent">
+                  {l.label}
                 </Link>
               </li>
-            );
-          })}
-        </ul>
-      </Card>
+            ))}
+          </ul>
+        </Card>
+
+        <Card title="Son değişiklikler" icon={History}>
+          {!isAdmin ? (
+            <p className="text-xs text-brand-500">Denetim kaydı yalnız ADMIN rolüne gösterilir.</p>
+          ) : audit === null ? (
+            <p className="text-xs text-brand-500">Yükleniyor…</p>
+          ) : audit.length === 0 ? (
+            <p className="text-xs text-brand-500">Henüz kayıt yok.</p>
+          ) : (
+            <ul className="space-y-1.5 text-xs">
+              {audit.map((a) => (
+                <li key={a.id} className="flex items-start gap-2">
+                  <span className="shrink-0 rounded bg-brand-100 px-1 font-mono text-[10px] text-brand-600">{a.action}</span>
+                  <span className="min-w-0 flex-1 truncate text-brand-700" title={a.summary ?? ''}>
+                    <span className="font-medium">{a.module}</span>
+                    {a.summary ? ` · ${a.summary}` : a.entityId ? ` · ${a.entityId}` : ''}
+                  </span>
+                  <span className="shrink-0 text-brand-400">{formatDateTime(a.createdAt)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

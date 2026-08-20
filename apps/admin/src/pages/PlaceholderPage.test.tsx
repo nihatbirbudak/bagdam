@@ -14,11 +14,11 @@ function renderAt(path: string) {
 }
 
 describe('PlaceholderPage', () => {
-  it('menüdeki yol için başlık ve faz metnini gösterir', () => {
-    renderAt('/katalog/haftanin-kutusu');
-    expect(screen.getByRole('heading', { level: 1, name: 'Haftanın Kutusu' })).toBeInTheDocument();
+  it('menüdeki yer tutucu yol için başlık ve faz metnini gösterir', () => {
+    renderAt('/icerik/gunluk');
+    expect(screen.getByRole('heading', { level: 1, name: 'Günlük' })).toBeInTheDocument();
     expect(screen.getByText(/fazında geliyor/)).toBeInTheDocument();
-    expect(screen.getByText('F4')).toBeInTheDocument();
+    expect(screen.getByText('F5')).toBeInTheDocument();
   });
 
   it('menüde olmayan yolda 404 gösterir', () => {

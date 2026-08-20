@@ -2,6 +2,7 @@ import { Controller, Get, HttpStatus, Logger, NotFoundException, Param, Req, Res
 import { SkipThrottle } from '@nestjs/throttler';
 import type { BootstrapPayload } from '@bagdam/shared';
 import type { Request, Response } from 'express';
+import { Public } from '../common/decorators/public.decorator';
 import { SkipTimeout } from '../common/decorators/skip-timeout.decorator';
 import { APP_VERSION } from '../config/app-info';
 import { getSiteMode } from '../config/site.config';
@@ -49,8 +50,10 @@ interface ViewData {
  * - Throttle yok: sayfalar anonim ve nginx cache'li; sınırlama API uçları için.
  * - Timeout yok: render senkron, @Res() ile yanıt Express'e bırakılır.
  * - F3: her sayfa CatalogService.getBootstrap → `{{> bootstrap}}` (me/sub şimdilik null; F6/F9'da çerezden).
+ * - F4: @Public — JwtAuthGuard sayfaları anonim geçirir (geçerli çerez varsa req.user yine dolar; F6 `me` için).
  */
 @Controller()
+@Public()
 @SkipThrottle()
 @SkipTimeout()
 export class WebController {

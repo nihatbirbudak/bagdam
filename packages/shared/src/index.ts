@@ -18,6 +18,7 @@ export * from './types/wholesale';
 export * from './types/order';
 export * from './types/subscription';
 export * from './types/pricing';
+export * from './types/admin'; // F4: admin panel DTO'ları (katalog CRUD + medya)
 
 // Durum makineleri (Order / Subscription / Cycle / Payment / Cancellation) — docs/state-machines.md ile aynı
 export * from './state-machines';

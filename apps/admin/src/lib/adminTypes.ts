@@ -81,5 +81,8 @@ export interface AdminAuditLog {
   summary: string | null;
   requestId: string | null;
   ipAddress: string | null;
+  /** F10 (ekran 22 detay): redakte edilmiş değişiklik anlık görüntüleri. */
+  oldValues?: unknown;
+  newValues?: unknown;
   createdAt: IsoDateTime;
 }

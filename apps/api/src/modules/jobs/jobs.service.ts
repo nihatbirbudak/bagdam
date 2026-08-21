@@ -6,6 +6,7 @@ import { CheckoutCompletionService } from '../checkout/checkout-completion.servi
 import { DeliveryService } from '../delivery/delivery.service';
 import { CyclesService } from '../subscriptions/services/cycles.service';
 import { JobsRepository, type CronLogRecord } from './jobs.repository';
+import { KvkkPurgeService } from './kvkk-purge.service';
 
 /** `now` ezmesi (simülasyon) izinli mi: üretim dışı her zaman; üretimde yalnız ALLOW_JOB_TIME_OVERRIDE=true. */
 export function jobTimeOverrideAllowed(): boolean {
@@ -43,7 +44,7 @@ interface JobDefinition {
  *  - Her koşu CronLog satırı (RUNNING → SUCCESS|FAILED, itemsProcessed/errors/details/durationMs).
  *  - Aynı job çakışmaz (in-process kilit; tek instance — app.module ScheduleModule yalnız instance 0 + ENABLE_CRON).
  *  - `now` parametre: cron `new Date()`, testler/admin elle verir (ADR-0004: SQL'de `now()` yok).
- *  - kvkk:purge / logs:cleanup F10'da eklenir.
+ *  - F10: `kvkk:purge` (KVKK saklama matrisi; eski `logs:cleanup` bunun içinde) — KvkkPurgeService.
  */
 @Injectable()
 export class JobsService {
@@ -56,6 +57,7 @@ export class JobsService {
     private readonly delivery: DeliveryService,
     private readonly cycles: CyclesService,
     private readonly checkout: CheckoutCompletionService,
+    private readonly kvkk: KvkkPurgeService,
   ) {
     const defs: JobDefinition[] = [
       {
@@ -106,7 +108,7 @@ export class JobsService {
       {
         name: 'reminders:cutoff',
         cron: '0 * * * *',
-        description: 'Kesimden ~24 s önce hatırlatma (Notifier stub; şablon F10).',
+        description: 'Kesimden ~24 s önce kesim hatırlatması e-postası (mail.cutoff-reminder; cycle başına bir kez — MailLog tekilliği).',
         run: async (now) => {
           const r = await this.cycles.remindCutoffs(now);
           return { itemsProcessed: r.itemsProcessed, errors: r.errors, details: { ...r } };
@@ -119,6 +121,16 @@ export class JobsService {
         run: async (now) => {
           const r = await this.checkout.reconcile(now);
           return { itemsProcessed: r.checked + r.staleOrdersCancelled, errors: r.errors, details: { ...r } };
+        },
+      },
+      {
+        name: 'kvkk:purge',
+        cron: '15 3 * * *',
+        description:
+          'KVKK saklama matrisi (ADR-0015): MailLog/SystemLog/CronLog yaş bazlı silme (logs:cleanup dahil) + AuditLog PII maskeleme + (açıksa) pasif müşteri anonimleştirme. Süreler Setting privacy.*.',
+        run: async (now) => {
+          const r = await this.kvkk.run(now);
+          return { itemsProcessed: KvkkPurgeService.itemsProcessed(r), errors: r.errors, details: { ...r } };
         },
       },
     ];

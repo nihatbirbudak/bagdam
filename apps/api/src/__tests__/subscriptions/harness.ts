@@ -13,6 +13,7 @@ import { COMMERCE_SETTINGS_DEFAULTS, computeCutoffAt, isoDateToUtc, type Commerc
 import type { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import cookieParser from 'cookie-parser';
+import { unlink } from 'fs/promises';
 import hbs from 'hbs';
 import { AllExceptionsFilter } from '../../common/filters/all-exceptions.filter';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
@@ -30,6 +31,7 @@ import { DeliveryModule } from '../../modules/delivery/delivery.module';
 import { JobsModule } from '../../modules/jobs/jobs.module';
 import { JobsService } from '../../modules/jobs/jobs.service';
 import { MailModule } from '../../modules/mail/mail.module';
+import { MAIL_PREVIEW_ERROR_PREFIX } from '../../modules/mail/mail.constants';
 import { SettingsModule } from '../../modules/settings/settings.module';
 import { SettingsService } from '../../modules/settings/settings.service';
 import { CancellationService } from '../../modules/subscriptions/services/cancellation.service';
@@ -351,6 +353,16 @@ export async function createSubsApp(opts: SubsAppOptions = {}): Promise<SubsApp>
   const cleanup = async (): Promise<void> => {
     const userIds = [...createdUserIds];
     if (userIds.length > 0) {
+      // F10: motor/sipariş bildirimleri artık gerçek MailLog satırı + DISABLE_MAIL önizleme dosyası üretir → temizle
+      const emails = (await prisma.user.findMany({ where: { id: { in: userIds } }, select: { email: true } })).map((u) => u.email);
+      if (emails.length > 0) {
+        const mails = await prisma.mailLog.findMany({ where: { to: { in: emails } }, select: { id: true, error: true } });
+        for (const m of mails) {
+          if (!m.error?.startsWith(MAIL_PREVIEW_ERROR_PREFIX)) continue;
+          await unlink(m.error.slice(MAIL_PREVIEW_ERROR_PREFIX.length).trim()).catch(() => undefined);
+        }
+        await prisma.mailLog.deleteMany({ where: { id: { in: mails.map((m) => m.id) } } });
+      }
       const subs = await prisma.subscription.findMany({ where: { userId: { in: userIds } }, select: { id: true } });
       const subIds = subs.map((s) => s.id);
       const orders = await prisma.order.findMany({ where: { OR: [{ userId: { in: userIds } }, { subscriptionId: { in: subIds } }] }, select: { id: true } });

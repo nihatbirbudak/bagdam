@@ -105,8 +105,8 @@ export function AdminAyarlarGenelPage() {
   return (
     <SettingsGroupsView
       title="Genel Ayarlar"
-      description="Ticaret/kampanya kuralları (KDV, ilk kutu indirimi, kesim, tahsilat stratejisi, ADR-0018: eşik kuralı / indirim yuvarlama / abone kargo), site kimliği ve çerez bayrakları. Kargo ücreti/eşik Bölgeler'de (tek sahip DeliveryZone)."
-      groups={['commerce', 'site', 'cookies']}
+      description="Ticaret/kampanya kuralları (KDV, ilk kutu indirimi, kesim, tahsilat stratejisi, ADR-0018: eşik kuralı / indirim yuvarlama / abone kargo), site kimliği, çerez bayrakları ve KVKK veri saklama süreleri (F10 — kvkk:purge bu değerleri okur, docs/kvkk-veri-saklama.md). Kargo ücreti/eşik Bölgeler'de (tek sahip DeliveryZone)."
+      groups={['commerce', 'site', 'cookies', 'privacy']}
     />
   );
 }

@@ -17,6 +17,59 @@ export interface NotifierPayloads {
   'wholesale.new-lead': { lead: NotifierLead };
   /** F8: sipariş ödendi (OrdersService PAID yan etkisi) → `mail.order-paid` (sipariş özeti + yasal belge kopyası bağlantıları). */
   'order.paid': { order: NotifierOrder };
+  // ── F10: teslimat olayları (OrdersService.transition yan etkisi; aynı NotifierOrder yükü) ──
+  /** Order → OUT_FOR_DELIVERY → `mail.order-shipped`. */
+  'order.shipped': { order: NotifierOrder };
+  /** Order → DELIVERED → `mail.order-delivered`. */
+  'order.delivered': { order: NotifierOrder };
+  /** Order → DELIVERY_FAILED → `mail.order-delivery-failed`; `reason` ops notu (kurye). */
+  'order.delivery-failed': { order: NotifierOrder; reason: string | null };
+  // ── F10: abonelik motoru olayları (SubscriptionNotifier zenginleştirir; F7 stub yerine) ──
+  /** Kutu tahsil edildi → `mail.cycle-charged`. */
+  'cycle.charged': { cycle: NotifierCycle; amount: number; orderNo: number | null; isDelta: boolean };
+  /** Tahsilat başarısız → `mail.cycle-payment-failed` (kart güncelle + varsa sıradaki deneme anı). */
+  'cycle.payment-failed': { cycle: NotifierCycle; amount: number; failure: string | null; nextRetryAt: Date | null; attemptNo: number; isDelta: boolean };
+  /** Ödeme linki üretildi → `mail.cycle-awaiting-payment`. */
+  'cycle.awaiting-payment': { cycle: NotifierCycle; amount: number; payUrl: string; expiresAt: Date; attemptNo: number };
+  /** Kesimden ~24 s önce → `mail.cutoff-reminder` (cycle başına BİR kez: MailService.sendOnce). */
+  'subscription.cutoff-reminder': { cycle: NotifierCycle; cutoffAt: Date };
+  /** İptal onaylandı → `mail.subscription-cancelled`. */
+  'subscription.cancelled': { user: NotifierUser; subscriptionId: string; tierName: string; effectiveAt: Date; lastBoxOn: string | null; refundAmount: number; refundDueAt: Date | null };
+  /** Üst üste başarısız tahsilat → abonelik PAST_DUE → `mail.subscription-past-due`. */
+  'subscription.past-due': { user: NotifierUser; subscriptionId: string; tierName: string; failedCycles: number };
+}
+
+/** F10 kutu satırı (CycleItem) — MailNotifier `qtyText` metnini üretir. */
+export interface NotifierCycleItem {
+  name: string;
+  qty: number;
+  unit: string | null;
+  pref: string | null;
+  /** CycleItemSource: TEMPLATE | SWAP | EXTRA. */
+  source: string;
+}
+
+/**
+ * F10 abonelik kutusu bağlamı — SubscriptionNotifier tarafından cycle + subscription kaydından doldurulur;
+ * MailNotifier yalnız biçimlendirir (tarih/para/etiket). Para alanları TL (number).
+ */
+export interface NotifierCycle {
+  cycleId: string;
+  cycleNo: number;
+  subscriptionId: string;
+  user: NotifierUser;
+  tierName: string;
+  /** YYYY-MM-DD */
+  deliveryOn: string;
+  /** DeliveryDaySlug (sali/persembe/cumartesi) ya da enum adı. */
+  deliveryDay: string;
+  addressLine: string;
+  zoneName: string;
+  items: NotifierCycleItem[];
+  /** uyelik.html (müşteri hesap sayfası). */
+  accountUrl: string;
+  /** kutu.html?tier=<slug> (kutu düzenleme). */
+  boxUrl: string;
 }
 
 /** F8 sipariş onayı e-postasının satırı. */

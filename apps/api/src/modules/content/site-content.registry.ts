@@ -498,6 +498,53 @@ export const SITE_CONTENT_REGISTRY: readonly SiteContentRegistryEntry[] = [
     'E-posta — sipariş onayı (ödeme alındı)',
     'Değişkenler: {{order.orderNo}} {{order.customerName}} {{order.paidAtText}} {{order.deliveryOnText}} {{order.deliveryDayLabel}} {{order.addressLine}} {{order.zoneName}} {{#each order.lines}}{{name}} {{qtyText}} {{lineTotalText}}{{/each}} {{order.subtotalText}} {{#if order.hasDiscount}}{{order.discountTotalText}}{{/if}} {{order.shippingFeeText}} {{order.vatTotalText}} {{order.grandTotalText}} {{order.couponCode}} {{#if order.isSubscription}}…{{/if}} {{#each order.legalDocuments}}{{title}} {{{url}}}{{/each}} {{{order.orderUrl}}} {{brand.*}}',
   ),
+  // ── F10 (ADR-0014 zorunlu şablon listesi): abonelik motoru + teslimat olayları ──
+  // Olay → şablon eşlemesi modules/mail/mail.notifier.ts; motor olayları SubscriptionNotifier üzerinden gelir.
+  ...mailTemplateEntry(
+    'cycle-charged',
+    'E-posta — haftalık kutu tahsil edildi',
+    'Değişkenler: {{cycle.amountText}} {{cycle.deliveryOnText}} {{cycle.deliveryDayLabel}} {{cycle.tierName}} {{cycle.orderNo}} {{#each cycle.items}}{{name}} {{qtyText}}{{/each}} {{{cycle.accountUrl}}} {{user.name}} {{brand.*}}',
+  ),
+  ...mailTemplateEntry(
+    'cycle-payment-failed',
+    'E-posta — tahsilat başarısız (kart güncelle)',
+    'Değişkenler: {{cycle.amountText}} {{cycle.deliveryOnText}} {{cycle.failure}} {{cycle.nextRetryText}} {{#if cycle.hasRetry}}…{{/if}} {{{cycle.cardUrl}}} {{user.name}} {{brand.*}}',
+  ),
+  ...mailTemplateEntry(
+    'cycle-awaiting-payment',
+    'E-posta — ödeme linki (kutunun ödemesi bekleniyor)',
+    'Değişkenler: {{cycle.amountText}} {{cycle.deliveryOnText}} {{cycle.expiresAtText}} {{{cycle.payUrl}}} {{user.name}} {{brand.*}}',
+  ),
+  ...mailTemplateEntry(
+    'cutoff-reminder',
+    'E-posta — kesim hatırlatması (24 saat kaldı)',
+    'Değişkenler: {{cycle.cutoffAtText}} {{cycle.deliveryOnText}} {{cycle.deliveryDayLabel}} {{#each cycle.items}}{{name}} {{qtyText}}{{/each}} {{{cycle.boxUrl}}} {{{cycle.accountUrl}}} {{user.name}} {{brand.*}}',
+  ),
+  ...mailTemplateEntry(
+    'order-shipped',
+    'E-posta — siparişin yola çıktı',
+    'Değişkenler: {{order.orderNo}} {{order.deliveryOnText}} {{order.deliveryDayLabel}} {{order.deliveryWindow}} {{order.addressLine}} {{order.zoneName}} {{#each order.lines}}{{name}} {{qtyText}}{{/each}} {{{order.orderUrl}}} {{brand.*}}',
+  ),
+  ...mailTemplateEntry(
+    'order-delivered',
+    'E-posta — siparişin teslim edildi',
+    'Değişkenler: {{order.orderNo}} {{order.deliveryOnText}} {{order.customerName}} {{{order.orderUrl}}} {{brand.*}}',
+  ),
+  ...mailTemplateEntry(
+    'order-delivery-failed',
+    'E-posta — teslim edilemedi (yeniden planlama)',
+    'Değişkenler: {{order.orderNo}} {{order.deliveryOnText}} {{order.reason}} {{order.addressLine}} {{brand.contactPhone}} {{{order.orderUrl}}} {{brand.*}}',
+  ),
+  ...mailTemplateEntry(
+    'subscription-cancelled',
+    'E-posta — abonelik iptali teyidi',
+    'Değişkenler: {{sub.effectiveAtText}} {{sub.lastBoxText}} {{#if sub.hasRefund}}{{sub.refundAmountText}} {{sub.refundDueAtText}}{{/if}} {{{sub.accountUrl}}} {{user.name}} {{brand.*}}',
+  ),
+  ...mailTemplateEntry(
+    'subscription-past-due',
+    'E-posta — abonelik askıda (üst üste başarısız tahsilat)',
+    'Değişkenler: {{sub.failedCycles}} {{sub.tierName}} {{{sub.cardUrl}}} {{{sub.accountUrl}}} {{user.name}} {{brand.*}}',
+  ),
 ];
 
 /**

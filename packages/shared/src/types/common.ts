@@ -9,10 +9,14 @@ export type Id = string;
 
 /**
  * Hata zarfı — UA `HttpExceptionFilter` kalıbı. `message` ValidationPipe'ta string[] olabilir.
- * `error`: makine kodu (ör. `DAY_FULL`, `INVALID_TRANSITION`, `CSRF_INVALID`).
+ * `error`: eski alan — ya HTTP adı ("Not Found") ya da uygulama kodu (`CSRF_INVALID`).
+ * `code` (F10): HER ZAMAN makine kodu (`[A-Z][A-Z0-9_]*`) — istemci buna göre dallanır
+ * (`NOT_FOUND`, `TOO_MANY_REQUESTS`, `DAY_FULL`, `INVALID_TRANSITION`, `CSRF_INVALID`…).
  */
 export interface ApiError {
   statusCode: number;
+  /** Makine kodu — F10'dan itibaren tüm hata yanıtlarında dolu. */
+  code?: string;
   message: string | string[];
   error?: string;
   requestId?: string;

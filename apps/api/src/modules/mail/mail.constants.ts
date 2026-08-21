@@ -6,7 +6,25 @@ import { APP_ROOT } from '../../config/paths';
  * MailModule sabitleri (F6, ADR-0014). Şablonlar SiteContent'te: anahtar `mail.<slug>` → `{subject, html}` (Handlebars);
  * kaynak liste site-content.registry.ts (grup `mail`) + seed database/seeds/content/site-content.json.
  */
-export const MAIL_TEMPLATE_SLUGS: readonly MailTemplateSlug[] = ['welcome', 'verify', 'reset', 'password-changed', 'wholesale-lead', 'test', 'order-paid'];
+export const MAIL_TEMPLATE_SLUGS: readonly MailTemplateSlug[] = [
+  'welcome',
+  'verify',
+  'reset',
+  'password-changed',
+  'wholesale-lead',
+  'test',
+  'order-paid',
+  // F10 (ADR-0014 zorunlu liste): abonelik motoru + teslimat olayları
+  'cycle-charged',
+  'cycle-payment-failed',
+  'cycle-awaiting-payment',
+  'cutoff-reminder',
+  'order-shipped',
+  'order-delivered',
+  'order-delivery-failed',
+  'subscription-cancelled',
+  'subscription-past-due',
+];
 
 /** SiteContent anahtar öneki: `mail.welcome` … */
 export const MAIL_SITE_CONTENT_PREFIX = 'mail.';
@@ -20,6 +38,10 @@ export const MAIL_PREVIEW_ERROR_PREFIX = 'preview:';
 
 /** MailLog kolon sınırları (VarChar). */
 export const MAIL_LOG_LIMITS = { to: 160, subject: 255, templateSlug: 60, entityId: 60, messageId: 160 } as const;
+
+/** F10 `kvkk:purge` MailLog temizliği: tek turda okunan satır sayısı ve azami tur (sonsuz döngü koruması). */
+export const MAIL_PURGE_BATCH_SIZE = 500;
+export const MAIL_PURGE_MAX_ROUNDS = 200;
 
 /** Admin `GET /admin/mail-logs` varsayılanları. */
 export const MAIL_LOGS_DEFAULT_LIMIT = 25;

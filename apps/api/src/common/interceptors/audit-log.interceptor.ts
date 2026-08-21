@@ -5,6 +5,7 @@ import { mergeMap } from 'rxjs/operators';
 import { AuditService } from '../../modules/audit/audit.service';
 import { AUDIT_MODULE_KEY, getAuditValues } from '../decorators/audit.decorator';
 import type { AuthenticatedRequest } from '../decorators/current-user.decorator';
+import { redactObject } from '../security/redaction';
 
 /** Yalnız mutasyonlar loglanır (GET/HEAD/OPTIONS yok). */
 const AUDITED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -41,64 +42,16 @@ const VERB_ACTIONS: Record<string, string> = {
   logout: 'LOGOUT',
 };
 
-/** Tam ad eşleşmesiyle redakte edilen alanlar (ADR-0015: e-posta/telefon/adres/parola). Küçük harfle karşılaştırılır. */
-const SENSITIVE_KEYS = new Set([
-  'password',
-  'passwordhash',
-  'currentpassword',
-  'newpassword',
-  'refreshtoken',
-  'refreshtokenhash',
-  'passwordresettoken',
-  'accesstoken',
-  'csrftoken',
-  'secret',
-  'apikey',
-  'apisecret',
-  'email',
-  'actoremail',
-  'phone',
-  'fullname',
-  'address',
-  'addressline',
-  'line',
-  'addresssnapshot',
-  'billingaddress',
-  'taxno',
-  'taxnumber',
-  'iban',
-  'cardnumber',
-  'cardholder',
-]);
-
-/** Anahtar desenleri — parola/sır/token içeren her ad. */
-const SENSITIVE_PATTERN = /password|secret|token|apikey|api_key/i;
-
-export const REDACTED = '[redacted]';
-const MAX_DEPTH = 8;
-const MAX_STRING = 4000;
-
-function isSensitiveKey(key: string): boolean {
-  return SENSITIVE_KEYS.has(key.toLowerCase()) || SENSITIVE_PATTERN.test(key);
-}
-
 /**
- * Audit snapshot'ı için redaksiyon: hassas anahtarlar `[redacted]`, derinlik/uzunluk sınırlı, Date ISO'ya.
- * Saf fonksiyon — testlerde doğrudan kullanılır.
+ * Redaksiyon (ADR-0015) — anahtar listeleri ve derin redaksiyon `common/security/redaction.ts` dosyasında
+ * (audit, HTTP log ve admin webhook payload'ı aynı kaynağı kullanır). Aşağıdaki iki dışa aktarım
+ * mevcut çağıranlar/testler kırılmasın diye korunan takma adlardır.
  */
+export { REDACTED } from '../security/redaction';
+
+/** Audit anlık görüntüsü için derin redaksiyon (bkz. `redactObject`). */
 export function redactForAudit(value: unknown, depth = 0): unknown {
-  if (value === null || value === undefined) return value;
-  if (depth > MAX_DEPTH) return '[truncated]';
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string') return value.length > MAX_STRING ? `${value.slice(0, MAX_STRING)}…` : value;
-  if (typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.map((v) => redactForAudit(v, depth + 1));
-  if (Buffer.isBuffer(value)) return `[buffer ${value.length}B]`;
-  const out: Record<string, unknown> = {};
-  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-    out[key] = isSensitiveKey(key) ? REDACTED : redactForAudit(v, depth + 1);
-  }
-  return out;
+  return redactObject(value, depth);
 }
 
 function resolveAction(method: string, handlerName: string): string {

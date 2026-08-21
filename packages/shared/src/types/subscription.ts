@@ -419,7 +419,9 @@ export type SubscriptionNotifierEvent =
   | 'cycle.payment-failed'
   | 'cycle.awaiting-payment'
   | 'subscription.cancelled'
-  | 'subscription.cutoff-reminder';
+  | 'subscription.cutoff-reminder'
+  /** F10: üst üste başarısız tahsilat → abonelik PAST_DUE (mail.subscription-past-due). */
+  | 'subscription.past-due';
 
 /** Stub bildiriminin kaydı (testler ve admin teşhisi için son N olay bellekte tutulur). */
 export interface SubscriptionNotification {
@@ -439,7 +441,8 @@ export type JobName =
   | 'cycles:expire-payment-links'
   | 'payments:retry'
   | 'reminders:cutoff'
-  | 'payments:reconcile'; // F8: PENDING kalmış checkout ödemeleri (sağlayıcı sorgusu / 24 s EXPIRED + Order CANCELLED + DD iade)
+  | 'payments:reconcile' // F8: PENDING kalmış checkout ödemeleri (sağlayıcı sorgusu / 24 s EXPIRED + Order CANCELLED + DD iade)
+  | 'kvkk:purge'; // F10: KVKK saklama matrisi (MailLog/SystemLog/CronLog yaş bazlı silme + AuditLog PII maskeleme + pasif müşteri anonimleştirme); logs:cleanup bunun içinde
 export const JOB_NAME_VALUES: readonly JobName[] = [
   'delivery-dates:generate',
   'cycles:ensure',
@@ -448,6 +451,7 @@ export const JOB_NAME_VALUES: readonly JobName[] = [
   'payments:retry',
   'reminders:cutoff',
   'payments:reconcile',
+  'kvkk:purge',
 ];
 
 /** Bir job koşusunun sonucu (CronLog satırıyla aynı alanlar). */

@@ -2,6 +2,9 @@
 
 > Kaynak: [`database/schema.prisma`](../database/schema.prisma) · gerekçe: [BACKEND-PLANI.md §2](BACKEND-PLANI.md) · kararlar: ADR-0004 (Timestamptz), ADR-0005 (kesim/bölge), ADR-0006 (tahsilat/DELTA), ADR-0007 (indirim/atlama/retention), ADR-0008 (abonelik modeli), ADR-0010 (ödeme), ADR-0013 (F2a/F2b, additive migration), ADR-0016 (kupon UI P2).
 > F2'de üretildi (F2a); **F7 1. gününde F2b varlıkları + minimal Coupon eklendi (2026-08-20)**. Durum geçişleri: [state-machines.md](state-machines.md).
+> **F10 sonu (2026-08-21): şema v1 DONDURULDU — [ADR-0021](adr/0021-sema-v1-donduruldu.md).** Aşağıdaki 37 model / 29 enum / 5 migration
+> sayımı bundan sonra referanstır; yalnız **additive** migration serbesttir (yeni tablo · nullable kolon · index · enum değeri · FK).
+> Kolon/tablo silme, yeniden adlandırma, tip daraltma, enum değeri kaldırma **yeni ADR ister**.
 
 ## Özet
 

@@ -100,6 +100,14 @@ function shouldReleaseDeliveryDate(from: OrderStatus, to: OrderStatus): boolean 
   return false;
 }
 
+/** F10: Order durumu → teslimat bildirimi olayı (ADR-0014 "yola çıktı / teslim / teslim edilemedi"). */
+export type DeliveryNotifyEvent = 'order.shipped' | 'order.delivered' | 'order.delivery-failed';
+const DELIVERY_NOTIFY_EVENTS: Partial<Record<OrderStatus, DeliveryNotifyEvent>> = {
+  [OrderStatus.OUT_FOR_DELIVERY]: 'order.shipped',
+  [OrderStatus.DELIVERED]: 'order.delivered',
+  [OrderStatus.DELIVERY_FAILED]: 'order.delivery-failed',
+};
+
 /** Checkout siparişi mi (CHECKOUT türünde ödemesi var) — sipariş onayı e-postası yalnız bunlara (cycle#n Order'ları motorun olayları). */
 export function isCheckoutOrder(order: Pick<OrderRecord, 'payments'>): boolean {
   return order.payments.some((p) => p.kind === 'CHECKOUT');
@@ -369,6 +377,14 @@ export class OrdersService {
     if (to === OrderStatus.PAID && ctx.notify !== false && isCheckoutOrder(result)) {
       void this.notifyPaid(result).catch((err: unknown) => this.logger.error(`order.paid bildirimi başarısız (#${result.orderNo}): ${(err as Error).message}`));
     }
+    // F10 (ADR-0014): teslimat bildirimleri — yola çıktı / teslim edildi / teslim edilemedi.
+    // Abonelik kutusu Order'ları da dahildir (haftalık kutu "yola çıktı" bildirimi); `ctx.notify === false` ile susturulabilir.
+    const deliveryEvent = DELIVERY_NOTIFY_EVENTS[to];
+    if (deliveryEvent && ctx.notify !== false) {
+      void this.notifyDelivery(deliveryEvent, result, ctx.reason ?? null).catch((err: unknown) =>
+        this.logger.error(`${deliveryEvent} bildirimi başarısız (#${result.orderNo}): ${(err as Error).message}`),
+      );
+    }
     return result;
   }
 
@@ -408,6 +424,16 @@ export class OrdersService {
   /** Notifier `order.paid` — sipariş özeti + onaylanan yasal belgelerin kopya bağlantıları (politikalar.html#slug). */
   async notifyPaid(order: OrderRecord): Promise<void> {
     await this.notifier.notify('order.paid', { order: buildNotifierOrder(order) });
+  }
+
+  /** F10 teslimat bildirimleri — `mail.order-shipped` / `-delivered` / `-delivery-failed` (entityId = orderId). */
+  async notifyDelivery(event: DeliveryNotifyEvent, order: OrderRecord, reason: string | null): Promise<void> {
+    const payload = buildNotifierOrder(order);
+    if (event === 'order.delivery-failed') {
+      await this.notifier.notify(event, { order: payload, reason });
+      return;
+    }
+    await this.notifier.notify(event, { order: payload });
   }
 
   // ── Müşteri okuma ────────────────────────────────────────────────────────────

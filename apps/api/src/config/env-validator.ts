@@ -39,6 +39,9 @@ const WEAK_DEFAULTS: Record<string, string[]> = {
 /** Değerin içinde .env.example yer tutucusu kaldıysa (ör. "CHANGE_ME_32_chars") yakala. */
 const PLACEHOLDER_PATTERN = /CHANGE_ME/i;
 
+/** WEB_URL/ADMIN_URL production'da mutlak olmalı (e-posta ve ödeme dönüş bağlantılarının kökü). */
+const ABSOLUTE_URL_RE = /^https?:\/\/[^\s/]+/i;
+
 export class EnvValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -89,6 +92,55 @@ export function validateEnv(): void {
   }
   if (process.env.WEB_URL && !/^https?:\/\//.test(process.env.WEB_URL.trim())) {
     warnings.push(`  [UYARI] WEB_URL: "${process.env.WEB_URL}" — http(s):// ile başlamalı (e-posta bağlantıları buna göre kurulur)`);
+  }
+
+  // F10 sertleştirme (ADR-0015) — production'da zorunlu ek kurallar
+  if (isProduction) {
+    // WEB_URL/ADMIN_URL mutlak olmalı: doğrulama/parola sıfırlama/ödeme dönüş bağlantıları buradan kurulur,
+    // CORS allow-list de bunları kullanır (göreli değer sessizce kırık bağlantı üretir).
+    for (const key of ['WEB_URL', 'ADMIN_URL'] as const) {
+      const raw = process.env[key]?.trim();
+      if (raw && !ABSOLUTE_URL_RE.test(raw)) {
+        errors.push(`  [HATA] ${key}: mutlak URL olmalı (https://…) — "${raw}"`);
+      } else if (raw && raw.startsWith('http://')) {
+        warnings.push(`  [UYARI] ${key}: production'da https:// bekleniyor — "${raw}"`);
+      }
+      if (raw && raw.endsWith('/')) {
+        warnings.push(`  [UYARI] ${key}: sondaki "/" bağlantılarda çift eğik çizgi üretir — "${raw}"`);
+      }
+    }
+
+    // Ödeme sağlayıcısı PayTR ise mağaza bilgileri eksiksiz ve yer tutucusuz olmalı (ADR-0019).
+    // (Panelden Setting payment.* ile de girilebilir; .env DEĞERİ VARSA doğru olmalı — yarı dolu yapılandırma
+    // çalışma anında imza hatası verir.)
+    const paytrKeys = ['PAYTR_MERCHANT_ID', 'PAYTR_MERCHANT_KEY', 'PAYTR_MERCHANT_SALT'] as const;
+    const paytrPresent = paytrKeys.filter((k) => (process.env[k] ?? '').trim().length > 0);
+    const providerIsPaytr = (process.env.PAYMENT_PROVIDER ?? '').trim().toLowerCase() === 'paytr';
+    if (paytrPresent.length > 0 || providerIsPaytr) {
+      for (const key of paytrKeys) {
+        const val = (process.env[key] ?? '').trim();
+        if (!val) {
+          // Sağlayıcı .env'den seçilmişse eksik anahtar hatadır; yalnız kısmi doldurma ise uyarı.
+          (providerIsPaytr ? errors : warnings).push(
+            `  [${providerIsPaytr ? 'HATA' : 'UYARI'}] ${key}: EKSİK — PayTR mağaza bilgisi (panel Ayarlar › Ödeme ya da .env)`,
+          );
+        } else if (PLACEHOLDER_PATTERN.test(val)) {
+          errors.push(`  [HATA] ${key}: .env.example yer tutucusu kalmış (CHANGE_ME)`);
+        }
+      }
+      const testMode = (process.env.PAYTR_TEST_MODE ?? '').trim();
+      if (testMode && testMode !== '0' && testMode !== '1') {
+        errors.push(`  [HATA] PAYTR_TEST_MODE: yalnız 0 ya da 1 ("${testMode}")`);
+      }
+      if (testMode === '1') {
+        warnings.push('  [UYARI] PAYTR_TEST_MODE=1: production\'da test modu açık — gerçek tahsilat yapılmaz');
+      }
+    }
+
+    // Job zaman ezmesi (`POST /admin/jobs/:name/run {now}`) production'da açık kalmamalı.
+    if ((process.env.ALLOW_JOB_TIME_OVERRIDE ?? '').trim().toLowerCase() === 'true') {
+      errors.push('  [HATA] ALLOW_JOB_TIME_OVERRIDE: production\'da açık olamaz (job simülasyon zamanı)');
+    }
   }
 
   if (isProduction) {

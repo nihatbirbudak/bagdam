@@ -1,0 +1,49 @@
+{{!-- Çerez onay şeridi (F10, ADR-0015; metinler bahcedenal CookieConsentBanner + tr.json'dan uyarlandı).
+
+     PİKSEL PARİTE: banner VARSAYILAN GİZLİ basılır (`style="display:none"`) ve `position:fixed` kullanır —
+     sayfa akışına hiç girmez. Görünür yapan tek şey cart.js'in `// F10 cookie:` bloğudur (localStorage
+     `bagdam_cookie_consent` yoksa gösterir). Parite koşusu `--mask=#cookieConsent` ile öğeyi `display:none !important`
+     yaptığı için 10 sayfada 0 px fark korunur (ADR-0003 istisna listesine eklenecek yeni istisna).
+
+     Stiller SATIR İÇİ: public/styles.css'e dokunulmaz (parite referansı). Renkler styles.css :root paletiyle aynı.
+     Kategoriler: zorunlu (her zaman) · analitik · pazarlama — son ikisi yalnız Setting `cookies.*` açıkken basılır. --}}
+<div id="cookieConsent" role="dialog" aria-modal="false" aria-labelledby="cookieConsentTitle" aria-describedby="cookieConsentText"
+     data-analytics="{{#if cookies.analyticsEnabled}}1{{else}}0{{/if}}" data-marketing="{{#if cookies.marketingEnabled}}1{{else}}0{{/if}}"
+     style="display:none; position:fixed; left:0; right:0; bottom:0; z-index:9000; background:#FBF8F0; border-top:1px solid rgba(41,41,34,.16); box-shadow:0 -8px 24px rgba(41,41,34,.10);">
+  <div style="max-width:1080px; margin:0 auto; padding:16px 20px; display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; justify-content:space-between;">
+    <div style="flex:1 1 320px; min-width:260px; color:#292922;">
+      <h2 id="cookieConsentTitle" style="margin:0 0 6px; font-size:15px; line-height:1.3; font-weight:600;">Çerez tercihleri</h2>
+      <p id="cookieConsentText" style="margin:0; font-size:13px; line-height:1.5; color:#5B594C;">
+        Siteyi çalıştırmak için zorunlu çerezler kullanıyoruz. Analitik ve pazarlama çerezleri yalnız onay verirsen çalışır.
+        Ayrıntı için <a href="politikalar.html#cerez" style="color:#5B594C;">Çerez Politikası</a> ve
+        <a href="politikalar.html#kvkk" style="color:#5B594C;">KVKK Aydınlatma Metni</a>.
+      </p>
+      <div id="cookieConsentManage" hidden style="margin-top:12px; display:flex; flex-direction:column; gap:8px; font-size:13px; color:#292922;">
+        <label style="display:flex; gap:8px; align-items:flex-start; line-height:1.4;">
+          <input type="checkbox" checked disabled style="margin-top:2px;">
+          <span><b>Zorunlu</b> — oturum, sepet ve güvenlik. Kapatılamaz.</span>
+        </label>
+        {{#if cookies.analyticsEnabled}}
+        <label style="display:flex; gap:8px; align-items:flex-start; line-height:1.4;">
+          <input type="checkbox" id="cookieConsentAnalytics" style="margin-top:2px;">
+          <span><b>Analitik</b> — sayfaların nasıl kullanıldığını anlamamıza yardım eder.</span>
+        </label>
+        {{/if}}
+        {{#if cookies.marketingEnabled}}
+        <label style="display:flex; gap:8px; align-items:flex-start; line-height:1.4;">
+          <input type="checkbox" id="cookieConsentMarketing" style="margin-top:2px;">
+          <span><b>Pazarlama</b> — sana uygun kampanyaları göstermek için.</span>
+        </label>
+        {{/if}}
+      </div>
+    </div>
+    <div style="flex:0 0 auto; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+      <button type="button" id="cookieConsentReject"
+              style="font:inherit; font-size:13px; padding:9px 16px; border:1px solid rgba(41,41,34,.32); background:transparent; color:#292922; border-radius:999px; cursor:pointer;">Reddet</button>
+      <button type="button" id="cookieConsentManageBtn" aria-expanded="false" aria-controls="cookieConsentManage"
+              style="font:inherit; font-size:13px; padding:9px 16px; border:1px solid rgba(41,41,34,.32); background:transparent; color:#292922; border-radius:999px; cursor:pointer;">Yönet</button>
+      <button type="button" id="cookieConsentAccept"
+              style="font:inherit; font-size:13px; padding:9px 18px; border:1px solid #E85B2A; background:#E85B2A; color:#FBF3EC; border-radius:999px; cursor:pointer;">Kabul Et</button>
+    </div>
+  </div>
+</div>

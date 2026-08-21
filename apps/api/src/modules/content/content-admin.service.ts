@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import type { AdminLegalGroup, AdminPostList, AdminSiteContentItem, LegalDocument as LegalDocumentDto, Post as PostDto } from '@bagdam/shared';
 import { ContentStatus, Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
+import { sanitizeRichHtml, sanitizeRichHtmlOrNull } from '../../common/security/html-sanitize';
 import { ADMIN_DEFAULT_LIMIT, ADMIN_DEFAULT_PAGE } from './content.constants';
 import { groupLegalDocuments, resolveSiteContentSchema, toAdminPost, toAdminSiteContentItem, toLegalDocument } from './content.mapper';
 import { ContentRepository } from './content.repository';
@@ -98,9 +99,9 @@ export class ContentAdminService {
         slug: dto.slug,
         kind: dto.kind,
         readMinutes: dto.readMinutes ?? 4,
-        titleHtml: dto.titleHtml,
+        titleHtml: sanitizeRichHtml(dto.titleHtml),
         excerpt: dto.excerpt ?? null,
-        bodyHtml: dto.bodyHtml,
+        bodyHtml: sanitizeRichHtml(dto.bodyHtml),
         coverMediaId: dto.coverMediaId ?? null,
         relatedSlugs: dto.relatedSlugs ?? [],
         status,
@@ -124,9 +125,9 @@ export class ContentAdminService {
       ...(dto.slug !== undefined ? { slug: dto.slug } : {}),
       ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
       ...(dto.readMinutes !== undefined ? { readMinutes: dto.readMinutes } : {}),
-      ...(dto.titleHtml !== undefined ? { titleHtml: dto.titleHtml } : {}),
+      ...(dto.titleHtml !== undefined ? { titleHtml: sanitizeRichHtml(dto.titleHtml) } : {}),
       ...(dto.excerpt !== undefined ? { excerpt: dto.excerpt } : {}),
-      ...(dto.bodyHtml !== undefined ? { bodyHtml: dto.bodyHtml } : {}),
+      ...(dto.bodyHtml !== undefined ? { bodyHtml: sanitizeRichHtml(dto.bodyHtml) } : {}),
       ...(dto.coverMediaId !== undefined ? { coverMediaId: dto.coverMediaId } : {}),
       ...(dto.relatedSlugs !== undefined ? { relatedSlugs: dto.relatedSlugs } : {}),
       ...(dto.status !== undefined ? { status: dto.status } : {}),
@@ -178,6 +179,8 @@ export class ContentAdminService {
    * (yayınla'da gerçek tarih). Bayraklar verilmezse yayındaki (yoksa en son) sürümden miras.
    */
   async createLegalVersion(slug: string, dto: CreateLegalVersionDto): Promise<LegalDocumentDto> {
+    // F10: gövde/lead panelden gelir ve politikalar.hbs'te HAM basılır → betik taşıyan yapılar burada düşer.
+    const bodyHtml = sanitizeRichHtml(dto.bodyHtml);
     const latest = await this.repo.findLatestLegalVersion(slug);
     const current = latest ? await this.repo.findCurrentLegalBySlug(slug) : null;
     const base = current ?? latest;
@@ -189,9 +192,9 @@ export class ContentAdminService {
         slug,
         title: dto.title,
         version: latest ? latest.version + 1 : 1,
-        leadHtml: dto.leadHtml ?? null,
-        bodyHtml: dto.bodyHtml,
-        contentHash: legalContentHash(dto.bodyHtml),
+        leadHtml: sanitizeRichHtmlOrNull(dto.leadHtml ?? null),
+        bodyHtml,
+        contentHash: legalContentHash(bodyHtml),
         effectiveFrom: new Date(),
         isCurrent: false,
         requiresAck: dto.requiresAck ?? base?.requiresAck ?? false,
@@ -215,8 +218,10 @@ export class ContentAdminService {
     }
     const row = await this.repo.updateLegal(id, {
       ...(dto.title !== undefined ? { title: dto.title } : {}),
-      ...(dto.leadHtml !== undefined ? { leadHtml: dto.leadHtml } : {}),
-      ...(dto.bodyHtml !== undefined ? { bodyHtml: dto.bodyHtml, contentHash: legalContentHash(dto.bodyHtml) } : {}),
+      ...(dto.leadHtml !== undefined ? { leadHtml: sanitizeRichHtmlOrNull(dto.leadHtml) } : {}),
+      ...(dto.bodyHtml !== undefined
+        ? { bodyHtml: sanitizeRichHtml(dto.bodyHtml), contentHash: legalContentHash(sanitizeRichHtml(dto.bodyHtml)) }
+        : {}),
     });
     return toLegalDocument(row);
   }

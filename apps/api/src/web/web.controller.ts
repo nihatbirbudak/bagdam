@@ -25,7 +25,7 @@ import {
   type PostView,
 } from './content-view';
 import { buildFeaturedViews, DEFAULT_FEATURED, FeaturedView } from './featured';
-import { WEB_CONTENT_SOURCE, type WebContentSource } from './web-content.source';
+import { WEB_CONTENT_SOURCE, type CookieToggles, type WebContentSource } from './web-content.source';
 import { COMING_SOON_VIEW, HOME_VIEW, WEB_PAGES } from './web.routes';
 
 /** Anonim HTML: nginx micro-cache 10 s (ADR-0003); tarayıcıda her seferinde doğrula. */
@@ -100,6 +100,8 @@ interface ViewData {
   toptanTextsJson?: string;
   /** sepet (F8): `{legal:[{slug,kind,title,version}], zones:[…]}` — checkout onay kutuları + ilçe seçenekleri (script içi JSON). */
   checkoutJson?: string;
+  /** F10 çerez banner'ı (partials/cookie-consent.hbs): hangi opsiyonel kategoriler gösterilecek (Setting cookies.*). */
+  cookies?: CookieToggles;
 }
 
 /**
@@ -250,6 +252,11 @@ export class WebController {
         data.legal = buildLegalNav(docs);
         data.legalDocs = buildLegalArticles(docs);
       }
+      // F10: çerez banner'ı — 10 sayfada ortak (banner varsayılan GİZLİ basılır; cart.js onay yoksa gösterir → parite bozulmaz).
+      data.cookies = await this.content.getCookieSettings().catch((err: Error) => {
+        this.logger.warn(`çerez ayarları okunamadı, opsiyonel kategoriler gizlendi: ${err.message}`);
+        return { analyticsEnabled: false, marketingEnabled: false };
+      });
       if (view === 'toptan') {
         data.toptanTextsJson = toScriptJson(this.toptanTexts(site));
       }

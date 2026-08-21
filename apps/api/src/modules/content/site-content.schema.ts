@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import type { ContentField, ContentFieldType, ContentSchema, ContentSelectOption } from '@bagdam/shared';
+import { sanitizeRichHtml } from '../../common/security/html-sanitize';
 import { HTML_CONTENT_FIELD_TYPES } from './site-content.registry';
 
 /**
@@ -11,6 +12,9 @@ import { HTML_CONTENT_FIELD_TYPES } from './site-content.registry';
  * - escapeContentValue / toSiteContentTree: WebController için — richtext dışındaki metinler escapeHtml (& < > " —
  *   `'` bilerek kaçışlanmaz, web/featured.ts ile aynı parite kuralı), noktalı anahtarlar ağaca açılır
  *   (`home.hero` → site.home.hero) ki şablon `{{{site.home.hero.title}}}` yazabilsin.
+ *
+ * F10: `richtext` alanları hâlâ HAM basılır ama artık `common/security/html-sanitize` süzgecinden geçer —
+ * hem yazma (validateContentValue) hem render (escapeContentValue) anında. Temiz içerik byte-byte aynı kalır.
  */
 
 const FIELD_TYPES: ReadonlySet<string> = new Set<ContentFieldType>([
@@ -161,7 +165,8 @@ function validateFields(fields: ContentField[], value: unknown, path: string, er
         if (checkString(v, CONTENT_LIMITS.textarea, p, errors)) out[f.name] = v;
         break;
       case 'richtext':
-        if (checkString(v, CONTENT_LIMITS.richtext, p, errors)) out[f.name] = v;
+        // F10: sayfaya ham basılan tek metin tipi → yazma anında betik taşıyan yapılar düşer (temizse dize aynı kalır).
+        if (checkString(v, CONTENT_LIMITS.richtext, p, errors)) out[f.name] = sanitizeRichHtml(v);
         break;
       case 'url':
       case 'image':
@@ -257,7 +262,8 @@ function escapeByFields(fields: ContentField[], value: unknown): unknown {
     if (!f) {
       out[k] = escapeDeep(v);
     } else if (HTML_CONTENT_FIELD_TYPES.has(f.type)) {
-      out[k] = v;
+      // richtext ham basılır → betik çalıştıran yapılar burada düşer (F10 depolanmış XSS savunması).
+      out[k] = typeof v === 'string' ? sanitizeRichHtml(v) : v;
     } else if (f.type === 'list' && Array.isArray(v)) {
       const itemFields = f.itemFields;
       out[k] = itemFields && itemFields.length > 0 ? v.map((item) => escapeByFields(itemFields, item)) : v.map(escapeDeep);

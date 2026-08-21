@@ -1,4 +1,5 @@
 import type { HomeFeaturedItem } from '@bagdam/shared';
+import { sanitizeRichHtml } from '../common/security/html-sanitize';
 import { escapeContentValue, normalizeContentSchema, toSiteContentTree } from '../modules/content/site-content.schema';
 import { escapeHtml } from './featured';
 
@@ -8,7 +9,8 @@ import { escapeHtml } from './featured';
  *
  * Kaçış kuralı (ADR-0003 piksel parite, web/featured.ts ile aynı): metinler sunucu tarafında escapeHtml (& < > " —
  * `'` kaçışlanmaz) ile HTML'e hazırlanır ve şablonda {{{ }}} ile basılır; Handlebars'ın varsayılan kaçışı ' → &#x27;
- * üretip website/*.html ile byte paritesini bozar. `richtext` alanları ve Post/LegalDocument gövdeleri HTML'dir, ham basılır.
+ * üretip website/*.html ile byte paritesini bozar. `richtext` alanları ve Post/LegalDocument gövdeleri HTML'dir, ham basılır
+ * — F10'dan beri `sanitizeRichHtml` süzgecinden geçerek (betik taşıyan yapılar düşer; temiz içerik byte-byte aynı kalır).
  *
  * Kaçış/ağaç kuralları TEK yerde (`modules/content/site-content.schema.ts`: normalizeContentSchema + escapeContentValue +
  * toSiteContentTree); burası yalnız şablon bağlamına şekil verir.
@@ -138,8 +140,8 @@ export function buildLegalArticles(docs: readonly LegalDocLike[]): LegalArticleV
       ...toLegalNavView(d),
       showInNav: d.showInNav,
       updatedLabel: escapeHtml(legalUpdatedLabel(d.effectiveFrom)),
-      leadHtml: d.leadHtml ?? '',
-      bodyHtml: d.bodyHtml,
+      leadHtml: sanitizeRichHtml(d.leadHtml ?? ''),
+      bodyHtml: sanitizeRichHtml(d.bodyHtml),
     }));
 }
 
@@ -226,9 +228,9 @@ export function toPostView(p: PostLike): PostView {
     slug: escapeHtml(p.slug),
     tag: escapeHtml(tag),
     meta: escapeHtml(meta),
-    titleHtml: p.titleHtml,
+    titleHtml: sanitizeRichHtml(p.titleHtml),
     titleText: escapeHtml(stripTags(p.titleHtml)),
-    bodyHtml: p.bodyHtml,
+    bodyHtml: sanitizeRichHtml(p.bodyHtml),
     coverPath: escapeHtml(p.coverPath ?? ''),
     coverAlt: escapeHtml(p.coverAlt ?? ''),
     hasCover: Boolean(p.coverPath),

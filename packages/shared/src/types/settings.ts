@@ -170,7 +170,7 @@ export interface SettingFieldMeta {
   integer?: boolean;
 }
 
-export const SETTING_GROUP_NAMES = ['commerce', 'site', 'seo', 'cookies', 'mail', 'sms', 'payment'] as const;
+export const SETTING_GROUP_NAMES = ['commerce', 'site', 'seo', 'cookies', 'mail', 'sms', 'payment', 'privacy'] as const;
 export type SettingGroupName = (typeof SETTING_GROUP_NAMES)[number];
 
 export interface SettingGroupMeta {
@@ -275,6 +275,35 @@ export interface PaymentSettings {
 export interface CookieSettingsFull extends CookieSettings {
   marketingEnabled: boolean;
 }
+
+/**
+ * Setting `privacy.*` (F10, ADR-0015 KVKK saklama matrisi — docs/kvkk-veri-saklama.md).
+ * `kvkk:purge` job bu değerleri okur; hepsi admin › Ayarlar › KVKK/Gizlilik ekranından değiştirilebilir.
+ * Süre 0 = o temizlik KAPALI (hiçbir satır silinmez/maskelenmez).
+ */
+export interface PrivacySettings {
+  /** Sipariş/abonelik (ticari kayıt) saklama süresi — ay. Bilgilendirme amaçlı; ticari kayıtlar job ile SİLİNMEZ (TTK/VUK). */
+  retentionMonths: number;
+  /** MailLog satırı + DISABLE_MAIL önizleme dosyası ömrü — gün (ADR-0014: 90). */
+  mailLogDays: number;
+  /** SystemLog ömrü — gün (ADR-0015: 30). */
+  systemLogDays: number;
+  /** CronLog ömrü — gün (ADR-0015: 90). */
+  cronLogDays: number;
+  /** AuditLog satırlarındaki PII (e-posta/telefon/adres/ad) kaç ay sonra `[silindi]` yapılır — satır SİLİNMEZ. */
+  auditPiiMonths: number;
+  /** Pasif müşteri anonimleştirme eşiği — ay; 0 = kapalı (varsayılan). Aktif abonelik/açık siparişi olan hesap atlanır. */
+  anonymizeInactiveMonths: number;
+}
+
+export const PRIVACY_SETTINGS_DEFAULTS: Readonly<PrivacySettings> = {
+  retentionMonths: 120,
+  mailLogDays: 90,
+  systemLogDays: 30,
+  cronLogDays: 90,
+  auditPiiMonths: 12,
+  anonymizeInactiveMonths: 0,
+};
 
 export const SITE_SETTINGS_DEFAULTS: Readonly<SiteSettings> = {
   name: 'Bağdam',
@@ -415,12 +444,23 @@ const COOKIES_FIELDS: readonly SettingFieldMeta[] = [
   { key: 'marketingEnabled', label: 'Pazarlama çerezleri', type: 'boolean', default: COOKIE_SETTINGS_DEFAULTS.marketingEnabled },
 ];
 
-/** Tüm ayar grupları — admin ekran sırası (14a: commerce/site/seo/cookies · 15: mail/sms/payment). */
+/** `privacy.*` alanları — KVKK saklama matrisi (F10; `kvkk:purge` job bunları okur). 0 = ilgili temizlik kapalı. */
+const PRIVACY_FIELDS: readonly SettingFieldMeta[] = [
+  { key: 'retentionMonths', label: 'Sipariş/abonelik verisi saklama (ay)', type: 'number', integer: true, min: 0, max: 240, required: true, default: PRIVACY_SETTINGS_DEFAULTS.retentionMonths, help: 'Ticari kayıt saklama süresi (TTK 10 yıl). Bilgilendirme amaçlıdır: kvkk:purge sipariş/abonelik satırı SİLMEZ, yalnız gizlilik metnindeki süreyi ve pasif hesap anonimleştirme kararını besler.' },
+  { key: 'mailLogDays', label: 'E-posta günlüğü ömrü (gün)', type: 'number', integer: true, min: 0, max: 3650, required: true, default: PRIVACY_SETTINGS_DEFAULTS.mailLogDays, help: 'ADR-0014: 90 gün. Satırla birlikte DISABLE_MAIL önizleme dosyası da silinir. 0 = kapalı.' },
+  { key: 'systemLogDays', label: 'Sistem günlüğü ömrü (gün)', type: 'number', integer: true, min: 0, max: 3650, required: true, default: PRIVACY_SETTINGS_DEFAULTS.systemLogDays, help: 'ADR-0015: 30 gün. 0 = kapalı.' },
+  { key: 'cronLogDays', label: 'Cron günlüğü ömrü (gün)', type: 'number', integer: true, min: 0, max: 3650, required: true, default: PRIVACY_SETTINGS_DEFAULTS.cronLogDays, help: 'ADR-0015: 90 gün. 0 = kapalı.' },
+  { key: 'auditPiiMonths', label: 'Denetim kaydı PII maskeleme yaşı (ay)', type: 'number', integer: true, min: 0, max: 240, required: true, default: PRIVACY_SETTINGS_DEFAULTS.auditPiiMonths, help: 'Bu yaştan eski AuditLog satırlarında e-posta/telefon/adres/ad alanları [silindi] yapılır; satır silinmez (denetim izi korunur). 0 = kapalı.' },
+  { key: 'anonymizeInactiveMonths', label: 'Pasif müşteriyi anonimleştirme eşiği (ay)', type: 'number', integer: true, min: 0, max: 240, required: true, default: PRIVACY_SETTINGS_DEFAULTS.anonymizeInactiveMonths, help: '0 = kapalı (varsayılan). Açılırsa bu süredir giriş yapmamış, canlı aboneliği ve açık siparişi olmayan CUSTOMER hesapları kvkk:purge tarafından anonimleştirilir.' },
+];
+
+/** Tüm ayar grupları — admin ekran sırası (14a: commerce/site/seo/cookies/privacy · 15: mail/sms/payment). */
 export const SETTINGS_REGISTRY: readonly SettingGroupMeta[] = [
   { group: 'commerce', label: 'Kampanya ve teslimat kuralları', description: 'Fiyatlama/abonelik kuralları (ADR-0018). Kargo ücreti ve eşik bölgelerde.', fields: COMMERCE_FIELDS },
   { group: 'site', label: 'Site bilgileri', fields: SITE_FIELDS },
   { group: 'seo', label: 'SEO', description: 'Sayfa başlıkları ve açıklamalar.', fields: SEO_FIELDS },
   { group: 'cookies', label: 'Çerezler', fields: COOKIES_FIELDS },
+  { group: 'privacy', label: 'KVKK ve veri saklama', description: 'Saklama süreleri ve kvkk:purge davranışı (docs/kvkk-veri-saklama.md).', fields: PRIVACY_FIELDS },
   { group: 'mail', label: 'E-posta', description: 'SMTP/sağlayıcı bilgileri; parola şifreli saklanır. Test gönderimi F6.', fields: MAIL_FIELDS },
   { group: 'sms', label: 'SMS', fields: SMS_FIELDS },
   { group: 'payment', label: 'Ödeme', description: 'PayTR mağaza bilgileri (merchant_key/salt şifreli saklanır), test modu, bildirim IP listesi, kayıtlı kart onayı (ADR-0019).', fields: PAYMENT_FIELDS },

@@ -108,6 +108,8 @@ export interface ExpireLinksResult {
 export interface RemindResult {
   itemsProcessed: number;
   errors: number;
+  /** F10: hatırlatma e-postası gönderilen (ya da zaten gönderilmiş sayılan) cycle sayısı. */
+  sent: number;
 }
 
 export interface CancelSubscriptionOpts {
@@ -627,6 +629,8 @@ export class CyclesService {
     await this.repo.updateSubscription(sub.id, subData, tx);
     await this.repo.addEvent({ subscriptionId: sub.id, cycleId: cycle.id, type: 'UNPAID', actor: ACTOR.SYSTEM, data: { reason, failedCycles, pastDue, retryCount: cycle.retryCount }, at: now }, tx);
     await this.refreshNextDelivery(sub.id, tx);
+    // F10 bildirimi: abonelik askıya alındıysa müşteriye 'kart güncelle' e-postası (mail.subscription-past-due).
+    if (pastDue) this.notifier.emit('subscription.past-due', { subscriptionId: sub.id, userId: sub.userId, cycleId: cycle.id, data: { failedCycles, reason } }, now);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -772,16 +776,19 @@ export class CyclesService {
     const from = new Date(to.getTime() - CUTOFF_REMINDER_WINDOW_MS);
     const cycles = await this.repo.findReminderCycles(from, to);
     let errors = 0;
+    let sent = 0;
     for (const cycle of cycles) {
       try {
         const sub = cycle.subscription;
         if (!(SUBSCRIPTION_ENGINE_ACTIVE_STATES as readonly string[]).includes(sub.status)) continue;
-        this.notifier.emit('subscription.cutoff-reminder', { subscriptionId: sub.id, userId: sub.userId, cycleId: cycle.id, data: { cutoffAt: cycle.deliveryDate.cutoffAt.toISOString(), deliveryOn: utcToIsoDate(cycle.deliveryDate.date) } }, now);
+        // F10: gerçek gönderim (mail.cutoff-reminder) — transaction dışında, cycle başına BİR kez (MailLog tekilliği).
+        await this.notifier.emitAndDeliver('subscription.cutoff-reminder', { subscriptionId: sub.id, userId: sub.userId, cycleId: cycle.id, data: { cutoffAt: cycle.deliveryDate.cutoffAt.toISOString(), deliveryOn: utcToIsoDate(cycle.deliveryDate.date) } }, now);
+        sent++;
       } catch {
         errors++;
       }
     }
-    return { itemsProcessed: cycles.length, errors };
+    return { itemsProcessed: cycles.length, errors, sent };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1082,7 +1089,8 @@ export class CyclesService {
       { subscriptionId: sub.id, cycleId: null, type: 'CANCELLED', actor: opts.actor, data: { reason: opts.reason ?? null, effectiveAt: effectiveAt.toISOString(), refundAmount, refundDueAt: refundDueAt?.toISOString() ?? null, cancelledCycles }, at: now },
       tx,
     );
-    this.notifier.emit('subscription.cancelled', { subscriptionId: sub.id, userId: sub.userId, data: { effectiveAt: effectiveAt.toISOString(), refundAmount } }, now);
+    // F10: iptal teyidi e-postası (mail.subscription-cancelled) — iade tutarı/tarihi de yükte.
+    this.notifier.emit('subscription.cancelled', { subscriptionId: sub.id, userId: sub.userId, data: { effectiveAt: effectiveAt.toISOString(), refundAmount, refundDueAt: refundDueAt?.toISOString() ?? null } }, now);
     return { effectiveAt, refundAmount, refundDueAt, cancelledCycles };
   }
 

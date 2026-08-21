@@ -16,6 +16,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
 import { ContentModule } from './modules/content/content.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
+import { CronLogsModule } from './modules/cron-logs/cron-logs.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
@@ -29,6 +30,8 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { SystemLogsModule } from './modules/system-logs/system-logs.module';
+import { WebhookEventsModule } from './modules/webhook-events/webhook-events.module';
 import { WholesaleModule } from './modules/wholesale/wholesale.module';
 import { WebModule } from './web/web.module';
 
@@ -59,7 +62,10 @@ new Logger('AppModule').log(
       },
     ]),
     PrismaModule, // @Global — PrismaService tüm repository'lerde (F2)
-    HealthModule,
+    SystemLogsModule, // F10: @Global SystemLogsService (AllExceptionsFilter 5xx kaydı) + GET /admin/system-logs (ekran 22)
+    CronLogsModule, // F10: GET /admin/cron-logs (ekran 22 › Cron günlüğü) + sağlık kartı özetleri
+    WebhookEventsModule, // F10: GET /admin/webhook-events (ekran 22 › Webhook olayları; payload redakte)
+    HealthModule, // F10: + GET /admin/health/detailed (ekran 22 sağlık kartı)
     AuthModule, // F4: /api/v1/auth/* (csrf, login, refresh, logout, me) + JwtAuthGuard'ın AuthService'i; F6: register/verify/forgot/reset (MailModule Notifier)
     AuditModule, // F4: AuditService (interceptor) + GET /api/v1/admin/audit-logs
     MailModule, // F6: MailService (SiteContent mail.* şablonları → MailLog → SMTP/DISABLE_MAIL önizleme) + NOTIFIER + /admin/mail-logs + /admin/settings/mail/test

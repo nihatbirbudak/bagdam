@@ -1,10 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { MailLogList, MailTestResult } from '@bagdam/shared';
 import { MailStatus } from '@prisma/client';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import { resolve } from 'path';
-import { isMailDisabled, MAIL_LOG_LIMITS, MAIL_LOGS_DEFAULT_LIMIT, MAIL_PREVIEW_DIR, MAIL_PREVIEW_ERROR_PREFIX, maskEmail } from './mail.constants';
-import { toMailLogItem } from './mail.mapper';
+import {
+  isMailDisabled,
+  MAIL_LOG_LIMITS,
+  MAIL_LOGS_DEFAULT_LIMIT,
+  MAIL_PREVIEW_DIR,
+  MAIL_PREVIEW_ERROR_PREFIX,
+  MAIL_PURGE_BATCH_SIZE,
+  MAIL_PURGE_MAX_ROUNDS,
+  maskEmail,
+} from './mail.constants';
+import { previewPathOf, toMailLogItem } from './mail.mapper';
 import { MailRepository, type MailLogRecord } from './mail.repository';
 import { MailTemplateError, MailTemplateRenderer } from './mail-templates.render';
 import { MailTransportError, SmtpTransport } from './mail.transport';
@@ -87,6 +96,56 @@ export class MailService {
       const finished = await this.safeLog(() => this.repo.finish(row.id, { status: MailStatus.FAILED, error: clip(message, 2000) }));
       return this.toResult(finished ?? row, MailStatus.FAILED, null, null, message);
     }
+  }
+
+  /**
+   * F10 — TEKİL gönderim: (templateSlug, entityId) için daha önce QUEUED/SENT/SKIPPED bir MailLog satırı varsa hiç
+   * göndermez (aynı cycle için ikinci kesim hatırlatması yok). Yalnız FAILED satır varsa yeniden dener.
+   * `entityId` zorunludur (tekillik anahtarı); `skipped:true` = zaten gönderilmiş.
+   */
+  async sendOnce(input: MailSendInput & { entityId: string }): Promise<MailSendResult & { skipped: boolean }> {
+    const templateSlug = clip(input.templateSlug, MAIL_LOG_LIMITS.templateSlug);
+    const entityId = clip(input.entityId, MAIL_LOG_LIMITS.entityId);
+    const existing = await this.safeLog(() => this.repo.findByEntity(templateSlug, entityId));
+    if (existing && existing.status !== MailStatus.FAILED) {
+      return {
+        logId: existing.id,
+        status: existing.status,
+        messageId: existing.messageId,
+        previewPath: previewPathOf(existing.error),
+        error: existing.error,
+        skipped: true,
+      };
+    }
+    const result = await this.send({ ...input, entityId });
+    return { ...result, skipped: false };
+  }
+
+  /**
+   * F10 `kvkk:purge` — `before` anından eski MailLog satırlarını siler; DISABLE_MAIL önizleme dosyaları
+   * (`preview:<yol>`) da diskten kaldırılır. Toplu (batch) çalışır; dosya silme hatası satırı engellemez.
+   */
+  async purgeLogsOlderThan(before: Date, batchSize = MAIL_PURGE_BATCH_SIZE, maxRounds = MAIL_PURGE_MAX_ROUNDS): Promise<{ deleted: number; previewsDeleted: number }> {
+    let deleted = 0;
+    let previewsDeleted = 0;
+    for (let round = 0; round < maxRounds; round++) {
+      const rows = await this.repo.findOlderThan(before, batchSize);
+      if (rows.length === 0) break;
+      for (const row of rows) {
+        const preview = previewPathOf(row.error);
+        if (!preview) continue;
+        try {
+          await unlink(preview);
+          previewsDeleted++;
+        } catch {
+          // dosya yoksa/erişilemiyorsa satır yine silinir
+        }
+      }
+      deleted += await this.repo.deleteByIds(rows.map((r) => r.id));
+      if (rows.length < batchSize) break;
+    }
+    if (deleted > 0) this.logger.log(`kvkk:purge — ${deleted} MailLog satırı silindi (${previewsDeleted} önizleme dosyası)`);
+    return { deleted, previewsDeleted };
   }
 
   /** Admin `POST /admin/settings/mail/test {to}` → `mail.test` şablonu; DISABLE_MAIL'de SKIPPED + previewPath. */

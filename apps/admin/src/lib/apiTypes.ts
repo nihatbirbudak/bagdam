@@ -680,3 +680,46 @@ export interface AdminOpsDateQuery {
   date: string;
   zone?: string;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * F10 sözleşmesi — Ekran 22 "Sistem": günlükler + sağlık + işler.
+ *
+ *   GET  /admin/audit-logs?page&limit&module&action&actorId&entityId&search → Paginated<AdminAuditLog>
+ *   GET  /admin/system-logs?page&limit&level&module&requestId&search        → SystemLogList
+ *   GET  /admin/cron-logs?page&limit&name&status&search                     → CronLogList
+ *   GET  /admin/mail-logs?page&limit&status&to                              → MailLogList
+ *   GET  /admin/webhook-events?page&limit&provider&status&search            → WebhookEventList
+ *   GET  /admin/health/detailed                                             → AdminHealthDetailed
+ *   GET  /admin/jobs                                                        → JobInfo[]
+ *   POST /admin/jobs/:name/run                                              → JobRunResult (yalnız dev/staging)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+export type {
+  AdminHealthDb,
+  AdminHealthDetailed,
+  AdminHealthScheduler,
+  CronLogItem,
+  CronLogList,
+  CronLogListQuery,
+  CronLogStatus,
+  JobInfo,
+  JobRunResult,
+  SystemLogItem,
+  SystemLogLevel,
+  SystemLogList,
+  SystemLogListQuery,
+  WebhookEventItem,
+  WebhookEventList,
+  WebhookEventListQuery,
+} from '@bagdam/shared';
+
+/** `GET /admin/audit-logs` sorgusu (AuditQueryDto ile birebir). */
+export interface AdminAuditLogQuery {
+  page?: number;
+  limit?: number;
+  module?: string;
+  action?: string;
+  actorId?: string;
+  entityId?: string;
+  search?: string;
+}

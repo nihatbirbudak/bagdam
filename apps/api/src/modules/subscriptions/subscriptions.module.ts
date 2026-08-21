@@ -1,6 +1,7 @@
 import { Module, type DynamicModule, type ModuleMetadata, type Provider } from '@nestjs/common';
 import { PrismaModule } from '../../common/prisma.module';
 import { DeliveryModule } from '../delivery/delivery.module';
+import { MailModule } from '../mail/mail.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { PricingModule } from '../pricing/pricing.module';
@@ -35,10 +36,12 @@ const DEPS_MODULES: NonNullable<ModuleMetadata['imports']> = [PricingModule, Pay
  * `ManualCheckoutService`: admin `POST /admin/subscriptions` — ofis/havale siparişi: fiyat (PricingService.quote) → Order (OrdersService) →
  *  MANUAL ödeme (PaymentsService) → Subscription + cycle#1 → aktivasyon (F8 checkout'un sunucu tarafı iskeleti; e2e simülasyonu da bunu kullanır).
  * `withDeps(provider, imports)`: testler/özel kurulumlar için sahte kapı (tek yönlü: kapı imzası `subscriptions.deps.ts`).
+ * F10: MailModule → `NOTIFIER` (MailNotifier); `SubscriptionNotifier` motor olaylarını (cycle.charged, cycle.payment-failed,
+ *  cycle.awaiting-payment, subscription.cutoff-reminder/cancelled/past-due) ADR-0014 şablonlarına bağlar (F7'de stub'dı).
  * JobsModule (cron) CyclesService'i kullanır; MeModule'e dokunulmaz (uçlar `/me/subscription*` bu modüldedir).
  */
 @Module({
-  imports: [PrismaModule, SettingsModule, ...DEPS_MODULES],
+  imports: [PrismaModule, SettingsModule, MailModule, ...DEPS_MODULES],
   controllers: CONTROLLERS,
   providers: [...CORE_PROVIDERS, SubscriptionsDepsAdapter, { provide: SUBSCRIPTIONS_DEPS, useExisting: SubscriptionsDepsAdapter }],
   exports: [...EXPORTS, SubscriptionsDepsAdapter],
@@ -48,7 +51,7 @@ export class SubscriptionsModule {
   static withDeps(depsProvider: Provider, imports: ModuleMetadata['imports'] = []): DynamicModule {
     return {
       module: SubscriptionsModule,
-      imports: [PrismaModule, SettingsModule, ...DEPS_MODULES, ...imports],
+      imports: [PrismaModule, SettingsModule, MailModule, ...DEPS_MODULES, ...imports],
       controllers: CONTROLLERS,
       providers: [...CORE_PROVIDERS, depsProvider],
       exports: EXPORTS,

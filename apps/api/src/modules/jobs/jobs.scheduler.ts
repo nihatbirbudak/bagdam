@@ -50,6 +50,11 @@ export class JobsScheduler {
     return this.fire('payments:reconcile');
   }
 
+  @Cron('15 3 * * *', { name: 'kvkk:purge', timeZone: TZ })
+  kvkkPurge(): Promise<void> {
+    return this.fire('kvkk:purge');
+  }
+
   private async fire(name: string): Promise<void> {
     try {
       await this.jobs.runOnce(name, new Date());

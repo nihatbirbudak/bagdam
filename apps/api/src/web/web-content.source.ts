@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CatalogService } from '../modules/catalog/catalog.service';
 import { ContentService } from '../modules/content/content.service';
 import { DeliveryService } from '../modules/delivery/delivery.service';
+import { SettingsService } from '../modules/settings/settings.service';
 import type { CategoryLike, DeliveryZoneLike, LegalDocLike, PostLike, SiteContentRowLike } from './content-view';
 
 /**
@@ -12,6 +13,7 @@ import type { CategoryLike, DeliveryZoneLike, LegalDocLike, PostLike, SiteConten
  * - getPublishedPosts()   → ContentService.getPublishedPosts() (tamamı; index ilk 3'ü alır)
  * - getCategories()       → CatalogService.listActiveCategories() (sekmeler + panel notları; Category.panelNote tek sahip [B11])
  * - getDeliveryZones()    → DeliveryService.listPublicZones() (F8: sepet.hbs `__BAGDAM_CHECKOUT__.zones` — ilçe select; ≡ GET /delivery/zones)
+ * - getCookieSettings()  → SettingsService.getCookies() (F10: çerez banner'ı — kapalı kategori hiç basılmaz)
  * Admin yazımları ContentAdminService/CatalogAdminService cache düşürmesiyle bir sonraki render'da görünür.
  */
 export interface WebContentSource {
@@ -20,6 +22,13 @@ export interface WebContentSource {
   getPublishedPosts(): Promise<PostLike[]>;
   getCategories(): Promise<CategoryLike[]>;
   getDeliveryZones(): Promise<DeliveryZoneLike[]>;
+  getCookieSettings(): Promise<CookieToggles>;
+}
+
+/** F10 çerez banner'ı: hangi opsiyonel kategoriler açık (Setting `cookies.*`; ADR-0015 varsayılan ikisi de kapalı). */
+export interface CookieToggles {
+  analyticsEnabled: boolean;
+  marketingEnabled: boolean;
 }
 
 export const WEB_CONTENT_SOURCE = Symbol('WEB_CONTENT_SOURCE');
@@ -33,6 +42,7 @@ export class ContentSourceAdapter implements WebContentSource {
     private readonly content: ContentService,
     private readonly catalog: CatalogService,
     private readonly delivery: DeliveryService,
+    private readonly settings: SettingsService,
   ) {}
 
   async getSiteContentRows(): Promise<SiteContentRowLike[]> {
@@ -73,6 +83,12 @@ export class ContentSourceAdapter implements WebContentSource {
   async getCategories(): Promise<CategoryLike[]> {
     const rows = await this.catalog.listActiveCategories();
     return rows.map((c) => ({ slug: c.slug, label: c.label, panelNote: c.panelNote }));
+  }
+
+  /** F10: çerez banner'ı kategorileri (Setting cookies.*); okunamazsa ikisi de kapalı sayılır (yalnız zorunlu çerez). */
+  async getCookieSettings(): Promise<CookieToggles> {
+    const c = await this.settings.getCookies();
+    return { analyticsEnabled: c.analyticsEnabled === true, marketingEnabled: c.marketingEnabled === true };
   }
 
   /** F8: aktif bölgeler (GET /delivery/zones ile aynı kaynak) — sepet.hbs checkout bootstrap'ı. */

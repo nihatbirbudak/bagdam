@@ -36,8 +36,15 @@ export const SYSTEM_WARN_DIGEST_MS = 24 * 60 * 60 * 1000;
 /** Ödeme linki tokenı: 16 bayt → 32 hex. */
 export const LINK_TOKEN_BYTES = 16;
 
-/** Notifier stub bellek tamponu. */
+/** Notifier bellek tamponu (son N olay; admin teşhisi + testler). */
 export const NOTIFIER_BUFFER_SIZE = 200;
+
+/**
+ * F10 — motor olayının e-postası kaç ms sonra gönderilir. Emit çoğunlukla bir Prisma transaction İÇİNDE çağrılır;
+ * bildirim yükü (cycle/abonelik satırı) COMMIT sonrası okunsun diye gönderim kısa süre ertelenir. Gönderim başarısızlığı
+ * motor akışını etkilemez. `SubscriptionNotifier.whenIdle()` bekleyen gönderimleri bekler (testler / job kapanışı).
+ */
+export const NOTIFIER_MAIL_DELAY_MS = 250;
 
 export const HOUR_MS = 60 * 60 * 1000;
 export const DAY_MS = 24 * HOUR_MS;

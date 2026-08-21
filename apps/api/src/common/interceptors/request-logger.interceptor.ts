@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Observable, tap } from 'rxjs';
+import { redactUrl } from '../security/redaction';
 
 type RequestWithMeta = Request & { requestId?: string; user?: { id?: string } };
 
@@ -22,7 +23,9 @@ export class RequestLoggerInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest<RequestWithMeta>();
-    const { method, originalUrl } = req;
+    const { method } = req;
+    // ADR-0015 (F10): sorgu dizesindeki token/e-posta değerleri loga ham düşmesin.
+    const originalUrl = redactUrl(req.originalUrl);
     const requestId = req.requestId ?? '-';
     const userId = req.user?.id ?? '-';
     const start = Date.now();

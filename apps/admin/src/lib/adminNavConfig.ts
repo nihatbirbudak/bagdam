@@ -9,7 +9,7 @@ export type AdminNavLeaf = {
   label: string;
   to: string;
   phase?: AdminPhase;
-  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: 1–8, F5: 9–15, F6: 16 + e-posta günlüğü, F8: 17 + 23, F9: 21 Özet + 14b + 18 + 19 + 20 bağlı). */
+  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: 1–8, F5: 9–15, F6: 16 + e-posta günlüğü, F8: 17 + 23, F9: 21 Özet + 14b + 18 + 19 + 20, F10: 22 Sistem bağlı). */
   comingSoon?: boolean;
   /** Yer tutucu sayfada gösterilen kısa kapsam notu (BACKEND-PLANI §4). */
   hint?: string;
@@ -122,7 +122,13 @@ export const adminNavItems: AdminNavItem[] = [
   {
     label: 'Sistem',
     children: [
-      { label: 'Sistem Durumu', to: '/sistem', phase: 'F10', comingSoon: true, hint: 'Audit / system / cron / mail / webhook günlükleri; sağlık.' },
+      {
+        label: 'Sistem Durumu',
+        to: '/sistem',
+        phase: 'F10',
+        comingSoon: false,
+        hint: 'Sağlık kartı (DB, zamanlayıcı, 24 saatlik sayımlar, uyarılar) + denetim / sistem / cron / e-posta / webhook günlükleri; işleri elle çalıştırma (yalnız dev/staging).',
+      },
       { divider: 'Günlükler' },
       {
         label: 'E-posta Günlüğü',

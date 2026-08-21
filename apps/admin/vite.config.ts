@@ -36,6 +36,28 @@ export default defineConfig(({ mode }) => ({
   build: {
     // Panel paketleri `dist/app/` altına yazılır: `/assets/*` API'nin medya yolu (proxy/nginx) için boş kalır.
     assetsDir: 'app',
+    rollupOptions: {
+      output: {
+        /**
+         * F10 (C) — satıcı paketleri ayrı chunk'ta.
+         *
+         * Rota bazlı bölme (`app/router.tsx` React.lazy) uygulama kodunu ekran başına ayırdı;
+         * geriye kalan giriş chunk'ının büyük kısmı React + React Router. Bunlar sürüm
+         * yükseltmesi dışında değişmediğinden ayrı dosyaya alınır: panel kodu her deploy'da
+         * yeni hash alsa da tarayıcı `vendor-react` dosyasını önbellekten kullanır
+         * (nginx `location /app/` 1 yıl immutable — deploy/nginx/admin.bagdam.com.conf).
+         *
+         * lucide-react ikonları Vite'ın kendi tree-shaking'i ile zaten ikon başına küçük
+         * chunk'lara ayrılıyor; elle gruplanmaz (gruplansa hepsi tek dosyada inerdi).
+         */
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'vendor-react';
+          if (/[\\/]node_modules[\\/](react-router|react-router-dom)[\\/]/.test(id)) return 'vendor-router';
+          return undefined;
+        },
+      },
+    },
   },
   server: {
     port: 4011,

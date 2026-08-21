@@ -56,6 +56,22 @@ export class MailRepository {
     });
   }
 
+  /** F10: (templateSlug, entityId) satırı — `MailService.sendOnce` aynı varlığa ikinci kez göndermesin diye. */
+  findByEntity(templateSlug: string, entityId: string): Promise<MailLogRecord | null> {
+    return this.prisma.mailLog.findUnique({ where: { templateSlug_entityId: { templateSlug, entityId } } });
+  }
+
+  /** F10 kvkk:purge: verilen andan eski satırlar (önizleme dosyaları çağıran tarafından silinir). */
+  findOlderThan(before: Date, take: number): Promise<MailLogRecord[]> {
+    return this.prisma.mailLog.findMany({ where: { createdAt: { lt: before } }, orderBy: { createdAt: 'asc' }, take });
+  }
+
+  async deleteByIds(ids: readonly string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const r = await this.prisma.mailLog.deleteMany({ where: { id: { in: [...ids] } } });
+    return r.count;
+  }
+
   findById(id: string): Promise<MailLogRecord | null> {
     return this.prisma.mailLog.findUnique({ where: { id } });
   }

@@ -18,6 +18,7 @@ const BahcedenCart = (function () {
           "bahceden_cart", "bahceden_prefs", "bahceden_sub", "bahceden_address",
           "bahceden_member", "bahceden_session", "bahceden_card",
           "bahceden_orders", "bahceden_retention_offered",
+          "bagdam_cookie_consent", // F10 cookie: ilk ziyaret simülasyonunda şerit yeniden çıksın
         ].forEach((k) => localStorage.removeItem(k));
       }
       qs.delete("sifirla");
@@ -1834,6 +1835,87 @@ const BahcedenCart = (function () {
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
   }
 
+  // ---- F10 cookie: çerez onay şeridi (views/partials/cookie-consent.hbs; ADR-0015 / KVKK) ----------------
+  // Şerit sunucuda VARSAYILAN GİZLİ basılır (style="display:none"), yalnız burası gösterir → piksel parite korunur.
+  // Karar tek yerde: localStorage `bagdam_cookie_consent` = {v, necessary, analytics, marketing, gk, ts}.
+  // Her opsiyonel kategori için sunucuya kanıt satırı: POST /api/v1/consents {kind, granted, guestKey}
+  // (COOKIE_ANALYTICS / COOKIE_MARKETING; anonim istekte CSRF aranmaz, oturumluysa api() token'ı ekler).
+  // Kapalı kategori (Setting cookies.analyticsEnabled / marketingEnabled = false) şeritte HİÇ basılmaz ve
+  // onayı da sorulmaz — sunucu bunu data-analytics / data-marketing özniteliğiyle bildirir.
+  const COOKIE_CONSENT_KEY = "bagdam_cookie_consent";
+  const COOKIE_CONSENT_VERSION = 1;
+
+  function getCookieConsent() {
+    const v = readJSON(COOKIE_CONSENT_KEY, null);
+    if (!v || typeof v !== "object" || v.v !== COOKIE_CONSENT_VERSION) return null;
+    return v;
+  }
+  // Sayfa betikleri (analitik/pazarlama etiketleri) bunu sorar: izin yoksa hiçbir şey yüklenmez.
+  function cookieConsentAllows(category) {
+    const c = getCookieConsent();
+    return !!(c && c[category] === true);
+  }
+  function newGuestKey() {
+    return ("g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)).slice(0, 64);
+  }
+  function saveCookieConsent(analytics, marketing) {
+    const previous = getCookieConsent();
+    const value = {
+      v: COOKIE_CONSENT_VERSION,
+      necessary: true,
+      analytics: !!analytics,
+      marketing: !!marketing,
+      gk: (previous && previous.gk) || newGuestKey(),
+      ts: new Date().toISOString(),
+    };
+    try { writeJSON(COOKIE_CONSENT_KEY, value); } catch (e) { /* depolama kapalıysa yalnız bu oturum */ }
+    return value;
+  }
+  function postCookieConsent(kind, granted, gk) {
+    return api("/consents", { method: "POST", body: { kind: kind, granted: !!granted, source: "HS_WEB", guestKey: gk } })
+      .catch(() => null); // bildirim başarısızsa sayfa akışı bozulmaz; karar yerelde duruyor
+  }
+
+  function wireCookieConsent(root) {
+    const el = (root || document).getElementById("cookieConsent");
+    if (!el) return;
+    if (getCookieConsent()) return; // karar verilmiş — şerit hiç görünmez
+    const analyticsOffered = el.getAttribute("data-analytics") === "1";
+    const marketingOffered = el.getAttribute("data-marketing") === "1";
+    const panel = el.querySelector("#cookieConsentManage");
+    const manageBtn = el.querySelector("#cookieConsentManageBtn");
+    const acceptBtn = el.querySelector("#cookieConsentAccept");
+    const rejectBtn = el.querySelector("#cookieConsentReject");
+    const analyticsBox = el.querySelector("#cookieConsentAnalytics");
+    const marketingBox = el.querySelector("#cookieConsentMarketing");
+
+    function decide(analytics, marketing) {
+      const value = saveCookieConsent(analyticsOffered && analytics, marketingOffered && marketing);
+      el.style.display = "none";
+      if (analyticsOffered) postCookieConsent("COOKIE_ANALYTICS", value.analytics, value.gk);
+      if (marketingOffered) postCookieConsent("COOKIE_MARKETING", value.marketing, value.gk);
+    }
+    function managing() {
+      return !!(panel && !panel.hidden);
+    }
+    if (manageBtn) {
+      manageBtn.addEventListener("click", () => {
+        const open = managing();
+        if (panel) panel.hidden = open;
+        manageBtn.setAttribute("aria-expanded", open ? "false" : "true");
+        if (acceptBtn) acceptBtn.textContent = open ? "Kabul Et" : "Seçimimi kaydet";
+      });
+    }
+    if (acceptBtn) {
+      acceptBtn.addEventListener("click", () => {
+        if (managing()) decide(!!(analyticsBox && analyticsBox.checked), !!(marketingBox && marketingBox.checked));
+        else decide(true, true); // "Kabul Et" = sunulan tüm kategoriler
+      });
+    }
+    if (rejectBtn) rejectBtn.addEventListener("click", () => decide(false, false));
+    el.style.display = "block";
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     updateBadge();
     recoverSession(); // F6 auth: csrf çerezi var ama oturum yoksa bir kez refresh dene
@@ -1841,6 +1923,7 @@ const BahcedenCart = (function () {
     wireAddButtons(document);
     wireNavBurger();
     wireSwapSelects();
+    wireCookieConsent(document); // F10 cookie: onay yoksa şeridi göster
     alignFooterSocial();
     window.addEventListener("resize", alignFooterSocial);
   });
@@ -1862,5 +1945,7 @@ const BahcedenCart = (function () {
     // F9 remote: canlı abonelik adaptörü + sunucu saati + teslimat tarihi yardımcıları
     remote, CANCEL_REASONS, serverNow, applyServerSub,
     isDeliveryDayLocked, firstDeliveryDateOf, nextOpenDeliveryDate, formatDeliveryDate,
+    // F10 cookie: çerez onayı (banner + karar okuma; analitik/pazarlama betikleri cookieConsentAllows ile kapılanır)
+    getCookieConsent, cookieConsentAllows, wireCookieConsent,
   };
 })();

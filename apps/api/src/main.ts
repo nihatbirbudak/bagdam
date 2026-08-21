@@ -15,13 +15,14 @@ import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
 import { existsSync, mkdirSync } from 'fs';
 import hbs from 'hbs';
-import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { applySecurityHeaders } from './common/security/security-headers';
 import { APP_VERSION, PARTIALS_DIR, PUBLIC_DIR, VIEWS_DIR, getSiteMode, validateEnv } from './config';
 import { SITEMAP_ROUTES_EXCLUDED_FROM_PREFIX } from './modules/content/sitemap.controller';
 import { resolveUploadsDir } from './modules/media/media.constants';
+import { SystemLogsService } from './modules/system-logs/system-logs.service';
 import { WEB_ROUTES_EXCLUDED_FROM_PREFIX } from './web/web.routes';
 
 /** Production'da CORS allow-list'e sabit eklenen alan adları (ADR-0012). */
@@ -66,7 +67,10 @@ async function bootstrap(): Promise<void> {
   // Env değişkenleri fail-fast doğrula — sessiz çalışma-zamanı hatası yerine bootstrap'ta dur.
   validateEnv();
 
-  // Fatal süreç hataları: logla ve çık (PM2 yeniden başlatır). F10'da SystemLog'a da yazılacak.
+  // Fatal süreç hataları: logla ve çık (PM2 yeniden başlatır).
+  // Bilerek SystemLog'a YAZILMAZ: process.exit(1) anında çalışır, asenkron DB yazımı flush edilemez —
+  // bu satırlar PM2 logunda + `error-watcher` bildiriminde görünür. HTTP 5xx'leri AllExceptionsFilter
+  // SystemLog'a düşürür (ekran 22 › Sistem günlüğü).
   process.on('uncaughtException', (err: Error) => {
     logger.fatal(`uncaughtException: ${err.message}`, err.stack);
     process.exit(1);
@@ -81,9 +85,6 @@ async function bootstrap(): Promise<void> {
     rawBody: true, // F8: iyzico webhook HMAC doğrulaması için ham gövde gerekli
   });
 
-  // nginx arkasında doğru req.ip için trust proxy (tek hop)
-  app.set('trust proxy', 1);
-
   // RequestId middleware — CORS/Guard pipeline'ından ÖNCE çalışmalı
   const requestIdMiddleware = new RequestIdMiddleware();
   app.use((req: Request, res: Response, next: NextFunction) => requestIdMiddleware.use(req, res, next));
@@ -92,13 +93,10 @@ async function bootstrap(): Promise<void> {
   app.useBodyParser('json', { limit: '1mb' });
   app.useBodyParser('urlencoded', { limit: '1mb', extended: true });
 
-  app.use(
-    helmet({
-      contentSecurityPolicy: false, // F10: CSP (frame-src iyzico vb.) ile birlikte açılacak
-      crossOriginEmbedderPolicy: false, // iyzico CF iFrame uyumluluğu
-      crossOriginResourcePolicy: false, // görseller admin/web origin'lerinden yüklenebilmeli
-    }),
-  );
+  // Güvenlik başlıkları (F10, ADR-0015): trust proxy (tek hop) + helmet + yola göre CSP
+  // (web: inline bootstrap + PayTR iFrame · admin: yalnız 'self' · /api/*: default-src 'none').
+  // HSTS yalnız production; X-Powered-By kapalı. Ayrıntı: common/security/security-headers.ts
+  applySecurityHeaders(app, { isProduction, trustProxy: true });
   app.use(compression());
   app.use(cookieParser());
 
@@ -144,8 +142,9 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Global exception filter — JSON hata zarfı (/api/*) + 404.hbs (web)
-  app.useGlobalFilters(new AllExceptionsFilter());
+  // Global exception filter — JSON hata zarfı (/api/*) + 404.hbs (web).
+  // F10: 5xx'ler SystemLog'a da düşer (ekran 22 › Sistem günlüğü); servis bulunamazsa yalnız Logger.
+  app.useGlobalFilters(new AllExceptionsFilter(app.get(SystemLogsService, { strict: false })));
 
   const port = Number(process.env.PORT ?? 4010);
   const host = process.env.HOST ?? '127.0.0.1';

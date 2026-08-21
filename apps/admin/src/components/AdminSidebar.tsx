@@ -65,7 +65,7 @@ export function AdminSidebar({ open, pinned, onTogglePin, onHoverEnter, onHoverL
       onMouseEnter={onHoverEnter}
       onMouseLeave={onHoverLeave}
       className={cn(
-        'hidden lg:flex flex-col shrink-0 border-r border-brand-200 bg-white transition-all duration-200 overflow-hidden',
+        'hidden lg:flex flex-col shrink-0 border-r border-brand-200 bg-white transition-all duration-200 overflow-hidden print:hidden',
         'sticky top-12 h-[calc(100vh-3rem)] z-40',
         open ? SIDEBAR_W_EXPANDED : SIDEBAR_W_COLLAPSED,
       )}

@@ -16,12 +16,12 @@ import type { ContentField, ContentFieldType, ContentSchema } from '@bagdam/shar
 export interface SiteContentRegistryEntry {
   key: string;
   label: string;
-  /** Admin menü gruplaması: global (promo/footer) · index · urunler · kutu · nasil-seciyoruz · toptan · gunluk. */
+  /** Admin menü gruplaması: global (promo/footer) · index · urunler · kutu · uyelik · sepet · nasil-seciyoruz · toptan · gunluk · mail. */
   page: SiteContentPage;
   schema: ContentSchema;
 }
 
-export const SITE_CONTENT_PAGES = ['global', 'index', 'urunler', 'kutu', 'nasil-seciyoruz', 'toptan', 'gunluk', 'mail'] as const;
+export const SITE_CONTENT_PAGES = ['global', 'index', 'urunler', 'kutu', 'uyelik', 'sepet', 'nasil-seciyoruz', 'toptan', 'gunluk', 'mail'] as const;
 export type SiteContentPage = (typeof SITE_CONTENT_PAGES)[number];
 
 /** Alan tipleri — HTML olarak ham basılanlar (escape YOK). */
@@ -246,6 +246,112 @@ export const SITE_CONTENT_REGISTRY: readonly SiteContentRegistryEntry[] = [
         text('extrasBadge', 'Ekstra rozeti', { help: '"SINIRSIZ EKLEME HAKKI"' }),
         textarea('extrasNote', 'Ekstra açıklaması'),
         text('dayLabel', 'Teslimat günü etiketi'),
+      ],
+    },
+  },
+
+  // ── Üyelik (F9 — abonelik kartı durum metinleri) ──────────────────────────
+  // uyelik.hbs bu değerleri <template id="uyelikTexts" data-*> içine basar; sayfa betiği anahtar boşsa kendi
+  // Türkçe varsayılanına düşer (SUB_TEXT_DEFAULTS). Alan adları oradaki data-* adlarıyla BİREBİR (camelCase).
+  // Tip: hepsi text/textarea — değerler kaçışlı basılır, dataset okuması varlıkları çözer (attribute bozulmaz);
+  // {boxes}/{pct} gibi süslü parantezli yer tutucuları sayfa doldurur.
+  {
+    key: 'uyelik.texts',
+    label: 'Üyelik — abonelik kartı metinleri (durumlar, atlama, iptal, kalma teklifi)',
+    page: 'uyelik',
+    schema: {
+      fields: [
+        text('empty', 'Abonelik yok — başlık', { help: 'Kart boşken görünen satır.' }),
+        text('emptyDraftCta', 'Abonelik yok — taslak varsa buton'),
+        text('emptyCta', 'Abonelik yok — buton'),
+        text('loading', 'Yükleniyor notu'),
+        textarea('loadError', 'Abonelik yüklenemedi hatası'),
+        textarea('payNote', 'Ödeme/tahsilat notu', { help: 'Kart altındaki "ödemen teslimat günü çekilir…" açıklaması.' }),
+        text('lockedNote', 'Değişiklik süresi doldu notu'),
+        textarea('skipConfirm', 'Atlama onayı sorusu'),
+        text('skipYes', 'Atlama onayı — evet düğmesi'),
+        text('skipNo', 'Atlama onayı — vazgeç düğmesi'),
+        text('skipLabel', 'Atla düğmesi'),
+        text('unskipLabel', 'Atlamayı geri al düğmesi'),
+        text('skipUsedLabel', 'Atlama hakkı bitti düğmesi'),
+        text('skippedBadge', 'Atlandı rozeti'),
+        text('extrasTitle', 'Bu haftaki ekstralar başlığı'),
+        text('editBoxCta', 'Kutuyu düzenle düğmesi'),
+        text('applyLabel', 'Değişiklikleri onayla düğmesi'),
+        text('discardLabel', 'Değişikliklerden vazgeç düğmesi'),
+        text('savedNote', 'Kaydedildi notu'),
+        text('nextDeliveryLabel', 'Sonraki teslimat etiketi'),
+        text('cutoffLabel', 'Kesim geri sayımı etiketi', { help: 'Süre metni sayfada eklenir: "DEĞİŞİKLİK İÇİN: 2 GÜN SÜREN VAR".' }),
+        text('pastDueBadge', 'PAST_DUE rozeti'),
+        textarea('pastDueNote', 'PAST_DUE uyarısı (dunning)'),
+        text('pastDueAction', 'PAST_DUE aksiyonu (kart güncelle)'),
+        text('awaitingBadge', 'Ödeme bekliyor rozeti'),
+        textarea('awaitingNote', 'Ödeme bekliyor açıklaması'),
+        text('awaitingAction', 'Ödeme bekliyor aksiyonu (ödeme linki)'),
+        text('unpaidBadge', 'Tahsil edilemedi rozeti'),
+        textarea('unpaidNote', 'Tahsil edilemedi açıklaması'),
+        text('cancelBadge', 'İptal talebi rozeti'),
+        textarea('cancelNote', 'İptal talebi açıklaması'),
+        text('cancelEffectiveLabel', 'Sona erme tarihi etiketi'),
+        text('cancelAbandon', 'İptalden vazgeç düğmesi'),
+        text('completedBadge', 'Tek seferlik tamamlandı rozeti'),
+        textarea('completedNote', 'Tek seferlik tamamlandı açıklaması'),
+        text('completedCta', 'Tek seferlik tamamlandı düğmesi'),
+        text('cancelLink', 'İptal bağlantısı'),
+        text('cancelFlowTitle', 'İptal akışı başlığı'),
+        textarea('cancelFlowIntro', 'İptal akışı giriş metni'),
+        text('cancelFlowPlaceholder', 'İptal nedeni yer tutucusu'),
+        text('cancelSubmit', 'İptali gönder düğmesi'),
+        text('cancelConfirmSubmit', 'Teklife rağmen iptal düğmesi'),
+        text('cancelBack', 'İptal akışından geri dön bağlantısı'),
+        textarea('retentionOffer', 'Kalma teklifi (kutu/oran bilinen)', { help: '{boxes} ve {pct} yer tutucuları sunucudan gelen teklifle doldurulur; <b> serbest.' }),
+        textarea('retentionOfferPlain', 'Kalma teklifi (yer tutucusuz)'),
+        text('retentionAccept', 'Teklifi kabul düğmesi'),
+        text('retentionApplied', 'Uygulanan indirim satırı'),
+        text('busyNote', 'Kaydediliyor notu', { help: 'İstek sürerken kart altında görünen satır.' }),
+        textarea('genericError', 'Genel hata metni'),
+      ],
+    },
+  },
+
+  // ── Sepet (F9 — checkout adımları ve hata metinleri) ──────────────────────
+  // sepet.hbs adım sekmeleri + bölüm başlıkları + doğrulama/ödeme mesajları. Yer tutucular: {no} sipariş no,
+  // {belge} onay bekleyen yasal belge adı. Anahtar boşsa sayfa kendi Türkçe varsayılanını kullanır.
+  {
+    key: 'sepet.texts',
+    label: 'Sepet — adım başlıkları ve hata/ödeme metinleri',
+    page: 'sepet',
+    schema: {
+      fields: [
+        text('stepSummaryLabel', 'Adım 1 — Özet'),
+        text('stepCustomerLabel', 'Adım 2 — Müşteri'),
+        text('stepDeliveryLabel', 'Adım 3 — Teslimat'),
+        text('stepPaymentLabel', 'Adım 4 — Ödeme'),
+        text('summaryTitle', 'Sipariş özeti başlığı'),
+        text('customerTitle', 'Müşteri bilgileri başlığı'),
+        text('deliveryTitle', 'Teslimat bilgileri başlığı'),
+        text('paymentTitle', 'Ödeme bilgileri başlığı'),
+        text('emptyCart', 'Sepet boş (özet kutusu)'),
+        text('completeCta', 'Siparişi tamamla düğmesi', { help: 'Mesafeli satış: "ödeme yükümlülüğü doğurur" ibaresi kalmalı.' }),
+        text('addToBoxCta', '"Bu haftaki kutuma ekle" düğmesi'),
+        text('shippingLabel', 'Kargo satırı etiketi'),
+        text('shippingIncludedLabel', 'Kargo dahil metni'),
+        text('customerRequiredError', 'Hata — müşteri alanları eksik'),
+        text('cartEmptyError', 'Hata — sepet boş'),
+        text('deliveryDayRequiredError', 'Hata — teslimat günü seçilmedi'),
+        textarea('deliveryDateError', 'Hata — teslimat tarihi alınamadı'),
+        text('legalRequiredError', 'Hata — belgeler onaylanmadı'),
+        text('legalSingleRequiredError', 'Hata — tek belge onayı', { help: '{belge} yer tutucusu belge adıyla değişir.' }),
+        text('quoteError', 'Hata — tutar hesaplanamadı'),
+        textarea('orderError', 'Hata — sipariş oluşturulamadı'),
+        textarea('orderResponseError', 'Hata — sipariş yanıtı alınamadı'),
+        textarea('orderNotFoundError', 'Hata — sipariş bulunamadı'),
+        textarea('paymentPendingNote', 'Ödeme başladı notu'),
+        text('paymentVerifyingNote', 'Ödeme doğrulanıyor notu'),
+        textarea('paymentTimeoutNote', 'Ödeme sonucu gelmedi notu'),
+        textarea('paymentFailedNote', 'Ödeme alınamadı notu'),
+        textarea('successOrder', 'Başarılı — tekil sipariş', { help: '{no} sipariş numarasıyla değişir.' }),
+        textarea('successSubscription', 'Başarılı — abonelik/kutu siparişi', { help: '{no} sipariş numarasıyla değişir.' }),
       ],
     },
   },

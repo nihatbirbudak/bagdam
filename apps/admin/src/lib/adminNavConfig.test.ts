@@ -40,6 +40,9 @@ const F6_LIVE_PATHS = ['/musteriler', '/sistem/e-posta-gunlugu'];
 /** F8'de gerçek sayfaya bağlanan ekranlar (BACKEND-PLANI §4 ekran 17 Siparişler + 23 Kuponlar). */
 const F8_LIVE_PATHS = ['/siparisler', '/kuponlar'];
 
+/** F9'da gerçek sayfaya bağlanan ekranlar (BACKEND-PLANI §4: 21 Özet, 14b, 18, 19, 20). */
+const F9_LIVE_PATHS = [ADMIN_ROOT, '/ayarlar/teslimat-tarihleri', '/odeme-problemleri', '/abonelikler', '/operasyon/teslimat-gunu'];
+
 describe('adminNavConfig (Bağdam menüsü)', () => {
   it('tüm yollar benzersiz ve / ile başlar', () => {
     const leaves = getAllNavLeaves();
@@ -54,7 +57,7 @@ describe('adminNavConfig (Bağdam menüsü)', () => {
     }
   });
 
-  it('F4 (2–8), F5 (9–15), F6 (16 + e-posta günlüğü) ve F8 (17 + 23) ekranları gerçek sayfaya bağlı: comingSoon=false; diğerleri yer tutucu', () => {
+  it('F4 (2–8), F5 (9–15), F6 (16 + e-posta günlüğü), F8 (17 + 23) ve F9 (21 + 14b + 18–20) ekranları gerçek sayfaya bağlı: comingSoon=false; diğerleri yer tutucu', () => {
     for (const leaf of getAllNavLeaves()) {
       if (F4_LIVE_PATHS.includes(leaf.to)) {
         expect(leaf.phase, leaf.to).toBe('F4');
@@ -67,6 +70,9 @@ describe('adminNavConfig (Bağdam menüsü)', () => {
         expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(false);
       } else if (F8_LIVE_PATHS.includes(leaf.to)) {
         expect(leaf.phase, leaf.to).toBe('F8');
+        expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(false);
+      } else if (F9_LIVE_PATHS.includes(leaf.to)) {
+        expect(leaf.phase, leaf.to).toBe('F9');
         expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(false);
       } else {
         expect(leaf.comingSoon, `${leaf.to} comingSoon`).toBe(true);
@@ -81,6 +87,8 @@ describe('adminNavConfig (Bağdam menüsü)', () => {
     expect(f6.map((l) => l.to).sort()).toEqual([...F6_LIVE_PATHS].sort());
     const f8 = getAllNavLeaves().filter((l) => l.phase === 'F8');
     expect(f8.map((l) => l.to).sort()).toEqual([...F8_LIVE_PATHS].sort());
+    const f9 = getAllNavLeaves().filter((l) => l.phase === 'F9');
+    expect(f9.map((l) => l.to).sort()).toEqual([...F9_LIVE_PATHS].sort());
   });
 
   it('BACKEND-PLANI §4 ekranları menüde', () => {

@@ -33,7 +33,7 @@ export function AdminTopBar({ sidebarOpen, onToggleSidebar }: Props) {
   const SidebarIcon = sidebarOpen ? PanelLeftClose : PanelLeftOpen;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-brand-200 bg-white shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-brand-200 bg-white shadow-sm print:hidden">
       <div className="flex h-12 items-center gap-3 px-4">
         {/* Sol: marka + yan menü düğmesi (yalnız masaüstü) */}
         <Link

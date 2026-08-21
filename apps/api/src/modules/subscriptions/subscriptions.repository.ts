@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, type CycleStatus, type SubscriptionStatus } from '@prisma/client';
+import { Prisma, type CycleStatus, type OrderStatus as OrderStatusEnum, type SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { SYSTEM_WARN_DIGEST_MS } from './subscriptions.constants';
 
@@ -47,6 +47,9 @@ export const ORDER_SUMMARY_SELECT = {
   paidAt: true,
   customerName: true,
   customerPhone: true,
+  // F9 (ekran 20 paketleme fişi): müşteri e-postası + ops notu (telafi kayıtları burada [B19])
+  customerEmail: true,
+  adminNote: true,
 } satisfies Prisma.OrderSelect;
 export type OrderSummaryRecord = Prisma.OrderGetPayload<{ select: typeof ORDER_SUMMARY_SELECT }>;
 
@@ -99,6 +102,12 @@ export type PaymentRecord = Prisma.PaymentGetPayload<Record<string, never>>;
 export type OrderRecord = Prisma.OrderGetPayload<{ include: { lines: true } }>;
 export type PaymentMethodRecord = Prisma.PaymentMethodGetPayload<Record<string, never>>;
 export type ZoneRecord = Prisma.DeliveryZoneGetPayload<Record<string, never>>;
+
+/** F9 ops gün özeti: teslimat tarihi + bölgesi. */
+export const DELIVERY_DATE_WITH_ZONE_INCLUDE = {
+  zone: { select: { id: true, slug: true, name: true, sortOrder: true } },
+} satisfies Prisma.DeliveryDateInclude;
+export type DeliveryDateWithZoneRecord = Prisma.DeliveryDateGetPayload<{ include: typeof DELIVERY_DATE_WITH_ZONE_INCLUDE }>;
 
 export interface AdminSubscriptionFilter {
   status?: SubscriptionStatus;
@@ -443,6 +452,26 @@ export class SubscriptionsRepository {
 
   findDeliveryDateById(id: string, tx?: Db): Promise<DeliveryDateRecord | null> {
     return this.db(tx).deliveryDate.findUnique({ where: { id } });
+  }
+
+  /** F9 ops gün özeti: takvim gününün (isteğe bağlı bölge süzgeci) teslimat tarihi satırları + bölge bilgisi. */
+  findDeliveryDatesForDate(date: Date, zoneId?: string, tx?: Db): Promise<DeliveryDateWithZoneRecord[]> {
+    return this.db(tx).deliveryDate.findMany({
+      where: { date, ...(zoneId ? { zoneId } : {}) },
+      orderBy: [{ zone: { sortOrder: 'asc' } }, { zone: { slug: 'asc' } }],
+      include: DELIVERY_DATE_WITH_ZONE_INCLUDE,
+    });
+  }
+
+  /**
+   * F9 ops gün özeti: aynı teslimat gününün ABONELİK DIŞI (tekil ürün) siparişleri — ödemesi alınmış durumlar.
+   * Kutu siparişleri cycle üzerinden sayıldığından `subscriptionId: null` şartı çift saymayı önler.
+   */
+  findStandaloneOrdersForDate(date: Date, zoneId: string | undefined, statuses: readonly OrderStatusEnum[], tx?: Db) {
+    return this.db(tx).order.findMany({
+      where: { deliveryOn: date, subscriptionId: null, deletedAt: null, status: { in: [...statuses] }, ...(zoneId ? { zoneId } : {}) },
+      select: { id: true, orderNo: true, status: true, grandTotal: true, zoneId: true },
+    });
   }
 
   // ── Order / Payment (yalnız okuma — yazım OrdersService / PaymentsService üzerinden, SubscriptionsDepsAdapter) ──────

@@ -346,6 +346,12 @@ export interface BootstrapPayload {
   recommendedTier: string | null;
   /** Setting `commerce.*` içinden istemcinin ihtiyaç duyduğu, gizli olmayan alt küme. */
   commerce: CommerceSettings;
+  /**
+   * F9 [B49]: sayfanın üretildiği ANIN sunucu saati (mutlak ISO). cart.js kesim geri sayımını bununla kurar —
+   * istemci saatine güvenilmez: `offset = Date.now() - Date.parse(serverNow)` bir kez hesaplanır, `cutoffAtIso`
+   * karşılaştırmaları bu farkla düzeltilir. Anonim bootstrap cache'inde tutulmaz, her yanıtta tazelenir.
+   */
+  serverNow: IsoDateTime;
 }
 
 // ── F3 ekleri (CatalogService.getBootstrap) — yalnız EKLEME; yukarıdaki sözleşme değişmez ────────

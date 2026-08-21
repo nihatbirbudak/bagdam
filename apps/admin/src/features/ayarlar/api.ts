@@ -11,6 +11,7 @@ import type {
   AdminMailSendResult,
   AdminSettingGroup,
   AdminSettingGroupUpdate,
+  DeliveryDatesGenerateResult,
 } from '../../lib/apiTypes';
 import { unwrapList } from '../catalog/api';
 import { normalizeSettingsGroup, normalizeSettingsGroups } from './settingsForm';
@@ -38,7 +39,7 @@ export const deliveryAdminApi = {
     list: async (params: { zone?: string; from?: string; to?: string }) =>
       unwrapList<AdminDeliveryDate>(await api.get<unknown>(`/admin/delivery/dates${buildQuery(params)}`)),
     patch: (id: string, body: AdminDeliveryDatePatch) => api.patch<AdminDeliveryDate>(`/admin/delivery/dates/${id}`, body),
-    /** Zone+tarih upsert; `weeks` hafta ileri (cron F7). */
-    generate: (weeks: number) => api.post<unknown>('/admin/delivery/dates/generate', { weeks }),
+    /** Zone+tarih upsert; `weeks` hafta ileri (cron F7). İdempotent: ikinci koşuda `created` 0. */
+    generate: (weeks: number) => api.post<DeliveryDatesGenerateResult>('/admin/delivery/dates/generate', { weeks }),
   },
 };

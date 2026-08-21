@@ -1,6 +1,6 @@
 import { Controller, Get, HttpStatus, Inject, Logger, NotFoundException, Param, Req, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { BootstrapMe, BootstrapPayload } from '@bagdam/shared';
+import type { BootstrapMe, BootstrapPayload, BootstrapSub } from '@bagdam/shared';
 import type { Request, Response } from 'express';
 import type { SessionUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
@@ -8,6 +8,7 @@ import { SkipTimeout } from '../common/decorators/skip-timeout.decorator';
 import { APP_VERSION } from '../config/app-info';
 import { getSiteMode } from '../config/site.config';
 import { CatalogService } from '../modules/catalog/catalog.service';
+import { SubscriptionsService } from '../modules/subscriptions/services/subscriptions.service';
 import { toBootstrapJson, toScriptJson } from './bootstrap-json';
 import {
   buildCategoryTabs,
@@ -106,7 +107,8 @@ interface ViewData {
  * Rotalar /api/v1 öneki dışında (bkz. web.routes.ts → setGlobalPrefix exclude).
  * - Throttle yok: sayfalar anonim ve nginx cache'li; sınırlama API uçları için.
  * - Timeout yok: render senkron, @Res() ile yanıt Express'e bırakılır.
- * - F3: her sayfa CatalogService.getBootstrap → `{{> bootstrap}}` (me/sub şimdilik null; F6/F9'da çerezden).
+ * - F3: her sayfa CatalogService.getBootstrap → `{{> bootstrap}}`; F6: `me` çerezden, F9: `sub` (satın alınmış
+ *   abonelik DTO'su) + `serverNow` (kesim geri sayımı için mutlak an) [B49].
  * - F4: @Public — JwtAuthGuard sayfaları anonim geçirir (geçerli çerez varsa req.user yine dolar; F6 `me` için).
  * - F5: sabit metinler SiteContent'ten (`site`), yasal metinler/günlük DB'den; değerler seed ile aynıyken render
  *   website/*.html ile piksel-piksel aynı (tools/visual-parity).
@@ -120,6 +122,7 @@ export class WebController {
 
   constructor(
     private readonly catalog: CatalogService,
+    private readonly subscriptions: SubscriptionsService,
     @Inject(WEB_CONTENT_SOURCE) private readonly content: WebContentSource,
   ) {}
 
@@ -186,16 +189,33 @@ export class WebController {
     });
   }
 
-  /** Bootstrap: `me` oturumdan (JwtAuthGuard req.user — F6), `sub` F9'a kadar null. Hata → null (çağıran 503 verir). */
+  /**
+   * Bootstrap: `me` oturumdan (JwtAuthGuard req.user — F6), `sub` oturumlu üyenin SATIN ALINMIŞ aboneliğinden
+   * (F9: SubscriptionsService.getForUser → `GET /me/subscription` ile AYNI DTO; yoksa null → cart.js localStorage
+   * taslağına düşer), `serverNow` CatalogService'te tazelenir. Bootstrap hatası → null (çağıran 503 verir);
+   * yalnız `sub` okunamazsa sayfa `sub:null` ile basılır (abonelik paneli boş görünür ama sayfa açılır).
+   */
   private async loadBootstrap(req: RequestWithCookies, view: string): Promise<BootstrapPayload | null> {
     try {
-      return await this.catalog.getBootstrap({ me: toBootstrapMe(req.user), sub: null });
+      return await this.catalog.getBootstrap({ me: toBootstrapMe(req.user), sub: await this.loadSub(req), now: new Date() });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
         `"${view}" için bootstrap üretilemedi [rid:${req.requestId ?? '-'}]: ${message}`,
         err instanceof Error ? err.stack : undefined,
       );
+      return null;
+    }
+  }
+
+  /** Oturumlu üyenin abonelik DTO'su; oturum yoksa ya da okuma başarısızsa null (sayfa yine basılır). */
+  private async loadSub(req: RequestWithCookies): Promise<BootstrapSub | null> {
+    if (!req.user) return null;
+    try {
+      return await this.subscriptions.getForUser(req.user.id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`abonelik okunamadı [rid:${req.requestId ?? '-'}]: ${message}`, err instanceof Error ? err.stack : undefined);
       return null;
     }
   }

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   assertOrderTransition,
+  canOrderTransition,
   DEFAULT_TZ,
   DEFAULT_VAT_RATE,
   InvalidTransitionError,
@@ -58,6 +59,26 @@ import type {
 export interface CreateOrderResult {
   order: OrderRecord;
   lines: OrderLineRecord[];
+}
+
+/** F9 ops toplu durum: tek bir siparişin ön kontrol / uygulama sonucu. */
+export interface BulkTransitionCheck {
+  id: string;
+  from: OrderStatus | null;
+  orderNo: number | null;
+  ok: boolean;
+  error?: string;
+  message?: string;
+}
+
+/** Nest hata gövdesinden `{error, message}` çıkarır (AllExceptionsFilter zarfıyla aynı alanlar). */
+function errorEnvelope(err: unknown): { error: string; message: string } {
+  const res = err instanceof ConflictException || err instanceof NotFoundException || err instanceof BadRequestException ? err.getResponse() : null;
+  if (res && typeof res === 'object') {
+    const body = res as { error?: string; message?: string };
+    return { error: body.error ?? 'ORDER_TRANSITION_FAILED', message: body.message ?? (err as Error).message };
+  }
+  return { error: 'ORDER_TRANSITION_FAILED', message: err instanceof Error ? err.message : String(err) };
 }
 
 /** Admin durum güncellemesi sonucu (controller audit için eski/yeni durum). */
@@ -434,6 +455,57 @@ export class OrdersService {
     const before = await this.requireOrder(id);
     const row = await this.transition(id, to, { actor: 'ADMIN', actorId: actorId ?? null, reason: reason ?? null });
     return { order: toOrderDto(row, { includePayments: true }), from: before.status as OrderStatus, to };
+  }
+
+  // ── F9 ops toplu durum (ekran 20 "Teslimat Günü") ────────────────────────────
+
+  /**
+   * Toplu geçiş ÖN KONTROLÜ — hiçbir şey yazmaz. Ops ekranı seçili satırların hepsini birden ilerletmeden önce
+   * (hep-ya-hiç) bunu kullanır: sipariş yoksa `ORDER_NOT_FOUND`, geçiş makineye uymuyorsa `ORDER_TRANSITION_INVALID`.
+   */
+  async checkBulkTransition(ids: readonly string[], to: OrderStatus): Promise<BulkTransitionCheck[]> {
+    const out: BulkTransitionCheck[] = [];
+    for (const id of ids) {
+      const order = await this.repo.findById(id);
+      if (!order) {
+        out.push({ id, from: null, orderNo: null, ok: false, error: 'ORDER_NOT_FOUND', message: 'Sipariş bulunamadı' });
+        continue;
+      }
+      const from = order.status as OrderStatus;
+      if (from === to) {
+        out.push({ id, from, orderNo: order.orderNo, ok: false, error: 'ORDER_ALREADY_IN_STATUS', message: `Sipariş zaten ${to}` });
+        continue;
+      }
+      out.push(
+        canOrderTransition(from, to)
+          ? { id, from, orderNo: order.orderNo, ok: true }
+          : { id, from, orderNo: order.orderNo, ok: false, error: 'ORDER_TRANSITION_INVALID', message: `Sipariş ${from} → ${to} geçişi geçersiz` },
+      );
+    }
+    return out;
+  }
+
+  /**
+   * Toplu geçiş UYGULAMA — sırayla `transition` çağırır (her biri kendi işleminde; yan etkiler orada).
+   * Ön kontrolden geçmiş id'ler beklenir; yine de tek tek hata yakalanır ve satır bazında raporlanır
+   * (yarış durumunda 409 ORDER_STATE_CHANGED tüm partiyi düşürmesin).
+   */
+  async applyBulkTransition(
+    ids: readonly string[],
+    to: OrderStatus,
+    opts: { actor: OrderTransitionContext['actor']; actorId?: string | null; reason?: string | null; now?: Date },
+  ): Promise<BulkTransitionCheck[]> {
+    const out: BulkTransitionCheck[] = [];
+    for (const id of ids) {
+      try {
+        const before = await this.repo.findById(id);
+        const order = await this.transition(id, to, { actor: opts.actor, actorId: opts.actorId ?? null, reason: opts.reason ?? null, now: opts.now });
+        out.push({ id, from: (before?.status as OrderStatus | undefined) ?? null, orderNo: order.orderNo, ok: true });
+      } catch (err) {
+        out.push({ id, from: null, orderNo: null, ok: false, ...errorEnvelope(err) });
+      }
+    }
+    return out;
   }
 
   /** Not ekleme — `[YYYY-MM-DD HH:mm] metin` satırı eklenir (Europe/Istanbul); toplam üst sınır aşılırsa 400. */

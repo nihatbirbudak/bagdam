@@ -30,6 +30,10 @@ const BahcedenCart = (function () {
     // F8 checkout: kart ve sipariş geçmişi de sunucuda (PaymentMethod / Order: /me/cards, /me/orders) — prototip
     // anahtarları okunmaz/yazılmaz; kalıntı silinir. bahceden_sub taslağı yalnız satın alma tamamlanınca temizlenir.
     ["bahceden_card", "bahceden_orders"].forEach((k) => localStorage.removeItem(k));
+    // F9 remote: iptalden caydırma teklifi hakkı da sunucuda (User.retentionOfferUsedAt; teklifin çıkıp çıkmayacağına
+    // POST /me/subscription/cancel yanıtındaki `offer` karar verir) — prototip anahtarı okunmaz/yazılmaz, kalıntı silinir.
+    // Kalan yerel kayıtlar: bahceden_cart, bahceden_prefs, satın ALINMAMIŞ kutu taslağı (bahceden_sub); ?sifirla korunur.
+    ["bahceden_retention_offered", "bahceden_address"].forEach((k) => localStorage.removeItem(k));
   } catch (e) { /* eski tarayıcıda sessizce geç */ }
 
   function readJSON(key, fallback) {
@@ -42,6 +46,28 @@ const BahcedenCart = (function () {
   }
   function writeJSON(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  // ---- F9 remote: sunucu saati — kesim geri sayımı istemci saatine GÜVENMEZ (BACKEND-PLANI §1.2 [B49]).
+  // Bootstrap'a gömülen `serverNow` (ISO) ile yerel saat arasındaki fark sayfa parse anında bir kez ölçülür;
+  // sonrası yerel saatin ilerleyişiyle taşınır (sayfa açık kaldıkça sapma büyümez). `serverNow` yoksa fark 0
+  // → eski davranış birebir korunur (C uçları gelmeden de çalışır).
+  const CLOCK_SKEW_MS = (function () {
+    try {
+      const iso = typeof __BAGDAM__ !== "undefined" && __BAGDAM__ ? __BAGDAM__.serverNow : null;
+      const t = iso ? Date.parse(iso) : NaN;
+      return isNaN(t) ? 0 : t - Date.now();
+    } catch (e) {
+      return 0;
+    }
+  })();
+  /** Sunucuya göre "şimdi" (epoch ms). */
+  function nowMs() {
+    return Date.now() + CLOCK_SKEW_MS;
+  }
+  /** Sunucuya göre "şimdi" (Date). */
+  function serverNow() {
+    return new Date(nowMs());
   }
 
   function getCart() {
@@ -711,7 +737,7 @@ const BahcedenCart = (function () {
     // Extras are per-order only: once the week they were added for is past
     // its cutoff, the next order renews as a plain box — drop them silently.
     // (writeJSON, not setSub — updateBadge() calls back into getSub().)
-    if (sub.extras.length && sub.extrasCutoff && Date.now() > sub.extrasCutoff) {
+    if (sub.extras.length && sub.extrasCutoff && nowMs() > sub.extrasCutoff) {
       sub.extras = [];
       sub.extrasCutoff = null;
       writeJSON(SUB_KEY, sub);
@@ -719,8 +745,22 @@ const BahcedenCart = (function () {
     return sub;
   }
   function setSub(sub) {
+    // F9 remote: satın alınmış abonelik SUNUCUDA yaşar — localStorage'a kopyalanmaz. Canlı bir DTO ile
+    // çağrılırsa (eski çağrı yolları) yalnız bootstrap kopyası tazelenir; taslak (satın alınmamış kutu)
+    // eskisi gibi yerelde saklanır.
+    if (sub && sub.purchased) {
+      applyServerSub(sub);
+      return;
+    }
     writeJSON(SUB_KEY, sub);
     updateBadge();
+  }
+  /** F9 remote: sunucudan dönen BootstrapSub DTO'sunu bootstrap'a yazar (tek doğruluk kaynağı) ve rozeti tazeler. */
+  function applyServerSub(sub) {
+    if (typeof window.__BAGDAM__ !== "object" || !window.__BAGDAM__) window.__BAGDAM__ = {};
+    window.__BAGDAM__.sub = sub && typeof sub === "object" ? sub : null;
+    updateBadge();
+    return window.__BAGDAM__.sub;
   }
 
   // F8 checkout: sipariş geçmişi (bahceden_orders, getOrders/addOrder) ve nextDeliveryDate kalktı — siparişler
@@ -750,6 +790,28 @@ const BahcedenCart = (function () {
     KVKK_REQUIRED: "Devam etmek için KVKK aydınlatma metnini onaylaman gerekiyor.",
     RESET_TOKEN_INVALID: "Sıfırlama bağlantısı geçersiz ya da süresi dolmuş — yeni bağlantı iste.",
     CURRENT_PASSWORD_INVALID: "Mevcut parolan hatalı.",
+    // F9 remote: abonelik motoru 409/400 kodları (apps/api/src/modules/subscriptions/subscriptions.errors.ts).
+    SUBSCRIPTION_EXISTS: "Zaten aktif bir aboneliğin var.",
+    NO_SUBSCRIPTION: "Aktif bir aboneliğin görünmüyor — sayfayı yenileyip tekrar dene.",
+    NO_CURRENT_CYCLE: "Bu hafta için düzenlenebilir bir kutu yok.",
+    CYCLE_LOCKED: "Bu haftanın değişiklik süresi doldu — kutun hazırlanmaya başladı.",
+    CYCLE_NOT_EDITABLE: "Bu kutu artık düzenlenemiyor.",
+    FIRST_CYCLE_NOT_SKIPPABLE: "İlk kutun atlanamaz.",
+    SKIP_LIMIT_REACHED: "Atlama hakkın bu yıllık dönem için doldu.",
+    NOT_SKIPPED: "Bu hafta zaten atlanmış değil.",
+    DAY_FULL: "Seçtiğin teslimat günü doldu — başka bir gün seç.",
+    BOX_ITEM_COUNT: "Kutudaki ürün sayısı değiştirilemez — yalnız değiştokuş yapabilirsin.",
+    PRODUCT_NOT_AVAILABLE: "Seçtiğin ürün şu an mevcut değil.",
+    PRODUCT_NOT_SWAPPABLE: "Bu ürün kutuda değiştirilemiyor.",
+    PREF_INVALID: "Seçtiğin tercih geçersiz.",
+    EXTRA_FACTOR_INVALID: "Ekstra miktarı geçersiz.",
+    FREQUENCY_INVALID: "Seçtiğin gönderim sıklığı geçersiz.",
+    DELIVERY_DAY_INVALID: "Seçtiğin teslimat günü geçersiz.",
+    ADDRESS_INVALID: "Adresin geçersiz — teslimat adresini güncelle.",
+    PAYMENT_METHOD_INVALID: "Seçtiğin kart geçersiz — başka bir kart seç.",
+    CANCEL_ALREADY_REQUESTED: "Zaten açık bir iptal talebin var.",
+    NO_OPEN_CANCELLATION: "Açık bir iptal talebin yok.",
+    RETENTION_NOT_OFFERED: "Bu iptal akışında kalma teklifi sunulmadı.",
   };
   const API_STATUS_MESSAGES = {
     400: "Girdiğin bilgileri kontrol et.",
@@ -1091,15 +1153,12 @@ const BahcedenCart = (function () {
     );
   }
   // Satın alınmış abonelik (GET /me/subscription) → bootstrap sub alanına yazılır; getSub()/hasPurchasedSub() onu okur.
-  // F8'de minimal gösterim için (uyelik/sepet); bootstrap.sub sunucudan F9'da gelir. Oturum yoksa null.
-  function loadSubscription() {
-    if (!isLoggedIn()) return Promise.resolve(null);
-    return api("/me/subscription").then((sub) => {
-      if (typeof window.__BAGDAM__ !== "object" || !window.__BAGDAM__) window.__BAGDAM__ = {};
-      window.__BAGDAM__.sub = sub && typeof sub === "object" ? sub : null;
-      updateBadge();
-      return window.__BAGDAM__.sub;
-    });
+  // F9: bootstrap `sub` alanı sunucudan dolu gelir (WebController); bu çağrı yalnız YEDEK — alan boşsa ya da
+  // sayfa yenilenmeden tazeleme gerektiğinde (`force`) kullanılır. Oturum yoksa null.
+  function loadSubscription(force) {
+    if (!isLoggedIn()) return Promise.resolve(applyServerSub(null));
+    if (!force && typeof __BAGDAM__ !== "undefined" && __BAGDAM__ && __BAGDAM__.sub) return Promise.resolve(__BAGDAM__.sub);
+    return api("/me/subscription").then(applyServerSub);
   }
   // Saklı kartlar (PaymentMethod): GET /me/cards · DELETE /me/cards/:id · POST /me/cards/add-session (PayTR'de 501: kart ilk ödemede saklanır).
   function listCards() {
@@ -1123,12 +1182,75 @@ const BahcedenCart = (function () {
     const lines = checkoutLines();
     if (!lines.length) return Promise.resolve(null);
     return api("/me/subscription/cycles/current/merge-cart", { method: "POST", body: { lines: lines } }).then((sub) => {
-      if (typeof window.__BAGDAM__ !== "object" || !window.__BAGDAM__) window.__BAGDAM__ = {};
-      if (sub && typeof sub === "object") window.__BAGDAM__.sub = sub;
+      const applied = applyServerSub(sub);
       setCart([]);
-      return sub;
+      return applied;
     });
   }
+
+  // ---- F9 remote: CANLI abonelik adaptörü (BACKEND-PLANI §1.2 F9, ADR-0008) ------------------------------
+  // Oturum açıksa ve satın alınmış bir abonelik varsa TÜM mutasyonlar API'ye gider; localStorage taslağı yalnız
+  // satın ALINMAMIŞ kutu için kalır. Sunucu tek doğruluk kaynağıdır: her uç güncel `BootstrapSub` DTO'sunu döner,
+  // DTO bootstrap'a yazılır (`applyServerSub`) ve sayfa ondan yeniden çizilir — OPTIMISTIC güncelleme YOK.
+  // Hata → api() reddi ({status, code, message}); çağıran sayfa mesajı kendi kutusunda gösterir ve DTO'yu değiştirmez.
+  const remote = {
+    /** Canlı mod mu (oturum + satın alınmış abonelik). */
+    isLive: hasPurchasedSub,
+    /** Güncel DTO (canlı değilse null). */
+    current: function () {
+      return hasPurchasedSub() ? getSub() : null;
+    },
+    /** GET /me/subscription — bootstrap `sub` boşsa ya da force ile tazeleme. */
+    load: loadSubscription,
+    /** Kutu içeriği: swap (`items`) · ürün tercihi (`itemPrefs`) · ekstralar (`extras`) → PATCH …/cycles/current. */
+    patchCycle: function (patch) {
+      return api("/me/subscription/cycles/current", { method: "PATCH", body: patch || {} }).then(applyServerSub);
+    },
+    /** "bu haftaki kutuma ekle" (sepetten) → POST …/cycles/current/merge-cart; başarıda sepet boşalır. */
+    mergeCart: mergeCartIntoBox,
+    /** Bu haftayı atla → POST …/cycles/current/skip. */
+    skip: function () {
+      return api("/me/subscription/cycles/current/skip", { method: "POST", body: {} }).then(applyServerSub);
+    },
+    /** Atlamayı geri al (hak iade edilir) → DELETE …/cycles/current/skip. */
+    unskip: function () {
+      return api("/me/subscription/cycles/current/skip", { method: "DELETE" }).then(applyServerSub);
+    },
+    /** Frekans / teslimat günü / adres / kart → PATCH /me/subscription (tier ve type YOK — ADR-0008). */
+    patchSubscription: function (patch) {
+      return api("/me/subscription", { method: "PATCH", body: patch || {} }).then(applyServerSub);
+    },
+    /** İptal talebi → POST /me/subscription/cancel {reason,note} → `{cancellationId, offer}` (offer null olabilir). */
+    cancel: function (reason, note) {
+      const body = { reason: reason };
+      if (note) body.note = note;
+      return api("/me/subscription/cancel", { method: "POST", body: body });
+    },
+    /** Kalma teklifini kabul → POST …/retention/accept (abonelik ACTIVE'e döner, sonraki kutuda indirim). */
+    acceptRetention: function () {
+      return api("/me/subscription/retention/accept", { method: "POST", body: {} }).then(applyServerSub);
+    },
+    /** İptali onayla → POST …/cancel/confirm; sonrasında abonelik müşteriye görünmez (DTO null'lanır). */
+    confirmCancel: function () {
+      return api("/me/subscription/cancel/confirm", { method: "POST", body: {} }).then((res) => {
+        applyServerSub(null);
+        return res;
+      });
+    },
+    /** İptalden vazgeç → POST …/cancel/abandon. */
+    abandonCancel: function () {
+      return api("/me/subscription/cancel/abandon", { method: "POST", body: {} }).then(applyServerSub);
+    },
+    /** Kart ekleme oturumu (PSP) → POST /me/cards/add-session (PayTR'de 501: kart ilk ödemede saklanır). */
+    cardSession: cardAddSession,
+  };
+  // İptal akışındaki `data-reason` değerleri = shared CancelReason enum'u; etiketler Türkçe.
+  const CANCEL_REASONS = [
+    { value: "PRICE", label: "Fiyat" },
+    { value: "VARIETY", label: "Ürün çeşitliliği" },
+    { value: "DELIVERY_DAYS", label: "Teslimat günleri" },
+    { value: "OTHER", label: "Diğer" },
+  ];
 
   // Wires the shared login/signup auth-gate markup (#checkoutAuth + its tabs
   // and forms — same ids on every page that uses it) to show `gatedElId`
@@ -1447,10 +1569,14 @@ const BahcedenCart = (function () {
     return sub.type === "onetime" ? (typeof DELIVERY_FEE !== "undefined" ? DELIVERY_FEE : 0) : 0;
   }
 
+  // ---- F9 remote: kesim ve gün kilidi __BAGDAM__.deliveryDates'ten (DeliveryDate: mutlak `cutoffAtIso`,
+  // `locked`, `full`) okunur; istemci saati yerine sunucu saati (serverNow farkı) kullanılır. Bootstrap'ta
+  // liste yoksa (eski statik prototip, hata durumu) aşağıdaki YEREL hesaba düşülür — davranış birebir eski gibi.
+
   // Next occurrence of a given weekday (0 Sun ... 6 Sat) at 23:59. If today
   // already is that weekday past 23:59, rolls to next week.
   function nextWeekdayCutoff(targetDay) {
-    const now = new Date();
+    const now = serverNow();
     const d = new Date(now);
     const day = d.getDay();
     let daysUntil = (targetDay - day + 7) % 7;
@@ -1462,14 +1588,55 @@ const BahcedenCart = (function () {
 
   // Delivery day -> the weekday its own cutoff falls on (2 days before, 23:59).
   const CUTOFF_WEEKDAY = { sali: 0, persembe: 2, cumartesi: 4 }; // Sun, Tue, Thu
+  const DELIVERY_DAY_IDS = ["sali", "persembe", "cumartesi"];
+
+  /** Bootstrap teslimat tarihleri (`[{day,date,cutoffAtIso,locked,full}]`, tarihe göre sıralı); yoksa boş dizi. */
+  function deliveryDatesList() {
+    const list = typeof __BAGDAM__ !== "undefined" && __BAGDAM__ ? __BAGDAM__.deliveryDates : null;
+    return Array.isArray(list) ? list : [];
+  }
+  function cutoffMsOf(row) {
+    const t = row && row.cutoffAtIso ? Date.parse(row.cutoffAtIso) : NaN;
+    return isNaN(t) ? null : t;
+  }
+  /** O teslimat gününün listedeki İLK tarihi (= bu haftaki sıradaki teslimat); yoksa null. */
+  function firstDeliveryDateOf(dayId) {
+    return deliveryDatesList().find((d) => d && d.day === dayId) || null;
+  }
+  /** O gün için kesimi geçmemiş, kapalı/dolu olmayan ilk tarih; yoksa null. */
+  function nextOpenDeliveryDate(dayId) {
+    const now = nowMs();
+    return (
+      deliveryDatesList().find((d) => {
+        if (!d || d.day !== dayId || d.locked || d.full) return false;
+        const t = cutoffMsOf(d);
+        return t !== null && t > now;
+      }) || null
+    );
+  }
 
   // Next edit cutoff for the current subscription: the chosen delivery day's
   // own cutoff, or — for "Haftada 3" (all three days) — whichever of the
   // three comes soonest. Falls back to Salı's cutoff if no day is set yet.
   function nextCutoff() {
     const sub = getSub();
+    // F9 remote: canlı abonelikte kesim SUNUCUDAN — açık cycle'ın mutlak cutoffAt'i (istemci hesabı yok).
+    if (sub.purchased) {
+      const cycle = sub.currentCycle || sub.inFlightCycle || null;
+      const iso = (cycle && cycle.cutoffAtIso) || sub.nextCutoffAtIso || null;
+      const t = iso ? Date.parse(iso) : NaN;
+      if (!isNaN(t)) return new Date(t);
+    }
     const freq = typeof FREQ_OPTIONS !== "undefined" ? FREQ_OPTIONS.find((f) => f.id === sub.freq) : null;
-    const allDays = sub.type === "subscription" && freq && freq.allDays;
+    const allDays = !!(sub.type === "subscription" && freq && freq.allDays);
+    // F9 remote: taslakta kesim deliveryDates'ten (seçili gün; "Haftada 3"te üçünün en yakını).
+    if (deliveryDatesList().length) {
+      const wanted = allDays
+        ? DELIVERY_DAY_IDS
+        : [sub.deliveryDay && CUTOFF_WEEKDAY.hasOwnProperty(sub.deliveryDay) ? sub.deliveryDay : "sali"];
+      const hits = wanted.map(nextOpenDeliveryDate).map(cutoffMsOf).filter((t) => t !== null);
+      if (hits.length) return new Date(Math.min.apply(null, hits));
+    }
     if (allDays) {
       return Object.keys(CUTOFF_WEEKDAY)
         .map((id) => nextWeekdayCutoff(CUTOFF_WEEKDAY[id]))
@@ -1484,8 +1651,18 @@ const BahcedenCart = (function () {
   // Salı, but from Pazartesi 12:00 on it's closed (you can't pick a day
   // that's already today either, let alone one that's passed this week).
   // The other two days still have lead time, so they stay open.
-  function lockedDeliveryDay() {
-    const now = new Date();
+  // F9 remote: deliveryDates varsa kilit kararı ORADAN (kesim/kapasite tek kaynağı DeliveryDate).
+  function isDeliveryDayLocked(dayId) {
+    if (deliveryDatesList().length) {
+      const first = firstDeliveryDateOf(dayId);
+      if (!first) return false;
+      const t = cutoffMsOf(first);
+      return !!first.locked || !!first.full || (t !== null && t <= nowMs());
+    }
+    return legacyLockedDeliveryDay() === dayId;
+  }
+  function legacyLockedDeliveryDay() {
+    const now = serverNow();
     const day = now.getDay(); // 0 Sun ... 6 Sat
     const afterNoon = now.getHours() >= 12;
     if ((day === 1 && afterNoon) || day === 2) return "sali";       // Pazartesi 12:00 (kesim) & Salı (teslimat günü)
@@ -1493,25 +1670,41 @@ const BahcedenCart = (function () {
     if ((day === 5 && afterNoon) || day === 6) return "cumartesi";  // Cuma 12:00 (kesim) & Cumartesi (teslimat günü)
     return null;
   }
+  function lockedDeliveryDay() {
+    if (!deliveryDatesList().length) return legacyLockedDeliveryDay();
+    return DELIVERY_DAY_IDS.find(isDeliveryDayLocked) || null;
+  }
 
   // Kilitli (kesimi geçmiş ya da bugünkü) günü seçmek yasak değil — sadece
   // bu haftaya yetişmez. Seçilen gün kilitliyse, gün seçicilerin altında
   // gösterilecek ortak not metnini üretir; değilse null döner.
   function lockedDayNote(dayId) {
-    if (!dayId || dayId !== lockedDeliveryDay()) return null;
+    if (!dayId || !isDeliveryDayLocked(dayId)) return null;
     const d = typeof DELIVERY_DAYS !== "undefined" ? DELIVERY_DAYS.find((x) => x.id === dayId) : null;
     if (!d) return null;
     return "Bu haftanın " + d.label + " kesimi kapandı — teslimatın önümüzdeki hafta " + d.label + " günü yapılır.";
   }
 
   function formatCountdown(target) {
-    const diff = target.getTime() - new Date().getTime();
+    const diff = target.getTime() - nowMs();
     if (diff <= 0) return "kilitlendi";
     const days = Math.floor(diff / 86400000);
     const hours = Math.floor((diff % 86400000) / 3600000);
     if (days > 0) return days + " gün " + hours + " sa";
     const mins = Math.floor((diff % 3600000) / 60000);
     return hours + " sa " + mins + " dk";
+  }
+
+  /** `YYYY-MM-DD` → "12 Eylül Cumartesi" (boş/geçersizse null) — teslimat tarihi metinleri tek yerde. */
+  function formatDeliveryDate(isoDate) {
+    if (!isoDate) return null;
+    const d = new Date(String(isoDate) + "T00:00:00");
+    if (isNaN(d.getTime())) return null;
+    return (
+      d.toLocaleDateString("tr-TR", { day: "numeric", month: "long" }) +
+      " " +
+      d.toLocaleDateString("tr-TR", { weekday: "long" })
+    );
   }
 
   // Footer'daki IG/YT ikon sütununu her zaman yüzen sepetin hemen soluna
@@ -1666,5 +1859,8 @@ const BahcedenCart = (function () {
     clearSubDraft, buildCheckoutPayload, hasCheckoutItems, quoteCheckout, submitCheckout, orderStatus, pollOrderStatus,
     loadDeliveryDates, loadLegalRequiresAck, loadSubscription, listCards, removeCard, cardAddSession, listOrders, getOrder, mergeCartIntoBox,
     freshProducts, nextCutoff, formatCountdown, lockedDeliveryDay, lockedDayNote,
+    // F9 remote: canlı abonelik adaptörü + sunucu saati + teslimat tarihi yardımcıları
+    remote, CANCEL_REASONS, serverNow, applyServerSub,
+    isDeliveryDayLocked, firstDeliveryDateOf, nextOpenDeliveryDate, formatDeliveryDate,
   };
 })();

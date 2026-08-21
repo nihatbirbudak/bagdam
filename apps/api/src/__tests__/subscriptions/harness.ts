@@ -6,12 +6,14 @@
 import '../helpers/env';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { COMMERCE_SETTINGS_DEFAULTS, computeCutoffAt, isoDateToUtc, type CommerceSettings, type DeliveryDay, type IsoDate } from '@bagdam/shared';
 import type { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import cookieParser from 'cookie-parser';
+import hbs from 'hbs';
 import { AllExceptionsFilter } from '../../common/filters/all-exceptions.filter';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -21,6 +23,9 @@ import { PrismaModule } from '../../common/prisma.module';
 import { PrismaService } from '../../common/prisma.service';
 import { AuditModule } from '../../modules/audit/audit.module';
 import { AuthModule } from '../../modules/auth/auth.module';
+import { CatalogModule } from '../../modules/catalog/catalog.module';
+import { ContentModule } from '../../modules/content/content.module';
+import { DashboardModule } from '../../modules/dashboard/dashboard.module';
 import { DeliveryModule } from '../../modules/delivery/delivery.module';
 import { JobsModule } from '../../modules/jobs/jobs.module';
 import { JobsService } from '../../modules/jobs/jobs.service';
@@ -36,6 +41,9 @@ import { SUBSCRIPTIONS_DEPS, type SubscriptionsDeps } from '../../modules/subscr
 import { weekStartOf } from '../../modules/subscriptions/subscriptions.constants';
 import { SubscriptionsModule } from '../../modules/subscriptions/subscriptions.module';
 import { SubscriptionsRepository } from '../../modules/subscriptions/subscriptions.repository';
+import { WebModule } from '../../web/web.module';
+import { WEB_ROUTES_EXCLUDED_FROM_PREFIX } from '../../web/web.routes';
+import { PARTIALS_DIR, VIEWS_DIR } from '../../config';
 import { CookieJar } from '../auth/cookie-jar';
 import { requireDatabaseUrl } from '../helpers/env';
 
@@ -139,7 +147,13 @@ export interface SubsApp {
   close(): Promise<void>;
 }
 
-export async function createSubsApp(): Promise<SubsApp> {
+/** `createSubsApp` seçenekleri — `web:true` .hbs sayfalarını da mount eder (F9 bootstrap sub/serverNow testi). */
+export interface SubsAppOptions {
+  /** WebModule + hbs görünüm motoru (`GET /uyelik.html` gibi sayfalar; prefix dışı). */
+  web?: boolean;
+}
+
+export async function createSubsApp(opts: SubsAppOptions = {}): Promise<SubsApp> {
   requireDatabaseUrl();
   const moduleRef = await Test.createTestingModule({
     imports: [
@@ -151,7 +165,9 @@ export async function createSubsApp(): Promise<SubsApp> {
       SettingsModule,
       DeliveryModule,
       SubscriptionsModule,
+      DashboardModule,
       JobsModule,
+      ...(opts.web ? [CatalogModule, ContentModule, WebModule] : []),
     ],
     providers: [
       { provide: APP_GUARD, useClass: JwtAuthGuard },
@@ -160,9 +176,18 @@ export async function createSubsApp(): Promise<SubsApp> {
       { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
     ],
   }).compile();
-  const app = moduleRef.createNestApplication();
+  const app = moduleRef.createNestApplication<NestExpressApplication>();
   app.use(cookieParser());
-  app.setGlobalPrefix('api/v1');
+  if (opts.web) {
+    // main.ts ile aynı görünüm motoru kurulumu (hbs + partials); web rotaları /api/v1 öneki almaz.
+    app.engine('hbs', hbs.__express);
+    app.setBaseViewsDir(VIEWS_DIR);
+    app.setViewEngine('hbs');
+    hbs.registerPartials(PARTIALS_DIR);
+    app.setGlobalPrefix('api/v1', { exclude: WEB_ROUTES_EXCLUDED_FROM_PREFIX });
+  } else {
+    app.setGlobalPrefix('api/v1');
+  }
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.useGlobalFilters(new AllExceptionsFilter());
   await app.listen(0, '127.0.0.1');

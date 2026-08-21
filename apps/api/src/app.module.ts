@@ -17,6 +17,7 @@ import { CheckoutModule } from './modules/checkout/checkout.module';
 import { ContentModule } from './modules/content/content.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
 import { JobsModule } from './modules/jobs/jobs.module';
@@ -76,6 +77,7 @@ new Logger('AppModule').log(
     WholesaleModule, // F5: POST /api/v1/wholesale-leads (3/dk/IP) + /admin/wholesale-leads
     SubscriptionsModule, // F7: /api/v1/me/subscription* + /admin/subscriptions|cycles|ops/* (motor; SUBSCRIPTIONS_DEPS = SubscriptionsDepsAdapter → Pricing/Payments/Orders/Delivery) + POST /admin/subscriptions (manuel checkout)
     CheckoutModule, // F8: POST /checkout/quote (@Public) + POST /checkout ($transaction: doğrula → DD rezerv → Order [+ Subscription PENDING + cycle#1] → Payment → sağlayıcı init) + CheckoutCompletionService (ödeme sonucu → PAID/ACTIVE/kupon/e-posta; payments:reconcile)
+    DashboardModule, // F9: GET /api/v1/admin/dashboard (ekran 21 Özet) — türetilmiş metrikler, salt okuma
     JobsModule, // F7: cron kayıt defteri + CronLog + @Cron (yalnız scheduler instance) + GET/POST /admin/jobs (run {now?} yalnız geliştirme/test) · F8: payments:reconcile
     WebModule,
   ],

@@ -29,6 +29,31 @@ export const PAYMENT_METHOD_WITH_USER_INCLUDE = {
 } satisfies Prisma.PaymentMethodInclude;
 export type PaymentMethodWithUserRecord = Prisma.PaymentMethodGetPayload<{ include: typeof PAYMENT_METHOD_WITH_USER_INCLUDE }>;
 
+/** F9 ekran 18: sipariş kaynaklı tahsilat sorunu satırı (PAYMENT_FAILED). */
+export const PAYMENT_ISSUE_ORDER_INCLUDE = {
+  payments: { orderBy: { createdAt: 'desc' }, take: 5 },
+  user: { select: { id: true, email: true, paymentMethods: { where: { isActive: true, deletedAt: null }, select: { id: true }, take: 1 } } },
+  subscription: { select: { id: true, status: true, failedCycles: true } },
+} satisfies Prisma.OrderInclude;
+export type PaymentIssueOrderRecord = Prisma.OrderGetPayload<{ include: typeof PAYMENT_ISSUE_ORDER_INCLUDE }>;
+
+/** F9 ekran 18: cycle kaynaklı tahsilat sorunu satırı (UNPAID / AWAITING_PAYMENT). */
+export const PAYMENT_ISSUE_CYCLE_INCLUDE = {
+  deliveryDate: { select: { date: true, cutoffAt: true } },
+  order: { include: { payments: { orderBy: { createdAt: 'desc' }, take: 5 } } },
+  deltaOrder: { include: { payments: { orderBy: { createdAt: 'desc' }, take: 5 } } },
+  subscription: {
+    select: {
+      id: true,
+      status: true,
+      failedCycles: true,
+      paymentMethodId: true,
+      user: { select: { id: true, email: true, name: true, phone: true } },
+    },
+  },
+} satisfies Prisma.SubscriptionCycleInclude;
+export type PaymentIssueCycleRecord = Prisma.SubscriptionCycleGetPayload<{ include: typeof PAYMENT_ISSUE_CYCLE_INCLUDE }>;
+
 export type PaymentCreateData = Prisma.PaymentUncheckedCreateInput;
 export type PaymentUpdateData = Prisma.PaymentUncheckedUpdateInput;
 export type PaymentMethodCreateData = Prisma.PaymentMethodUncheckedCreateInput;
@@ -210,6 +235,38 @@ export class PaymentsRepository {
   async sumSucceededRefunds(paymentId: string, tx?: DbClient): Promise<Prisma.Decimal> {
     const agg = await (tx ?? this.prisma).refund.aggregate({ where: { paymentId, status: 'SUCCEEDED' }, _sum: { amount: true } });
     return agg._sum.amount ?? new Prisma.Decimal(0);
+  }
+
+  // ── F9: Ödeme problemleri (ekran 18) — birleşik liste kaynakları ──────────────────────────────────────────────────
+
+  /** PAYMENT_FAILED siparişler (silinmemiş) + son ödeme denemeleri + müşteri/abonelik bağı. */
+  findFailedOrders(where: Prisma.OrderWhereInput, skip: number, take: number, tx?: DbClient): Promise<PaymentIssueOrderRecord[]> {
+    return (tx ?? this.prisma).order.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      skip,
+      take,
+      include: PAYMENT_ISSUE_ORDER_INCLUDE,
+    });
+  }
+
+  countFailedOrders(where: Prisma.OrderWhereInput, tx?: DbClient): Promise<number> {
+    return (tx ?? this.prisma).order.count({ where });
+  }
+
+  /** UNPAID / AWAITING_PAYMENT cycle'lar + abonelik/müşteri/sipariş/ödeme bağları (dunning sayaçlarıyla). */
+  findProblemCycles(where: Prisma.SubscriptionCycleWhereInput, skip: number, take: number, tx?: DbClient): Promise<PaymentIssueCycleRecord[]> {
+    return (tx ?? this.prisma).subscriptionCycle.findMany({
+      where,
+      orderBy: [{ deliveryDate: { date: 'asc' } }, { id: 'asc' }],
+      skip,
+      take,
+      include: PAYMENT_ISSUE_CYCLE_INCLUDE,
+    });
+  }
+
+  countProblemCycles(where: Prisma.SubscriptionCycleWhereInput, tx?: DbClient): Promise<number> {
+    return (tx ?? this.prisma).subscriptionCycle.count({ where });
   }
 
   // ── WebhookEvent ──────────────────────────────────────────────────────────────────────────────────────────────────

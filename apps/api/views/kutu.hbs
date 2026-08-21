@@ -109,7 +109,9 @@
 (function () {
   const params = new URLSearchParams(window.location.search);
   const tierParam = params.get("tier");
-  if (tierParam && SUB_TIERS.some((t) => t.id === tierParam)) {
+  // F9 remote: CANLI abonelikte tier sunucudadır ve değiştirilemez (ADR-0008) — ?tier= yok sayılır,
+  // aksi hâlde sunucu DTO'su yerel taslağa kopyalanırdı.
+  if (tierParam && !BahcedenCart.remote.isLive() && SUB_TIERS.some((t) => t.id === tierParam)) {
     const current = BahcedenCart.subTier();
     if (!current || current.id !== tierParam) {
       BahcedenCart.subSetTier(tierParam);
@@ -150,11 +152,13 @@
   // Satın alınmış (aktif) abonelikte değişiklikler doğrudan kaydedilmez:
   // önce bu taslağa yazılır, sayfa taslaktan render edilir ve ancak alttaki
   // "değişiklikleri onayla" butonuyla aboneliğe işlenir. Satın alma
-  // öncesinde her şey eskisi gibi anında kaydedilir.
+  // öncesinde her şey eskisi gibi anında (yerel taslakta) kaydedilir.
+  // F9 remote: canlı modda onay API'ye gider (PATCH /me/subscription + PATCH …/cycles/current) ve
+  // sayfa yalnızca dönen `BootstrapSub` DTO'sundan yeniden çizilir — optimistic güncelleme yok.
   let draft = null;
   // Çıkış yapılmışsa abonelik arayüzde yok sayılır — sayfa misafir
   // görünümüne döner ("abone ol / sepete ekle"), giriş yapınca geri gelir.
-  function isLive() { return BahcedenCart.hasPurchasedSub(); }
+  function isLive() { return BahcedenCart.remote.isLive(); }
   function currentSub() {
     if (!isLive()) return BahcedenCart.getSub();
     if (!draft) draft = JSON.parse(JSON.stringify(BahcedenCart.getSub()));
@@ -166,6 +170,26 @@
   // "Değişiklikleri onayla"ya basıldıktan sonra alttaki not "kaydedildi"
   // teyidine döner; vazgeçilir ya da sayfa yeniden yüklenirse varsayılana.
   let changesSaved = false;
+  let liveBusy = false;   // F9 remote: API isteği sürüyor → düzenleme düğmeleri pasif
+  let liveError = "";     // son API hatası (Türkçe; api() hata haritasından)
+
+  // F9 remote: taslaktaki farkları uçlara böler — önce abonelik alanları (gün/sıklık; SCHEDULED cycle'lar
+  // yeniden üretilir), sonra kutu içeriği (swap/tercih/ekstra) o cycle'a uygulanır.
+  function liveApplySteps(next, saved) {
+    const steps = [];
+    const subPatch = {};
+    if (next.freq && next.freq !== saved.freq) subPatch.freq = next.freq;
+    if (next.deliveryDay && next.deliveryDay !== saved.deliveryDay) subPatch.deliveryDay = next.deliveryDay;
+    if (Object.keys(subPatch).length) steps.push(() => BahcedenCart.remote.patchSubscription(subPatch));
+    const cyclePatch = {};
+    if (JSON.stringify(next.items || []) !== JSON.stringify(saved.items || [])) cyclePatch.items = (next.items || []).slice();
+    if (JSON.stringify(next.itemPrefs || {}) !== JSON.stringify(saved.itemPrefs || {})) cyclePatch.itemPrefs = Object.assign({}, next.itemPrefs);
+    if (JSON.stringify(next.extras || []) !== JSON.stringify(saved.extras || [])) {
+      cyclePatch.extras = (next.extras || []).map((ex) => ({ id: ex.id, factor: ex.factor, label: ex.label || "" }));
+    }
+    if (Object.keys(cyclePatch).length) steps.push(() => BahcedenCart.remote.patchCycle(cyclePatch));
+    return steps;
+  }
 
   // The "kutuna ekstra ekle" section: a product + amount picker on top,
   // then one row per extra already added to this order. Unlimited adds —
@@ -238,6 +262,7 @@
     refreshAmountOptions();
 
     document.getElementById("extraAddBtn").addEventListener("click", () => {
+      if (liveBusy) return; // F9 remote: kaydetme sürerken ekstra eklenmez
       const p = pickedProduct();
       const opt = BahcedenCart.subExtraOptions(p)[parseInt(extraAmountSel.value, 10) || 0];
       if (!p || !opt) return;
@@ -251,6 +276,7 @@
     });
     boxExtrasEl.querySelectorAll("[data-extra-idx]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (liveBusy) return; // F9 remote: kaydetme sürerken ekstra kaldırılmaz
         const idx = parseInt(btn.getAttribute("data-extra-idx"), 10);
         if (isLive()) {
           const s = currentSub();
@@ -321,8 +347,12 @@
     tierDescEl.textContent = "Şu an en iyi olan " + tier.count + " ürünü, senin için tattığımız haliyle kapına getiriyoruz.";
     tierPriceEl.innerHTML = tier.price + ' TL <span class="unit">/ kutu</span>';
 
+    // F9 remote: CANLI modda sipariş türü (abonelik ↔ tek seferlik) ve tier değiştirilemez (ADR-0008:
+    // "canlı modda tier/type değişimi yok — UI butonları disabled"). Değişim yalnız yeni siparişle olur.
     typeButtons.forEach((btn) => {
       btn.classList.toggle("active", btn.getAttribute("data-type") === sub.type);
+      btn.disabled = isLive();
+      btn.title = isLive() ? "Aktif siparişinde tür değiştirilemez — yeni bir kutu oluşturabilirsin." : "";
     });
 
     const fresh = BahcedenCart.freshProducts();
@@ -339,6 +369,7 @@
     ).join("");
     freqToggle.querySelectorAll(".toggle").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (liveBusy) return; // F9 remote: kaydetme sürerken sıklık değişmez
         if (isLive()) {
           currentSub().freq = btn.getAttribute("data-freq");
         } else {
@@ -362,6 +393,7 @@
     }).join("");
     deliveryDayToggle.querySelectorAll(".toggle:not([disabled])").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (liveBusy) return; // F9 remote: kaydetme sürerken gün değişmez
         if (isLive()) {
           currentSub().deliveryDay = btn.getAttribute("data-day");
         } else {
@@ -463,33 +495,55 @@
     // "değişiklikleri onayla"ya basılınca aboneliğe kaydedilir. Çıkış
     // yapılmışsa buraya girilmez: misafir "abone ol / sepete ekle" görür.
     if (isLive()) {
+      // F9 remote: kesimi geçmiş (düzenlenemez) cycle'da kutu içeriği kilitlidir — sunucu 409 CYCLE_LOCKED verir,
+      // arayüz bunu önceden söyler (currentCycle yok ya da locked).
+      const liveCycle = BahcedenCart.getSub().currentCycle || null;
+      const liveEditable = !!liveCycle && !liveCycle.locked;
+      const errorNote = liveError ? '<p class="box-live-note mono">' + liveError + "</p>" : "";
       if (hasPendingChanges()) {
         boxEditorFoot.innerHTML =
-          '<button class="cta wide" id="applyChangesBtn" type="button">değişiklikleri onayla</button>' +
-          '<button class="btn" id="discardChangesBtn" type="button">vazgeç</button>';
+          errorNote +
+          '<button class="cta wide" id="applyChangesBtn" type="button"' + (liveBusy ? " disabled" : "") + ">değişiklikleri onayla</button>" +
+          '<button class="btn" id="discardChangesBtn" type="button"' + (liveBusy ? " disabled" : "") + ">vazgeç</button>" +
+          (liveBusy ? '<p class="box-live-note mono">Kaydediliyor…</p>' : "");
         document.getElementById("applyChangesBtn").addEventListener("click", () => {
-          BahcedenCart.setSub(draft);
-          // Onaylanan ekstralar bu haftanın siparişine ait — kesim damgası
-          // burada vurulur ki hafta dönünce otomatik temizlensinler.
+          if (liveBusy) return;
+          const next = draft;
           const saved = BahcedenCart.getSub();
-          if ((saved.extras || []).length) {
-            saved.extrasCutoff = BahcedenCart.nextCutoff().getTime();
-            BahcedenCart.setSub(saved);
-          }
-          draft = null;
-          changesSaved = true;
+          const steps = liveApplySteps(next, saved);
+          if (!steps.length) { draft = null; renderEditor(); return; }
+          liveBusy = true;
+          liveError = "";
           renderEditor();
+          steps.reduce((p, step) => p.then(step), Promise.resolve()).then(
+            () => {
+              // Sunucu yanıtı bootstrap `sub`'a yazıldı; taslak düşer, sayfa DTO'dan yeniden çizilir.
+              liveBusy = false;
+              draft = null;
+              changesSaved = true;
+              renderEditor();
+            },
+            (err) => {
+              liveBusy = false;
+              liveError = (err && err.message) || "Değişikliklerin kaydedilemedi — tekrar dene.";
+              renderEditor();
+            },
+          );
         });
         document.getElementById("discardChangesBtn").addEventListener("click", () => {
+          if (liveBusy) return;
           draft = null;
           changesSaved = false;
+          liveError = "";
           renderEditor();
         });
       } else {
         // Değişiklik yokken sessiz kalır — yalnızca onay sonrasında
         // "kaydedildi" teyidi gösterilir.
         boxEditorFoot.innerHTML =
+          errorNote +
           (changesSaved ? '<p class="box-live-note mono">Aboneliğin aktif — değişikliklerin kaydedildi.</p>' : "") +
+          (liveEditable ? "" : '<p class="box-live-note mono">Bu haftanın değişiklik süresi doldu — düzenlemelerin bir sonraki kutuna işlenir.</p>') +
           '<a class="btn" href="uyelik.html">aboneliğine dön</a>';
       }
     // Once added (subscription or one-time), stay on the page — the button
@@ -527,16 +581,14 @@
 
   typeButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (isLive()) {
-        currentSub().type = btn.getAttribute("data-type");
-      } else {
-        BahcedenCart.subSetType(btn.getAttribute("data-type"));
-      }
+      if (isLive()) return; // ADR-0008: canlı modda tür değişimi yok (düğme zaten disabled)
+      BahcedenCart.subSetType(btn.getAttribute("data-type"));
       renderEditor();
     });
   });
 
   boxItemsEl.addEventListener("click", (e) => {
+    if (liveBusy) return; // F9 remote: kaydetme sürerken içerik değişmez
     const btn = e.target.closest(".toggle");
     if (!btn) return;
     const wrap = btn.closest(".box-item-pref");
@@ -553,6 +605,7 @@
   });
 
   boxItemsEl.addEventListener("change", (e) => {
+    if (liveBusy) return; // F9 remote: kaydetme sürerken değiştokuş yapılmaz
     const sel = e.target.closest(".swap-select");
     if (!sel) return;
     if (isLive()) {

@@ -1,7 +1,9 @@
 import {
+  CYCLE_FULFILLABLE_STATES,
   CYCLE_IN_FLIGHT_STATES,
   deliveryDayToSlug,
   freqIdFromWeeks,
+  roundMoney,
   utcToIsoDate,
   type AdminCycleListItem,
   type BootstrapSub,
@@ -13,8 +15,11 @@ import {
   type CycleItemSource,
   type CycleStatus,
   type DeliveryDay,
+  type IsoDate,
   type Money,
+  type OpsDaySummary,
   type PackingListEntry,
+  type PackingListItem,
   type PickListRow,
   type SkipSource,
   type SubEventType,
@@ -31,6 +36,7 @@ import type {
   CycleItemRecord,
   CycleRecord,
   CycleWithSubRecord,
+  DeliveryDateWithZoneRecord,
   EventRecord,
   SubscriptionRecord,
 } from './subscriptions.repository';
@@ -325,6 +331,8 @@ export function toBootstrapSub(input: BootstrapSubInput): BootstrapSub {
 
 export function buildPickList(cycles: readonly CycleWithSubRecord[]): PickListRow[] {
   const rows = new Map<string, PickListRow>();
+  /** Satır anahtarı → tercih → {qty,count} (PickListRow.prefs sonda diziye çevrilir). */
+  const prefs = new Map<string, Map<string, { qty: number; count: number }>>();
   for (const cycle of cycles) {
     for (const item of cycle.items) {
       const key = `${item.productId}|${item.lotCode ?? item.lot?.lotCode ?? ''}`;
@@ -339,20 +347,60 @@ export function buildPickList(cycles: readonly CycleWithSubRecord[]): PickListRo
           totalQty: 0,
           boxCount: 0,
           extraCount: 0,
+          boxQty: 0,
+          extraQty: 0,
+          labels: [],
+          prefs: [],
         } satisfies PickListRow);
-      row.totalQty = Math.round((row.totalQty + Number(item.qty.toString())) * 1000) / 1000;
-      if (isBoxItem(item)) row.boxCount += 1;
-      else row.extraCount += 1;
+      const qty = Number(item.qty.toString());
+      row.totalQty = round3(row.totalQty + qty);
+      if (isBoxItem(item)) {
+        row.boxCount += 1;
+        row.boxQty = round3(row.boxQty + qty);
+      } else {
+        row.extraCount += 1;
+        row.extraQty = round3(row.extraQty + qty);
+      }
+      const label = item.label ?? item.product.boxAmount ?? null;
+      if (label && !row.labels.includes(label)) row.labels.push(label);
+      if (item.pref) {
+        const byPref = prefs.get(key) ?? new Map<string, { qty: number; count: number }>();
+        const hit = byPref.get(item.pref) ?? { qty: 0, count: 0 };
+        hit.qty = round3(hit.qty + qty);
+        hit.count += 1;
+        byPref.set(item.pref, hit);
+        prefs.set(key, byPref);
+      }
       rows.set(key, row);
     }
   }
+  for (const [key, row] of rows) {
+    const byPref = prefs.get(key);
+    if (byPref) row.prefs = [...byPref.entries()].map(([pref, v]) => ({ pref, qty: v.qty, count: v.count })).sort((a, b) => a.pref.localeCompare(b.pref, 'tr'));
+  }
   return [...rows.values()].sort((a, b) => a.productName.localeCompare(b.productName, 'tr'));
+}
+
+/** Decimal(8,3) toplamlarında kayan nokta artığını temizler. */
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
 }
 
 export function buildPackingList(cycles: readonly CycleWithSubRecord[], curatorByTier: ReadonlyMap<string, string | null>): PackingListEntry[] {
   return cycles.map((cycle) => {
     const sub = cycle.subscription;
-    const snapshot = (cycle.order?.addressSnapshot as { fullName?: string; phone?: string; line?: string; zoneName?: string } | null) ?? null;
+    const snapshot = (cycle.order?.addressSnapshot as { fullName?: string; phone?: string; line?: string; zoneName?: string; zip?: string | null } | null) ?? null;
+    const items: PackingListItem[] = cycle.items.map((i) => ({
+      productId: i.productId,
+      productSlug: i.product.slug,
+      name: i.product.name,
+      label: i.label ?? i.product.boxAmount ?? null,
+      pref: i.pref,
+      source: i.source as CycleItemSource,
+      lotCode: i.lotCode ?? i.lot?.lotCode ?? null,
+      qty: Number(i.qty.toString()),
+      unit: i.unit ?? i.product.unit,
+    }));
     return {
       cycleId: cycle.id,
       subscriptionId: sub.id,
@@ -365,14 +413,117 @@ export function buildPackingList(cycles: readonly CycleWithSubRecord[], curatorB
       tierLabel: sub.tier.label,
       curatorName: curatorByTier.get(sub.tierId) ?? null,
       status: cycle.status as CycleStatus,
-      items: cycle.items.map((i) => ({
-        name: i.product.name,
-        label: i.label ?? i.product.boxAmount ?? null,
-        pref: i.pref,
-        source: i.source as CycleItemSource,
-        lotCode: i.lotCode ?? i.lot?.lotCode ?? null,
-      })),
+      items,
       note: cycle.order?.note ?? null,
+      // F9 ekleri (ekran 20)
+      cycleNo: cycle.cycleNo,
+      isOneTime: sub.isOneTime,
+      deliveryOn: utcToIsoDate(cycle.deliveryDate.date),
+      deliveryDay: deliveryDayToSlug(cycle.deliveryDate.day as DeliveryDay),
+      zoneSlug: sub.zone.slug,
+      customerEmail: cycle.order?.customerEmail ?? sub.user.email,
+      addressZip: snapshot?.zip ?? sub.address?.zip ?? null,
+      itemPrefs: (sub.itemPrefs as Record<string, string> | null) ?? {},
+      orderStatus: cycle.order?.status ?? null,
+      adminNote: cycle.order?.adminNote ?? null,
+      total: moneyOrNull(cycle.total),
+      boxItemCount: items.filter((i) => (BOX_SOURCES as readonly string[]).includes(i.source)).length,
+      extraItemCount: items.filter((i) => (EXTRA_SOURCES as readonly string[]).includes(i.source)).length,
     };
   });
+}
+
+// ── Ops gün özeti (F9 ekran 20/21) ────────────────────────────────────────────
+
+/** `buildDaySummary` girdisi — servis DB'den toplar, mapper yalnız sayar (saf fonksiyon: TZ'siz, `now` dışarıdan). */
+export interface DaySummaryInput {
+  date: IsoDate;
+  zoneSlug: string | null;
+  now: Date;
+  cycles: readonly CycleWithSubRecord[];
+  deliveryDates: readonly DeliveryDateWithZoneRecord[];
+  standaloneOrders: ReadonlyArray<{ id: string; grandTotal: Prisma.Decimal; zoneId: string | null }>;
+}
+
+/**
+ * Günün ops özeti: cycle durum dağılımı, teslimata girecek kutular (tier kırılımı + satır sayıları), ciro,
+ * bölge bazlı kapasite/kesim durumu ve abonelik dışı sipariş sayısı. Ciro cycle'ın ana + delta siparişinden.
+ */
+export function buildDaySummary(input: DaySummaryInput): OpsDaySummary {
+  const { cycles, deliveryDates, standaloneOrders, now } = input;
+  const fulfillable = (status: string): boolean => (CYCLE_FULFILLABLE_STATES as readonly string[]).includes(status);
+
+  const cycleCountsByStatus: Partial<Record<CycleStatus, number>> = {};
+  const byTier = new Map<string, { tierSlug: string; tierLabel: string; count: number }>();
+  const cycleCountByZone = new Map<string, { total: number; fulfillable: number }>();
+  let fulfillableCount = 0;
+  let deliveredCount = 0;
+  let skippedCount = 0;
+  let unpaidCount = 0;
+  let awaitingPaymentCount = 0;
+  let boxItemCount = 0;
+  let extraItemCount = 0;
+  let revenue = 0;
+
+  for (const cycle of cycles) {
+    const status = cycle.status as CycleStatus;
+    cycleCountsByStatus[status] = (cycleCountsByStatus[status] ?? 0) + 1;
+    const zoneKey = cycle.subscription.zoneId;
+    const zoneHit = cycleCountByZone.get(zoneKey) ?? { total: 0, fulfillable: 0 };
+    zoneHit.total += 1;
+    if (status === 'DELIVERED') deliveredCount += 1;
+    if (status === 'SKIPPED') skippedCount += 1;
+    if (status === 'UNPAID') unpaidCount += 1;
+    if (status === 'AWAITING_PAYMENT') awaitingPaymentCount += 1;
+    if (fulfillable(status)) {
+      fulfillableCount += 1;
+      zoneHit.fulfillable += 1;
+      const tier = byTier.get(cycle.subscription.tierId) ?? { tierSlug: cycle.subscription.tier.slug, tierLabel: cycle.subscription.tier.label, count: 0 };
+      tier.count += 1;
+      byTier.set(cycle.subscription.tierId, tier);
+      for (const item of cycle.items) {
+        if (isBoxItem(item)) boxItemCount += 1;
+        else extraItemCount += 1;
+      }
+      revenue += money(cycle.order?.grandTotal ?? 0) + money(cycle.deltaOrder?.grandTotal ?? 0);
+    }
+    cycleCountByZone.set(zoneKey, zoneHit);
+  }
+
+  const zones = deliveryDates.map((dd) => {
+    const counts = cycleCountByZone.get(dd.zoneId) ?? { total: 0, fulfillable: 0 };
+    return {
+      zoneId: dd.zoneId,
+      zoneSlug: dd.zone.slug,
+      zoneName: dd.zone.name,
+      deliveryDateId: dd.id,
+      cutoffAtIso: dd.cutoffAt.toISOString(),
+      locked: dd.cutoffAt.getTime() <= now.getTime() || dd.status !== 'OPEN',
+      status: dd.status as string,
+      capacity: dd.capacity,
+      reserved: dd.reserved,
+      cycleCount: counts.total,
+      fulfillableCount: counts.fulfillable,
+    };
+  });
+
+  return {
+    date: input.date,
+    zone: input.zoneSlug,
+    serverNowIso: now.toISOString(),
+    cycleCountsByStatus,
+    cycleCount: cycles.length,
+    fulfillableCount,
+    deliveredCount,
+    skippedCount,
+    unpaidCount,
+    awaitingPaymentCount,
+    boxCountByTier: [...byTier.values()].sort((a, b) => a.tierSlug.localeCompare(b.tierSlug, 'tr')),
+    boxItemCount,
+    extraItemCount,
+    revenue: roundMoney(revenue),
+    standaloneOrderCount: standaloneOrders.length,
+    standaloneOrderRevenue: roundMoney(standaloneOrders.reduce((sum, o) => sum + money(o.grandTotal), 0)),
+    zones,
+  };
 }

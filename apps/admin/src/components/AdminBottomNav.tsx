@@ -37,7 +37,7 @@ export function AdminBottomNav({ onOpenDrawer, activeDrawer }: Props) {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden print:hidden"
       aria-label="Alt menü"
     >
       <div className="grid h-14 grid-cols-6">

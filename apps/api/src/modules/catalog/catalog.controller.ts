@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query, Req, Res } from '@nestjs/common';
 import type { BootstrapPayload, BoxTemplate, BoxTier, Producer, Product } from '@bagdam/shared';
 import type { Request, Response } from 'express';
+import type { SessionUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { CatalogService } from './catalog.service';
 import { SlugParamDto } from './dto/slug-param.dto';
@@ -13,7 +14,7 @@ const CACHE_PRIVATE = 'private, no-store';
 /** Oturum çerezi (ADR-0009: access_token path=/). */
 const SESSION_COOKIE = 'access_token';
 
-type RequestWithCookies = Request & { cookies?: Record<string, unknown> };
+type RequestWithCookies = Request & { cookies?: Record<string, unknown>; user?: SessionUser };
 
 /**
  * CatalogController — public katalog uçları (BACKEND-PLANI §3 catalog satırı), önek /api/v1:
@@ -27,14 +28,18 @@ export class CatalogController {
 
   /**
    * `window.__BAGDAM__` yükü (products.js şekli). Anonimde `Cache-Control: public, max-age=60`;
-   * oturum çerezi varsa `private, no-store` (me/sub F6'da JwtAuth ile dolacak — şimdilik null).
+   * oturum çerezi varsa `private, no-store`. `me` geçerli çerezden (JwtAuthGuard @Public uçta da `req.user`'ı doldurur).
+   * `serverNow` her yanıtta tazedir [B49]. `sub` bu uçta null'dır: sayfaların gömülü bootstrap'ında (WebController)
+   * dolar; REST istemcisi aboneliği `GET /me/subscription` ile alır (aynı DTO) — katalog modülü abonelik motoruna
+   * bağımlı değildir (ADR-0002 modül sınırı).
    */
   @Public()
   @Get('bootstrap')
   async bootstrap(@Req() req: RequestWithCookies, @Res({ passthrough: true }) res: Response): Promise<BootstrapPayload> {
     const hasSession = Boolean(req.cookies?.[SESSION_COOKIE]);
     res.setHeader('Cache-Control', hasSession ? CACHE_PRIVATE : CACHE_ANONYMOUS);
-    return this.catalog.getBootstrap();
+    const user = req.user;
+    return this.catalog.getBootstrap({ me: user ? { loggedIn: true, id: user.id, email: user.email, name: user.name } : null });
   }
 
   @Public()

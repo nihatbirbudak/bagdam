@@ -3,7 +3,7 @@
 // ADR-0019 (PayTR birincil; iyzico P2), docs/state-machines.md §4 (Payment) ve §8 adım 6. Burada yalnız saf tipler;
 // Order/Payment/Refund/WebhookEvent DTO'ları `types/order.ts` içindedir (tekrar tanımlanmaz). PayTR adaptörü (F8) aynı tipleri doldurur.
 import type { ChargeStrategy, PaymentProvider, PaymentStatus, WebhookStatus } from '../enums';
-import type { Id, IsoDateTime } from './common';
+import type { Id, IsoDate, IsoDateTime } from './common';
 import type { Money } from './pricing';
 
 /**
@@ -163,3 +163,64 @@ export interface ProviderPaymentLink {
 
 /** Sağlayıcı özelliği kapalı/onaysız (ör. PayTR kayıtlı kart onayı yok) — 503 zarfı `error` kodu. */
 export const PROVIDER_FEATURE_DISABLED = 'PROVIDER_FEATURE_DISABLED';
+
+// ── F9 ekleri (ekran 18 "Ödeme Problemleri") — yalnız EKLEME ──────────────────────────────────────────────────
+// Birleşik liste: PAYMENT_FAILED siparişler + UNPAID / AWAITING_PAYMENT abonelik cycle'ları.
+// Eylemler ayrı uçlarda: POST /admin/cycles/:id/charge · POST /admin/cycles/:id/send-payment-link ·
+// PATCH /admin/orders/:id/status · POST /admin/orders/:id/notes (müşteriye not).
+
+export const PAYMENT_ISSUE_KINDS = ['ORDER', 'CYCLE'] as const;
+export type PaymentIssueKind = (typeof PAYMENT_ISSUE_KINDS)[number];
+
+/** `GET /admin/payment-issues` satırı — sipariş ya da cycle kaynaklı tek bir tahsilat sorunu. */
+export interface PaymentIssueItem {
+  kind: PaymentIssueKind;
+  /** Satır kimliği: ORDER → orderId, CYCLE → cycleId. */
+  id: Id;
+  orderId: Id | null;
+  orderNo: number | null;
+  cycleId: Id | null;
+  cycleNo: number | null;
+  subscriptionId: Id | null;
+  /** OrderStatus (ORDER) ya da CycleStatus (CYCLE). */
+  status: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  /** Tahsil edilemeyen tutar (sipariş grandTotal'ı). */
+  amount: Money;
+  deliveryOn: IsoDate | null;
+  /** Dunning: kaçıncı deneme ve sıradaki deneme anı (cycle satırlarında). */
+  retryCount: number;
+  nextRetryAtIso: IsoDateTime | null;
+  /** PAYMENT_LINK: linkin son geçerlilik anı. */
+  paymentDueAtIso: IsoDateTime | null;
+  /** Açık ödeme linki (varsa) — "ödeme linki gönder" sonrası dolar. */
+  paymentLinkUrl: string | null;
+  /** Son başarısız denemenin sağlayıcı kodu/mesajı. */
+  lastFailureCode: string | null;
+  lastFailureMessage: string | null;
+  lastAttemptAtIso: IsoDateTime | null;
+  /** Saklı kart var mı (yeniden çekim mümkün mü). */
+  hasCard: boolean;
+  /** Abonelik PAST_DUE bayrağı. */
+  subscriptionStatus: string | null;
+  failedCycles: number;
+  createdAtIso: IsoDateTime;
+}
+
+export interface PaymentIssueCounts {
+  failedOrders: number;
+  unpaidCycles: number;
+  awaitingPaymentCycles: number;
+  total: number;
+}
+
+/** `GET /admin/payment-issues?kind=&q=&page=&limit=` yanıtı. */
+export interface PaymentIssueList {
+  items: PaymentIssueItem[];
+  total: number;
+  page: number;
+  limit: number;
+  counts: PaymentIssueCounts;
+}

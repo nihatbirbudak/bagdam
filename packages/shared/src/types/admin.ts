@@ -378,3 +378,65 @@ export interface AdminMediaPatch {
   alt?: string | null;
   folder?: string;
 }
+
+// ── F9 ekleri (ekran 21 "Özet" — `GET /admin/dashboard`) — yalnız EKLEME ──────────────────────────────────────
+// Türetilmiş metrikler; tek uçtan (DashboardModule). Tüm anlar mutlak ISO, takvim günleri Europe/Istanbul.
+
+export interface AdminDashboardOrders {
+  todayCount: number;
+  todayRevenue: Money;
+  weekCount: number;
+  weekRevenue: Money;
+  /** Ödemesi bekleyen (PENDING_PAYMENT) sipariş sayısı. */
+  pendingPaymentCount: number;
+  /** Bugün teslim edilecek sipariş sayısı (deliveryOn = bugün, ödemesi alınmış). */
+  deliveringTodayCount: number;
+}
+
+export interface AdminDashboardSubscriptions {
+  active: number;
+  pastDue: number;
+  cancelRequested: number;
+  pending: number;
+  /** Aktif tek seferlik kutular (isOneTime). */
+  oneTimeActive: number;
+  /** Bu hafta başlayan abonelikler. */
+  newThisWeek: number;
+}
+
+/** Bu haftanın (ve varsa bugünden sonraki) teslimat günü + kesim durumu satırı. */
+export interface AdminDashboardCutoff {
+  date: IsoDate;
+  zoneSlug: string;
+  zoneName: string;
+  cutoffAtIso: IsoDateTime;
+  locked: boolean;
+  status: string;
+  capacity: number;
+  reserved: number;
+  cycleCount: number;
+}
+
+export interface AdminDashboardEvent {
+  id: Id;
+  type: string;
+  actor: string;
+  subscriptionId: Id;
+  cycleId: Id | null;
+  userEmail: string | null;
+  createdAt: IsoDateTime;
+}
+
+/** `GET /admin/dashboard` — ekran 21 özet metrikleri. */
+export interface AdminDashboard {
+  serverNowIso: IsoDateTime;
+  today: IsoDate;
+  weekStart: IsoDate;
+  orders: AdminDashboardOrders;
+  subscriptions: AdminDashboardSubscriptions;
+  /** Bu haftanın kesim/kapasite durumu (bölge × teslimat günü), tarihe göre sıralı. */
+  cutoffs: AdminDashboardCutoff[];
+  paymentIssues: { failedOrders: number; unpaidCycles: number; awaitingPaymentCycles: number; total: number };
+  /** Son abonelik olayları (en yeni önce). */
+  recentEvents: AdminDashboardEvent[];
+}

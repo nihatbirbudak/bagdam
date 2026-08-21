@@ -136,3 +136,35 @@
   .rich-text-content table { border-collapse: collapse; margin: 0.6em 0; }
   .rich-text-content td, .rich-text-content th { border: 1px solid var(--color-brand-300); padding: 0.25em 0.5em; }
 }
+
+/*
+ * Yazdırma (ekran 20 Teslimat Günü — toplama / paketleme listeleri).
+ * Panel kabuğu (üst çubuk, yan menü, alt çubuk, toast) `print:hidden` ile gizlenir; burada sayfa düzeni,
+ * beyaz zemin, siyah metin ve tablo kenarlıkları tanımlanır. `.print-only` yalnız çıktıda görünür,
+ * `.no-print` yalnız ekranda kalır, `.print-sheet` her fişi yeni sayfaya taşır.
+ */
+.print-only { display: none; }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+
+  html, body { background: #fff !important; }
+  body { color: #000; font-size: 11pt; }
+
+  .print-only { display: block; }
+  .no-print { display: none !important; }
+
+  /* Kaydırma kapsayıcıları çıktıda kesilmesin */
+  .overflow-x-auto, .overflow-y-auto, .overflow-hidden { overflow: visible !important; max-height: none !important; }
+
+  /* Sade liste: gölge/yuvarlak köşe yok, ince kenarlık var */
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  .admin-table th, .admin-table td { border: 1px solid #999 !important; padding: 4px 6px !important; color: #000 !important; background: #fff !important; }
+  .admin-table thead { display: table-header-group; }
+  .admin-table tr { page-break-inside: avoid; }
+
+  .print-sheet { page-break-after: always; break-after: page; border: 1px solid #999; padding: 8mm; }
+  .print-sheet:last-child { page-break-after: auto; break-after: auto; }
+
+  a { color: #000 !important; text-decoration: none !important; }
+}

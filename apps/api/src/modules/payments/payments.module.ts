@@ -4,6 +4,8 @@ import { OrdersModule } from '../orders/orders.module';
 import { SettingsModule } from '../settings/settings.module';
 import { ChargeStrategyResolver, MerchantInitiatedCharge, PaymentLinkCharge } from './charge/charge-strategy';
 import { PayController } from './pay.controller';
+import { PaymentIssuesController } from './payment-issues.controller';
+import { PaymentIssuesService } from './payment-issues.service';
 import { PaymentsAdminController } from './payments-admin.controller';
 import { PaymentsAdminService } from './payments-admin.service';
 import { PaymentsRepository } from './payments.repository';
@@ -28,13 +30,15 @@ import { PaymentSettlementService } from './settlement/payment-settlement.servic
  *    → PaymentMethod upsert — VARSAYILAN PaymentOutcomeListener (B CheckoutCompletionService kayıt olunca devralır)
  *  - `PaytrCallbackController/Service`: `POST /api/v1/payments/paytr/callback` (@Public @SkipCsrf; IP allowlist + hash + WebhookEvent idempotency)
  *  - `PayController`: public `GET /api/v1/pay/:linkToken` (JSON; PayTR link/iframe sayfası B/C)
+ *  - `PaymentIssuesController/Service` (F9/C): `GET /api/v1/admin/payment-issues` (ekran 18) — PAYMENT_FAILED siparişler +
+ *    UNPAID/AWAITING_PAYMENT cycle'lar tek listede (salt okuma; eylemler cycles/orders uçlarında)
  *  - `PaymentsAdminController/Service` (F8/E): `POST /api/v1/admin/payments/:id/refund` (ADMIN) → PaymentsService.refund + tam iadede Order REFUNDED
  * Bağımlılıklar: OrdersModule (Order geçişleri; PAID → kupon + order.paid e-postası orada). SubscriptionsModule bu modülü import eder → abonelik servisleri
  * settlement'ta ModuleRef ile tembel çözülür (döngü yok). CacheModule @Global (AppModule) → SettingsService; testlerde register.
  */
 @Module({
   imports: [PrismaModule, SettingsModule, OrdersModule],
-  controllers: [PayController, PaytrCallbackController, PaymentsAdminController],
+  controllers: [PayController, PaytrCallbackController, PaymentsAdminController, PaymentIssuesController],
   providers: [
     PaymentsRepository,
     ManualProvider,
@@ -44,6 +48,7 @@ import { PaymentSettlementService } from './settlement/payment-settlement.servic
     PaymentProviderFactory,
     PaymentsService,
     PaymentsAdminService,
+    PaymentIssuesService,
     PaymentSettlementService,
     PaytrCallbackService,
     MerchantInitiatedCharge,
@@ -63,6 +68,7 @@ import { PaymentSettlementService } from './settlement/payment-settlement.servic
     PaymentLinkCharge,
     ChargeStrategyResolver,
     PaymentsRepository,
+    PaymentIssuesService,
   ],
 })
 export class PaymentsModule {}

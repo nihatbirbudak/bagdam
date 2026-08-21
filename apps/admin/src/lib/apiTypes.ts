@@ -550,3 +550,133 @@ export interface AdminCouponDetail extends Coupon {
 }
 
 // `AdminRefundResult` (POST /admin/payments/:id/refund yanıtı) artık shared'dan: ok/refund/payment/refundedTotal + orderStatus/orderTransitioned (F8/E).
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * F9 sözleşmesi — ops/abonelik ekranları (14b Teslimat tarihleri · 18 Ödeme Problemleri · 19 Abonelikler ·
+ * 20 Teslimat Günü · 21 Özet). DTO'ların TAMAMI `@bagdam/shared`'dan gelir; burada yalnız yeniden dışa
+ * aktarım ve panelin kendi sorgu/gövde takma adları vardır.
+ *
+ * Uçlar (apps/api kaynağından okundu — imzalar birebir):
+ *   GET   /admin/delivery/dates?zone&from&to            → DeliveryDateAdmin[]
+ *   PATCH /admin/delivery/dates/:id {capacity?,status?} → DeliveryDateAdmin
+ *   POST  /admin/delivery/dates/generate {weeks?}       → DeliveryDatesGenerateResult
+ *   GET   /admin/subscriptions?status&q&page&limit      → SubscriptionList
+ *   GET   /admin/subscriptions/:id                      → Subscription (+cycles +cancellations +events)
+ *   PATCH /admin/subscriptions/:id                      → Subscription
+ *   GET   /admin/cycles?date&status&zone                → AdminCycleListItem[]
+ *   PATCH /admin/cycles/:id/status {status,note?}       → SubscriptionCycle
+ *   POST  /admin/cycles/:id/charge                      → SubscriptionCycle
+ *   POST  /admin/cycles/:id/send-payment-link           → {cycle, linkToken, linkExpiresAt}
+ *   POST  /admin/cycles/:id/compensate {productId,qty?,label?,note} → SubscriptionCycle
+ *   GET   /admin/ops/pick-list?date&zone                → PickListRow[]
+ *   GET   /admin/ops/packing-list?date&zone             → PackingListEntry[]
+ *   GET   /admin/ops/day-summary?date&zone              → OpsDaySummary
+ *   POST  /admin/ops/bulk-status                        → OpsBulkStatusResult
+ *   GET   /admin/payment-issues?kind&q&page&limit       → PaymentIssueList
+ *   GET   /admin/dashboard                              → AdminDashboard
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+export type {
+  AdminCycleListItem,
+  AdminDashboard,
+  AdminDashboardCutoff,
+  AdminDashboardEvent,
+  AdminDashboardOrders,
+  AdminDashboardSubscriptions,
+  CycleItem,
+  DeliveryDateAdmin,
+  DeliveryDatesGenerateResult,
+  OpsBulkStatus,
+  OpsBulkStatusItemResult,
+  OpsBulkStatusRequest,
+  OpsBulkStatusResult,
+  OpsDaySummary,
+  OpsDaySummaryZone,
+  PackingListEntry,
+  PackingListItem,
+  PaymentIssueCounts,
+  PaymentIssueItem,
+  PaymentIssueKind,
+  PaymentIssueList,
+  PickListPref,
+  PickListRow,
+  Subscription,
+  SubscriptionCancellation,
+  SubscriptionCycle,
+  SubscriptionEvent,
+  SubscriptionList,
+  SubscriptionListItem,
+} from '@bagdam/shared';
+
+import type { ChargeStrategy, CycleStatus, DeliveryDay, SubscriptionStatus } from '@bagdam/shared';
+
+/* ── Ekran 14b — Ayarlar › Teslimat tarihleri ─────────────────────────────── */
+
+/** `GET /admin/delivery/dates` sorgusu (bölge + hafta aralığı). */
+export interface AdminDeliveryDatesQuery {
+  zone?: string;
+  from?: string;
+  to?: string;
+}
+
+/* ── Ekran 19 — Abonelikler ───────────────────────────────────────────────── */
+
+/** `GET /admin/subscriptions?status&q&page&limit` (AdminSubscriptionsQueryDto ile birebir). */
+export interface AdminSubscriptionsQuery {
+  status?: SubscriptionStatus | '';
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** `PATCH /admin/subscriptions/:id` (AdminSubscriptionPatchDto ile birebir; tier/type değişimi YOK — ADR-0008). */
+export interface AdminSubscriptionPatchBody {
+  status?: SubscriptionStatus;
+  frequencyWeeks?: number;
+  deliveryDay?: DeliveryDay;
+  addressId?: string;
+  paymentMethodId?: string | null;
+  chargeStrategy?: ChargeStrategy;
+  note?: string;
+}
+
+/** `GET /admin/cycles?date&status&zone` sorgusu; `status` virgüllü liste. */
+export interface AdminCyclesQuery {
+  date: string;
+  status?: string;
+  zone?: string;
+}
+
+/** `POST /admin/cycles/:id/compensate` gövdesi — 0 TL EXTRA satırı [B19]. */
+export interface AdminCycleCompensateBody {
+  productId: string;
+  qty?: number;
+  label?: string;
+  note: string;
+}
+
+/** `POST /admin/cycles/:id/send-payment-link` yanıtı. */
+export interface AdminPaymentLinkResult {
+  cycle: { id: string; cycleNo: number; status: CycleStatus | string; paymentDueAt: string | null };
+  linkToken: string;
+  linkExpiresAt: string;
+}
+
+/* ── Ekran 18 — Ödeme Problemleri ─────────────────────────────────────────── */
+
+/** `GET /admin/payment-issues?kind&q&page&limit` sorgusu (PaymentIssuesQueryDto ile birebir). */
+export interface AdminPaymentIssuesQuery {
+  kind?: 'ORDER' | 'CYCLE' | '';
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+/* ── Ekran 20 — Teslimat Günü (ops) ───────────────────────────────────────── */
+
+/** `GET /admin/ops/pick-list` · `packing-list` · `day-summary` ortak sorgusu. */
+export interface AdminOpsDateQuery {
+  date: string;
+  zone?: string;
+}

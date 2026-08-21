@@ -94,6 +94,61 @@
 
 {{> site_footer}}
 
+<!-- F9 CMS — abonelik durum metinleri (SiteContent `uyelik.texts`; C ekler). <template> hiçbir zaman
+     RENDER EDİLMEZ (piksel parite etkilenmez) ve dataset okuması HTML varlıklarını çözer; SiteContent
+     değerleri sunucuda escapeHtml'lidir, bu yüzden üç süslü parantezli (ham) yazım kullanılır. Anahtar yoksa değer boş
+     kalır ve cart.js/sayfa kendi Türkçe varsayılanına düşer. -->
+<template id="uyelikTexts"
+  data-empty="{{{site.uyelik.texts.empty}}}"
+  data-empty-draft-cta="{{{site.uyelik.texts.emptyDraftCta}}}"
+  data-empty-cta="{{{site.uyelik.texts.emptyCta}}}"
+  data-loading="{{{site.uyelik.texts.loading}}}"
+  data-load-error="{{{site.uyelik.texts.loadError}}}"
+  data-pay-note="{{{site.uyelik.texts.payNote}}}"
+  data-locked-note="{{{site.uyelik.texts.lockedNote}}}"
+  data-skip-confirm="{{{site.uyelik.texts.skipConfirm}}}"
+  data-skip-yes="{{{site.uyelik.texts.skipYes}}}"
+  data-skip-no="{{{site.uyelik.texts.skipNo}}}"
+  data-skip-label="{{{site.uyelik.texts.skipLabel}}}"
+  data-unskip-label="{{{site.uyelik.texts.unskipLabel}}}"
+  data-skip-used-label="{{{site.uyelik.texts.skipUsedLabel}}}"
+  data-skipped-badge="{{{site.uyelik.texts.skippedBadge}}}"
+  data-extras-title="{{{site.uyelik.texts.extrasTitle}}}"
+  data-edit-box-cta="{{{site.uyelik.texts.editBoxCta}}}"
+  data-apply-label="{{{site.uyelik.texts.applyLabel}}}"
+  data-discard-label="{{{site.uyelik.texts.discardLabel}}}"
+  data-saved-note="{{{site.uyelik.texts.savedNote}}}"
+  data-next-delivery-label="{{{site.uyelik.texts.nextDeliveryLabel}}}"
+  data-cutoff-label="{{{site.uyelik.texts.cutoffLabel}}}"
+  data-past-due-badge="{{{site.uyelik.texts.pastDueBadge}}}"
+  data-past-due-note="{{{site.uyelik.texts.pastDueNote}}}"
+  data-past-due-action="{{{site.uyelik.texts.pastDueAction}}}"
+  data-awaiting-badge="{{{site.uyelik.texts.awaitingBadge}}}"
+  data-awaiting-note="{{{site.uyelik.texts.awaitingNote}}}"
+  data-awaiting-action="{{{site.uyelik.texts.awaitingAction}}}"
+  data-unpaid-badge="{{{site.uyelik.texts.unpaidBadge}}}"
+  data-unpaid-note="{{{site.uyelik.texts.unpaidNote}}}"
+  data-cancel-badge="{{{site.uyelik.texts.cancelBadge}}}"
+  data-cancel-note="{{{site.uyelik.texts.cancelNote}}}"
+  data-cancel-effective-label="{{{site.uyelik.texts.cancelEffectiveLabel}}}"
+  data-cancel-abandon="{{{site.uyelik.texts.cancelAbandon}}}"
+  data-completed-badge="{{{site.uyelik.texts.completedBadge}}}"
+  data-completed-note="{{{site.uyelik.texts.completedNote}}}"
+  data-completed-cta="{{{site.uyelik.texts.completedCta}}}"
+  data-cancel-link="{{{site.uyelik.texts.cancelLink}}}"
+  data-cancel-flow-title="{{{site.uyelik.texts.cancelFlowTitle}}}"
+  data-cancel-flow-intro="{{{site.uyelik.texts.cancelFlowIntro}}}"
+  data-cancel-flow-placeholder="{{{site.uyelik.texts.cancelFlowPlaceholder}}}"
+  data-cancel-submit="{{{site.uyelik.texts.cancelSubmit}}}"
+  data-cancel-confirm-submit="{{{site.uyelik.texts.cancelConfirmSubmit}}}"
+  data-cancel-back="{{{site.uyelik.texts.cancelBack}}}"
+  data-retention-offer="{{{site.uyelik.texts.retentionOffer}}}"
+  data-retention-offer-plain="{{{site.uyelik.texts.retentionOfferPlain}}}"
+  data-retention-accept="{{{site.uyelik.texts.retentionAccept}}}"
+  data-retention-applied="{{{site.uyelik.texts.retentionApplied}}}"
+  data-busy-note="{{{site.uyelik.texts.busyNote}}}"
+  data-generic-error="{{{site.uyelik.texts.genericError}}}"></template>
+
 {{> bootstrap}}
 <script>
 (function () {
@@ -145,16 +200,87 @@
     renderPayment();
   });
 
-  // Gün değişikliği ve ekstra silme burada da anında kaydedilmez — taslakta
-  // birikir, "değişiklikleri onayla" ile aboneliğe işlenir (kutu.html ile
-  // aynı kural). Atlama ve iptal ise kendi onay sorularından geçer.
-  let subDraft = null;
+  // ---- F9 remote: abonelik kartı — SUNUCU tek doğruluk kaynağı (BahcedenCart.remote) ----
+  // Satın alınmış abonelikte gün ve ekstra değişiklikleri önce yerel TASLAKTA birikir; "değişiklikleri onayla"
+  // ile API'ye gider (PATCH /me/subscription · PATCH …/cycles/current) ve dönen DTO ile kart yeniden çizilir.
+  // Atlama, iptal ve kalma teklifi kendi onaylarından geçip doğrudan API'ye gider. Optimistic güncelleme YOK:
+  // ekranda görünen her zaman sunucudan dönen `BootstrapSub` DTO'sudur.
+  // Durum dalları (ADR-0003 istisna 7 — aynı kart içinde ek metin/aksiyon):
+  //   ACTIVE            → bu haftanın kutusu + kesim geri sayımı + atla/geri al + içerik düzenle + sonraki teslimat
+  //   PAST_DUE          → dunning uyarısı + "kartını güncelle" (ödeme yöntemi sekmesi)
+  //   CANCEL_REQUESTED  → iptal tarihi + vazgeç (+ sunucu teklif sunduysa kalma teklifi)
+  //   AWAITING_PAYMENT  → ödeme linki butonu (cycle.paymentLinkUrl) · UNPAID → tahsilat uyarısı + kart güncelle
+  //   COMPLETED         → tek seferlik kutu teslim edildi (PAUSED dalı yok — ADR-0008: şema-var/UI-yok)
+  const SUB_TEXT_DEFAULTS = {
+    empty: "Henüz bir aboneliğin yok.",
+    emptyDraftCta: "kutunu tamamla",
+    emptyCta: "kutunu oluştur",
+    loading: "Aboneliğin yükleniyor…",
+    loadError: "Aboneliğin yüklenemedi — sayfayı yenileyip tekrar dene.",
+    payNote: "Ödemen teslimat günü çekilir — ekstralar kutu ücretiyle birlikte tahsil edilir ve kutunla aynı gün teslim edilir. Sonraki hafta kutun ekstrasız yenilenir.",
+    lockedNote: "Bu haftanın değişiklik süresi doldu",
+    skipConfirm: "Bu haftaki kutunu atlamak istediğine emin misin?",
+    skipYes: "atla",
+    skipNo: "vazgeç",
+    skipLabel: "bir sonraki siparişi atla",
+    unskipLabel: "atlamayı iptal et",
+    skipUsedLabel: "atlama hakkın kullanıldı",
+    skippedBadge: "BİR SONRAKİ SİPARİŞ ATLANDI",
+    extrasTitle: "BU HAFTAKİ EKSTRALAR",
+    editBoxCta: "kutunu düzenle + ekstra ekle",
+    applyLabel: "değişiklikleri onayla",
+    discardLabel: "vazgeç",
+    savedNote: "Değişikliklerin kaydedildi.",
+    nextDeliveryLabel: "Sonraki teslimat",
+    cutoffLabel: "DEĞİŞİKLİK İÇİN",
+    pastDueBadge: "ÖDEME ALINAMADI",
+    pastDueNote: "Bu haftanın ödemesini kartından çekemedik. Kartını güncellersen bir sonraki denemede otomatik olarak tahsil edilir.",
+    pastDueAction: "kartını güncelle",
+    awaitingBadge: "ÖDEME BEKLİYOR",
+    awaitingNote: "Bu haftaki kutunun ödemesi bekleniyor — güvenli ödeme sayfasından tamamlayabilirsin.",
+    awaitingAction: "ödemeyi tamamla",
+    unpaidBadge: "ÖDEME ALINAMADI",
+    unpaidNote: "Bu haftaki kutunun ödemesi alınamadı — kartını güncelleyip yeniden deneyebiliriz.",
+    cancelBadge: "İPTAL TALEBİN ALINDI",
+    cancelNote: "Aboneliğin sona erecek; o tarihe kadar kalan kutuların teslim edilir.",
+    cancelEffectiveLabel: "Sona erme tarihi",
+    cancelAbandon: "iptalden vazgeç",
+    completedBadge: "TESLİM EDİLDİ",
+    completedNote: "Tek seferlik kutun teslim edildi — dilediğin zaman yeni bir kutu oluşturabilirsin.",
+    completedCta: "yeni kutu oluştur",
+    cancelLink: "aboneliği iptal et",
+    cancelFlowTitle: "Gittiğine üzüldük.",
+    cancelFlowIntro: "Neden ayrıldığını bize söylemek ister misin? İstersen boş bırakabilirsin.",
+    cancelFlowPlaceholder: "Bize kısaca yazabilirsin…",
+    cancelSubmit: "aboneliği iptal et",
+    cancelConfirmSubmit: "yine de aboneliği iptal et",
+    cancelBack: "vazgeç",
+    retentionOffer: "<b>Gitmeden önce:</b> sana {boxes} kutuluk <b>%{pct} indirim</b> hakkı veriyoruz — kullanmak ister misin?",
+    retentionOfferPlain: "<b>Gitmeden önce:</b> sana özel bir indirim hakkı tanımladık — kullanmak ister misin?",
+    retentionAccept: "indirimi kullan, üye kal",
+    retentionApplied: "1 kutuluk indirim (üye kaldığın için)",
+    busyNote: "Kaydediliyor…",
+    genericError: "İşlem tamamlanamadı — tekrar dene.",
+  };
+  // Metinler CMS'ten (SiteContent `uyelik.texts` → <template id="uyelikTexts" data-*>); anahtar yoksa/boşsa
+  // yukarıdaki varsayılan kullanılır. Markup'taki sabit metinler değişmez → anonim görünüm paritesi korunur.
+  const subTextsEl = document.getElementById("uyelikTexts");
+  function T(key) {
+    const raw = subTextsEl && subTextsEl.dataset ? subTextsEl.dataset[key] : "";
+    return raw && String(raw).trim() ? String(raw) : SUB_TEXT_DEFAULTS[key];
+  }
+  function fill(text, vars) {
+    return String(text).replace(/\{(\w+)\}/g, (m, k) => (vars && vars[k] !== undefined ? String(vars[k]) : m));
+  }
+
+  let subDraft = null;          // yerel taslak (gün / ekstra) — onaylanana dek sunucuya gitmez
   let skipConfirmOpen = false;
-  let cancelFlowOpen = false;
-  let cancelOfferThisFlow = false;
-  // İptalden caydırma teklifi üye başına tek seferlik: akış İLK açılışta
-  // işaretlenir; ikinci kez iptale basana teklif çıkmaz.
-  const RETENTION_KEY = "bahceden_retention_offered";
+  let cancelFlowOpen = false;   // neden formu açık (talep henüz gönderilmedi)
+  let cancelOffer = null;       // POST /cancel yanıtındaki teklif ({pct, boxes}) — kararı SUNUCU verir
+  let subBusy = false;          // API isteği sürüyor → düğmeler pasif
+  let subMsg = "";              // kart altındaki bilgi/hata notu
+  let subMsgOk = false;
+  let subLoadError = "";
 
   function ensureDraft() {
     if (!subDraft) subDraft = JSON.parse(JSON.stringify(BahcedenCart.getSub()));
@@ -163,259 +289,351 @@
   function hasPending() {
     return !!subDraft && JSON.stringify(subDraft) !== JSON.stringify(BahcedenCart.getSub());
   }
-
-  // F8 checkout: satın alınmış abonelik artık localStorage'da değil — BahcedenCart.loadSubscription() (GET /me/subscription)
-  // bootstrap sub alanını doldurur, getSub() onu okur. Kartın mutasyonları (gün/ekstra/atla/iptal/onay) F9'da API'ye bağlanır;
-  // o güne kadar sunucu kaynaklı kartta bu düğmeler pasif + kısa not (ADR-0003 istisna 7 kapsamı).
+  // F9 remote: canlı (satın alınmış + oturumlu) abonelik mi — mutasyonlar API'ye buna göre gider.
   function isServerSub() {
-    return BahcedenCart.isLoggedIn() && !!(window.__BAGDAM__ && window.__BAGDAM__.sub);
+    return BahcedenCart.remote.isLive();
   }
-  function renderSub() {
-    const savedSub = BahcedenCart.getSub();
-    const sub = subDraft || savedSub;
-    // "active" kutunun sepette beklediğini, "purchased" ödemenin sepette
-    // tamamlandığını söyler — aboneliklerim kartı yalnızca satın alınmış
-    // kutuyu gösterir; sepetteki taslak için aşağıdaki yönlendirme yeter.
-    const purchased = !!savedSub.purchased;
-    const tier = purchased ? BahcedenCart.subTier() : null;
+  function setSubMsg(text, ok) {
+    subMsg = text || "";
+    subMsgOk = !!ok;
+  }
+  // Tek giriş noktası: istek boyunca kart pasif, hata mesajı kartın altında, başarıda taslak düşer.
+  function runSub(task, okText) {
+    if (subBusy) return Promise.resolve();
+    subBusy = true;
+    setSubMsg("");
+    renderSub();
+    return task().then(
+      () => {
+        subBusy = false;
+        subDraft = null;
+        skipConfirmOpen = false;
+        cancelFlowOpen = false;
+        cancelOffer = null;
+        setSubMsg(okText || "", true);
+        renderSub();
+      },
+      (err) => {
+        subBusy = false;
+        setSubMsg((err && err.message) || T("genericError"));
+        renderSub();
+      },
+    );
+  }
 
-    if (!tier) {
+  function renderSub() {
+    const saved = BahcedenCart.getSub();
+    const live = isServerSub();
+
+    if (!live) {
+      // Satın alınmış abonelik yok: sepette bekleyen kutu taslağı varsa oraya, yoksa katalog yönlendirmesi.
       const draftTier = BahcedenCart.subTier();
       subCard.innerHTML =
         '<p class="pcard-meta mono">ABONELİK</p>' +
-        '<p class="account-empty">Henüz bir aboneliğin yok.</p>' +
+        '<p class="account-empty">' + escText(subLoadError || T("empty")) + "</p>" +
         (draftTier
-          ? '<a class="cta" href="kutu.html?tier=' + draftTier.id + '">kutunu tamamla</a>'
-          : '<a class="cta" href="urunler.html">kutunu oluştur</a>');
+          ? '<a class="cta" href="kutu.html?tier=' + escAttr(draftTier.id) + '">' + escText(T("emptyDraftCta")) + "</a>"
+          : '<a class="cta" href="urunler.html">' + escText(T("emptyCta")) + "</a>");
       return;
     }
 
-    const itemNames = sub.items
+    const sub = subDraft || saved;
+    const tier = BahcedenCart.subTier() || { id: saved.tierId || "", label: saved.tierId || "Kutun", note: "", price: 0, count: (saved.items || []).length, img: "" };
+    const status = saved.status || "ACTIVE";
+    const cycle = saved.currentCycle || null;
+    const inFlight = saved.inFlightCycle || null;
+    const completed = status === "COMPLETED";
+    const cancelRequested = status === "CANCEL_REQUESTED";
+    const openCancel = saved.cancellation && saved.cancellation.outcome === "PENDING" ? saved.cancellation : null;
+    const awaiting = !!inFlight && inFlight.status === "AWAITING_PAYMENT";
+    const unpaid = !!inFlight && inFlight.status === "UNPAID";
+    const pastDue = status === "PAST_DUE" || (!!saved.dunning && saved.dunning.active && !awaiting);
+    // Düzenlenebilirlik SUNUCUDAN: açık cycle var ve kesimi geçmemiş (cart.js kendi saat hesabını yapmaz).
+    const editable = !completed && !!cycle && !cycle.locked;
+    const isSub = !saved.isOneTime && sub.type === "subscription";
+
+    const itemNames = (sub.items || [])
       .map((id) => { const p = PRODUCTS.find((x) => x.id === id); return p ? p.name : ""; })
       .filter(Boolean)
       .join(", ");
 
-    // Taslak varken toplam da taslaktan hesaplanır — subExtrasTotal()
-    // kayıtlı hali okur, henüz onaylanmamış silmeleri görmez.
+    // Taslak varken toplam da taslaktan hesaplanır — subExtrasTotal() kayıtlı hali okur, onaylanmamış
+    // silmeleri görmez. Onaylanmış hâlde ise "Bu haftaki ödeme" satırı SUNUCUNUN cycle toplamıdır.
     const extras = sub.extras || [];
     const extrasTotal = extras.reduce((sum, ex) => sum + BahcedenCart.subExtraPrice(ex), 0);
+    const hasRetentionDiscount = !!saved.nextBoxDiscount;
+    const discountAmount = hasRetentionDiscount ? Math.round(tier.price / 2) : 0;
+    const localWeekTotal = sub.skipThisWeek ? 0 : tier.price - discountAmount + extrasTotal;
+    const serverTotal = cycle && cycle.total !== null && cycle.total !== undefined ? Number(cycle.total) : null;
+    const weekTotal = !hasPending() && serverTotal !== null ? serverTotal : localWeekTotal;
 
     const cutoff = BahcedenCart.nextCutoff();
     const countdown = BahcedenCart.formatCountdown(cutoff);
-    const editable = countdown !== "kilitlendi";
-    const isSub = sub.type === "subscription";
     const freq = isSub ? FREQ_OPTIONS.find((f) => f.id === sub.freq) : null;
     const freqLabel = freq ? freq.label + (!freq.allDays && sub.deliveryDay ? " — " + (DELIVERY_DAYS.find((d) => d.id === sub.deliveryDay) || {}).label : "") : null;
+    const nextDeliveryOn = saved.nextDeliveryOn || (cycle && cycle.deliveryOn) || (inFlight && inFlight.deliveryOn) || null;
+    const nextDeliveryText = BahcedenCart.formatDeliveryDate(nextDeliveryOn);
 
-    const skipLabel = sub.skipThisWeek
-      ? "atlamayı iptal et"
-      : (sub.skipUsed ? "atlama hakkın kullanıldı" : "bir sonraki siparişi atla");
-    const skipDisabled = !sub.skipThisWeek && sub.skipUsed;
+    const skipLabel = sub.skipThisWeek ? T("unskipLabel") : (sub.skipUsed ? T("skipUsedLabel") : T("skipLabel"));
+    // Atlanan hafta DTO'da `locked: true` gelir (durumu SCHEDULED değil) → kutu içeriği düzenlenemez;
+    // ama atlamayı GERİ ALMAK kesime kadar mümkündür (sunucu DELETE …/skip'i kabul eder). Bu yüzden
+    // geri alma düğmesi `editable` yerine yalnız kesim anına bakar.
+    const cutoffPassed = !cycle || !cycle.cutoffAtIso || new Date(cycle.cutoffAtIso).getTime() <= BahcedenCart.serverNow();
+    const skipDisabled = (!sub.skipThisWeek && sub.skipUsed) || (sub.skipThisWeek ? cutoffPassed : !editable) || subBusy;
 
-    // Bu haftanın çekilecek tutarı: kutu + o hafta eklenen ekstralar.
-    // Hafta atlandıysa o hafta ödeme de yok. İptalden vazgeçme teklifi
-    // kullanıldıysa bir sonraki kutuya 1 seferlik %50 indirim işler.
-    const hasRetentionDiscount = !!sub.nextBoxDiscount;
-    const discountAmount = hasRetentionDiscount ? Math.round(tier.price / 2) : 0;
-    const weekTotal = sub.skipThisWeek ? 0 : tier.price - discountAmount + extrasTotal;
-
-    // O haftaki ekstralar (meyve/sebze de, sepetten "kutuma ekle" ile taşınan
-    // fırın/kiler/süt ürünleri de) buradan tek tek çıkarılabilir — değişiklik
-    // süresi dolduysa yalnızca listelenir.
     const TRASH_SVG =
       '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
     const extrasListHtml = extras.length
       ? '<div class="account-extras">' +
-          '<p class="pcard-meta mono">BU HAFTAKİ EKSTRALAR</p>' +
+          '<p class="pcard-meta mono">' + escText(T("extrasTitle")) + "</p>" +
           extras.map((ex, i) => {
             const p = PRODUCTS.find((x) => x.id === ex.id);
             if (!p) return "";
             return (
               '<div class="account-extra-row">' +
-                "<span>" + p.name + ' <span class="mono">(' + ex.label + ")</span></span>" +
+                "<span>" + escText(p.name) + ' <span class="mono">(' + escText(ex.label) + ")</span></span>" +
                 '<span class="mono">' + money(BahcedenCart.subExtraPrice(ex)) + " TL</span>" +
-                (editable ? '<button class="qty-stepper-dec trash" data-extra-idx="' + i + '" type="button" aria-label="Ekstrayı kaldır">' + TRASH_SVG + "</button>" : "") +
+                (editable && !subBusy ? '<button class="qty-stepper-dec trash" data-extra-idx="' + i + '" type="button" aria-label="Ekstrayı kaldır">' + TRASH_SVG + "</button>" : "") +
               "</div>"
             );
           }).join("") +
         "</div>"
       : "";
 
-    // Teslimat günü kutu sayfasına gitmeden buradan da değiştirilebilir.
-    // Kesimi geçmiş gün de seçilebilir — not, teslimatın sonraki haftaya
-    // kaldığını söyler.
+    // Teslimat günü kutu sayfasına gitmeden buradan da değiştirilebilir (PATCH /me/subscription).
+    // Kesimi geçmiş gün de seçilebilir — not, teslimatın sonraki haftaya kaldığını söyler.
     const dayNoteText = BahcedenCart.lockedDayNote(sub.deliveryDay);
-    const dayToggleHtml =
-      '<div class="freq-row account-day-row">' +
-        '<span class="pcard-pref-label mono">teslimat günü</span>' +
-        '<div class="toggle-list small" id="accountDayToggle">' +
-          DELIVERY_DAYS.map((d) => {
-            const isActive = sub.deliveryDay === d.id;
-            return '<button class="toggle' + (isActive ? " active" : "") + '" type="button" data-day="' + d.id + '">' + d.label + "</button>";
-          }).join("") +
-        "</div>" +
-        (dayNoteText ? '<p class="day-note mono">' + dayNoteText + "</p>" : "") +
-      "</div>";
+    const dayToggleHtml = completed || cancelRequested
+      ? ""
+      : '<div class="freq-row account-day-row">' +
+          '<span class="pcard-pref-label mono">teslimat günü</span>' +
+          '<div class="toggle-list small" id="accountDayToggle">' +
+            DELIVERY_DAYS.map((d) => {
+              const isActive = sub.deliveryDay === d.id;
+              return '<button class="toggle' + (isActive ? " active" : "") + '" type="button" data-day="' + escAttr(d.id) + '"' + (subBusy ? " disabled" : "") + ">" + escText(d.label) + "</button>";
+            }).join("") +
+          "</div>" +
+          (dayNoteText ? '<p class="day-note mono">' + escText(dayNoteText) + "</p>" : "") +
+        "</div>";
 
-    // "Bu haftayı atla" kendi onay sorusundan geçer.
-    const skipConfirmHtml =
-      '<div class="skip-confirm">' +
-        '<span>Bu haftaki kutunu atlamak istediğine emin misin?</span>' +
-        '<button class="btn" id="skipYesBtn" type="button">atla</button>' +
-        '<button class="btn" id="skipNoBtn" type="button">vazgeç</button>' +
-      "</div>";
+    // ---- Durum şeritleri (ADR-0003 istisna 7): ödeme bekliyor / tahsil edilemedi / iptal talebi / tamamlandı
+    function banner(badge, note, actionsHtml) {
+      // Kart içinde ek şerit — yeni CSS sınıfı YOK: mevcut .sub-skip-note / .account-empty / .account-actions
+      // kalıpları kullanılır (ADR-0003 istisna 7: uyelik durum metinleri aynı kartın içinde).
+      return (
+        '<p class="sub-skip-note mono">' + escText(badge) + "</p>" +
+        '<p class="account-empty">' + note + "</p>" +
+        (actionsHtml ? '<div class="account-actions">' + actionsHtml + "</div>" : "")
+      );
+    }
+    let statusHtml = "";
+    if (completed) {
+      statusHtml += banner(T("completedBadge"), escText(T("completedNote")), '<a class="cta" href="urunler.html">' + escText(T("completedCta")) + "</a>");
+    }
+    if (awaiting) {
+      const due = inFlight.paymentDueAtIso ? " Son ödeme: " + orderDateParts(inFlight.paymentDueAtIso).date + "." : "";
+      statusHtml += banner(
+        T("awaitingBadge"),
+        escText(T("awaitingNote") + due),
+        inFlight.paymentLinkUrl
+          ? '<a class="cta" href="' + escAttr(inFlight.paymentLinkUrl) + '" target="_blank" rel="noopener">' + escText(T("awaitingAction")) + "</a>"
+          : "",
+      );
+    } else if (unpaid || pastDue) {
+      const retryText = saved.dunning && saved.dunning.nextRetryAtIso
+        ? " Bir sonraki deneme: " + orderDateParts(saved.dunning.nextRetryAtIso).date + " " + orderDateParts(saved.dunning.nextRetryAtIso).time + "."
+        : "";
+      statusHtml += banner(
+        unpaid ? T("unpaidBadge") : T("pastDueBadge"),
+        escText((unpaid ? T("unpaidNote") : T("pastDueNote")) + retryText),
+        '<button class="cta" id="updateCardBtn" type="button">' + escText(T("pastDueAction")) + "</button>" +
+          (inFlight && inFlight.paymentLinkUrl
+            ? '<a class="btn" href="' + escAttr(inFlight.paymentLinkUrl) + '" target="_blank" rel="noopener">' + escText(T("awaitingAction")) + "</a>"
+            : ""),
+      );
+    }
+    if (cancelRequested || openCancel) {
+      const eff = openCancel && openCancel.effectiveAtIso ? orderDateParts(openCancel.effectiveAtIso).date : null;
+      const offerHtml = openCancel && openCancel.retentionOffered
+        ? '<p class="cancel-offer">' + (cancelOffer ? fill(T("retentionOffer"), cancelOffer) : T("retentionOfferPlain")) + "</p>"
+        : "";
+      statusHtml += banner(
+        T("cancelBadge"),
+        escText(T("cancelNote") + (eff ? " " + T("cancelEffectiveLabel") + ": " + eff + "." : "")) + offerHtml,
+        (openCancel && openCancel.retentionOffered ? '<button class="cta" id="useOfferBtn" type="button"' + (subBusy ? " disabled" : "") + ">" + escText(T("retentionAccept")) + "</button>" : "") +
+          '<button class="btn" id="confirmCancelBtn" type="button"' + (subBusy ? " disabled" : "") + ">" + escText(openCancel && openCancel.retentionOffered ? T("cancelConfirmSubmit") : T("cancelSubmit")) + "</button>" +
+          '<button class="btn" id="abandonCancelBtn" type="button"' + (subBusy ? " disabled" : "") + ">" + escText(T("cancelAbandon")) + "</button>",
+      );
+    }
 
-    // İptal akışı: önce kısa bir ayrılma-nedeni formu (boş bırakılabilir),
-    // teklif hakkı daha önce kullanılmadıysa 1 kutuluk %50 indirim önerilir.
+    // İptal akışı (talep henüz gönderilmedi): kısa ayrılma-nedeni formu; teklifi SUNUCU döndürür.
     const cancelFlowHtml =
       '<div class="cancel-flow">' +
-        '<p class="cancel-flow-title">Gittiğine üzüldük.</p>' +
-        '<p class="account-empty">Neden ayrıldığını bize söylemek ister misin? İstersen boş bırakabilirsin.</p>' +
+        '<p class="cancel-flow-title">' + escText(T("cancelFlowTitle")) + "</p>" +
+        '<p class="account-empty">' + escText(T("cancelFlowIntro")) + "</p>" +
         '<div class="toggle-list small" id="cancelReasons">' +
-          ["Fiyat", "Ürün çeşitliliği", "Teslimat günleri", "Diğer"].map((r) =>
-            '<button class="toggle" type="button" data-reason="' + r + '">' + r + "</button>"
+          BahcedenCart.CANCEL_REASONS.map((r) =>
+            '<button class="toggle" type="button" data-reason="' + escAttr(r.value) + '">' + escText(r.label) + "</button>"
           ).join("") +
         "</div>" +
-        '<textarea class="cancel-reason-text" id="cancelReasonText" placeholder="Bize kısaca yazabilirsin…"></textarea>' +
-        (cancelOfferThisFlow
-          ? '<p class="cancel-offer"><b>Gitmeden önce:</b> sana 1 kutuluk <b>%50 indirim</b> hakkı veriyoruz — kullanmak ister misin?</p>' +
-            '<div class="account-actions">' +
-              '<button class="cta" id="useOfferBtn" type="button">indirimi kullan, üye kal</button>' +
-              '<button class="btn" id="confirmCancelBtn" type="button">yine de aboneliği iptal et</button>' +
-            "</div>"
-          : '<div class="account-actions">' +
-              '<button class="btn" id="confirmCancelBtn" type="button">aboneliği iptal et</button>' +
-            "</div>") +
-        '<p class="cancel-note"><a href="#" id="cancelFlowBack">vazgeç</a></p>' +
+        '<textarea class="cancel-reason-text" id="cancelReasonText" placeholder="' + escAttr(T("cancelFlowPlaceholder")) + '"></textarea>' +
+        '<div class="account-actions">' +
+          '<button class="btn" id="requestCancelBtn" type="button"' + (subBusy ? " disabled" : "") + ">" + escText(T("cancelSubmit")) + "</button>" +
+        "</div>" +
+        '<p class="cancel-note"><a href="#" id="cancelFlowBack">' + escText(T("cancelBack")) + "</a></p>" +
+      "</div>";
+
+    const skipConfirmHtml =
+      '<div class="skip-confirm">' +
+        "<span>" + escText(T("skipConfirm")) + "</span>" +
+        '<button class="btn" id="skipYesBtn" type="button">' + escText(T("skipYes")) + "</button>" +
+        '<button class="btn" id="skipNoBtn" type="button">' + escText(T("skipNo")) + "</button>" +
       "</div>";
 
     subCard.innerHTML =
-      '<p class="pcard-meta mono">' + (isSub ? "AKTİF ABONELİK" : "TEK SEFERLİK SİPARİŞ") + "</p>" +
-      "<h2>" + tier.label + "</h2>" +
-      '<p class="pcard-meta mono">' + itemNames + "</p>" +
+      '<p class="pcard-meta mono">' + (completed ? "TAMAMLANAN SİPARİŞ" : isSub ? "AKTİF ABONELİK" : "TEK SEFERLİK SİPARİŞ") + "</p>" +
+      "<h2>" + escText(tier.label) + "</h2>" +
+      '<p class="pcard-meta mono">' + escText(itemNames) + "</p>" +
+      statusHtml +
       extrasListHtml +
-      (isSub ? '<p class="account-freq mono">Gönderim: ' + freqLabel + "</p>" : "") +
-      (sub.skipThisWeek ? '<p class="sub-skip-note mono">BİR SONRAKİ SİPARİŞ ATLANDI</p>' : "") +
+      (isSub && freqLabel ? '<p class="account-freq mono">Gönderim: ' + escText(freqLabel) + "</p>" : "") +
+      (sub.skipThisWeek ? '<p class="sub-skip-note mono">' + escText(T("skippedBadge")) + "</p>" : "") +
       dayToggleHtml +
-      '<div class="account-pay">' +
-        '<div class="ps-row"><span>Kutu</span><span class="mono">' + money(sub.skipThisWeek ? 0 : tier.price) + " TL</span></div>" +
-        (hasRetentionDiscount ? '<div class="ps-row ps-note"><span>1 kutuluk %50 indirim (üye kaldığın için)</span><span class="mono">-' + money(sub.skipThisWeek ? 0 : discountAmount) + " TL</span></div>" : "") +
-        (extras.length ? '<div class="ps-row"><span>Bu haftaki ekstralar</span><span class="mono">+' + money(sub.skipThisWeek ? 0 : extrasTotal) + " TL</span></div>" : "") +
-        '<div class="ps-row ps-total"><span>Bu haftaki ödeme</span><span class="mono">' + money(weekTotal) + " TL</span></div>" +
-        '<p class="account-freq mono">Ödemen teslimat günü çekilir — ekstralar kutu ücretiyle birlikte tahsil edilir ve kutunla aynı gün teslim edilir. Sonraki hafta kutun ekstrasız yenilenir.</p>' +
-      "</div>" +
-      '<div class="pd-price-row">' +
-        '<span class="cutoff mono">DEĞİŞİKLİK İÇİN: ' + countdown.toUpperCase() + " SÜREN VAR</span>" +
-      "</div>" +
+      (completed
+        ? ""
+        : '<div class="account-pay">' +
+            '<div class="ps-row"><span>Kutu</span><span class="mono">' + money(sub.skipThisWeek ? 0 : tier.price) + " TL</span></div>" +
+            (hasRetentionDiscount ? '<div class="ps-row ps-note"><span>' + escText(T("retentionApplied")) + '</span><span class="mono">-' + money(sub.skipThisWeek ? 0 : discountAmount) + " TL</span></div>" : "") +
+            (extras.length ? '<div class="ps-row"><span>Bu haftaki ekstralar</span><span class="mono">+' + money(sub.skipThisWeek ? 0 : extrasTotal) + " TL</span></div>" : "") +
+            '<div class="ps-row ps-total"><span>Bu haftaki ödeme</span><span class="mono">' + money(weekTotal) + " TL</span></div>" +
+            (nextDeliveryText ? '<div class="ps-row ps-note"><span>' + escText(T("nextDeliveryLabel")) + '</span><span class="mono">' + escText(nextDeliveryText) + "</span></div>" : "") +
+            '<p class="account-freq mono">' + escText(T("payNote")) + "</p>" +
+          "</div>") +
+      (completed
+        ? ""
+        : '<div class="pd-price-row">' +
+            '<span class="cutoff mono">' + escText(T("cutoffLabel")) + ": " + countdown.toLocaleUpperCase("tr-TR") + " SÜREN VAR</span>" +
+          "</div>") +
       (hasPending()
         ? '<div class="account-actions account-pending">' +
-            '<button class="cta" id="applyAccountChanges" type="button">değişiklikleri onayla</button>' +
-            '<button class="btn" id="discardAccountChanges" type="button">vazgeç</button>' +
+            '<button class="cta" id="applyAccountChanges" type="button"' + (subBusy ? " disabled" : "") + ">" + escText(T("applyLabel")) + "</button>" +
+            '<button class="btn" id="discardAccountChanges" type="button"' + (subBusy ? " disabled" : "") + ">" + escText(T("discardLabel")) + "</button>" +
           "</div>"
         : "") +
-      '<div class="account-actions">' +
-        (editable
-          ? '<a class="cta olive" href="kutu.html?tier=' + tier.id + '">kutunu düzenle + ekstra ekle</a>'
-          : '<span class="account-locked mono">Bu haftanın değişiklik süresi doldu</span>') +
-        (isSub && !skipConfirmOpen ? '<button class="btn" type="button" id="skipWeekBtn"' + (skipDisabled ? " disabled" : "") + '>' + skipLabel + "</button>" : "") +
-      "</div>" +
+      (completed
+        ? ""
+        : '<div class="account-actions">' +
+            (editable
+              ? '<a class="cta olive" href="kutu.html?tier=' + escAttr(tier.id) + '">' + escText(T("editBoxCta")) + "</a>"
+              : '<span class="account-locked mono">' + escText(T("lockedNote")) + "</span>") +
+            (isSub && !skipConfirmOpen && !cancelRequested ? '<button class="btn" type="button" id="skipWeekBtn"' + (skipDisabled ? " disabled" : "") + ">" + escText(skipLabel) + "</button>" : "") +
+          "</div>") +
       (skipConfirmOpen ? skipConfirmHtml : "") +
-      (cancelFlowOpen ? cancelFlowHtml : '<p class="cancel-note"><a href="#" id="cancelSubLink">aboneliği iptal et</a></p>');
+      (subMsg ? '<p class="checkout-auth-msg mono" id="subMsg"' + (subMsgOk ? ' style="color:var(--olive-deep)"' : "") + ">" + escText(subMsg) + "</p>" : "") +
+      (subBusy ? '<p class="cancel-note mono">' + escText(T("busyNote")) + "</p>" : "") +
+      (completed || cancelRequested || openCancel
+        ? ""
+        : cancelFlowOpen
+          ? cancelFlowHtml
+          : '<p class="cancel-note"><a href="#" id="cancelSubLink">' + escText(T("cancelLink")) + "</a></p>");
 
-    // F8 checkout: sunucu kaynaklı abonelikte değişiklik düğmeleri F9'a kadar pasif; yalnız görüntüleme.
-    if (isServerSub()) {
-      subCard.querySelectorAll("button").forEach((b) => { b.disabled = true; });
-      const cancelLink = document.getElementById("cancelSubLink");
-      if (cancelLink) cancelLink.addEventListener("click", (e) => e.preventDefault());
-      const note = document.createElement("p");
-      note.className = "cancel-note";
-      note.textContent = "Abonelik değişiklikleri (gün, ekstra, atlama, iptal) çok yakında bu sayfadan yapılabilecek — şimdilik mutlu müşteri hattımızdan ulaşabilirsin.";
-      subCard.appendChild(note);
-      return;
-    }
+    wireSubCard();
+  }
 
+  // ---- Kart içindeki düğmeler: taslak (gün/ekstra) yerelde birikir, gerisi doğrudan API'ye gider ----
+  function wireSubCard() {
     // Ekstra silme ve gün değişikliği taslağa yazılır — onay bekler.
     subCard.querySelectorAll("[data-extra-idx]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const d = ensureDraft();
         const idx = parseInt(btn.getAttribute("data-extra-idx"), 10);
         d.extras = (d.extras || []).filter((_, i2) => i2 !== idx);
+        setSubMsg("");
         renderSub();
       });
     });
 
     const dayToggle = document.getElementById("accountDayToggle");
     if (dayToggle) {
-      dayToggle.querySelectorAll(".toggle").forEach((btn) => {
+      dayToggle.querySelectorAll(".toggle:not([disabled])").forEach((btn) => {
         btn.addEventListener("click", () => {
           ensureDraft().deliveryDay = btn.getAttribute("data-day");
+          setSubMsg("");
           renderSub();
         });
       });
     }
 
+    // F9 remote: onay → önce abonelik alanları (gün; SCHEDULED cycle'ları yeniden üretir), sonra kutu içeriği.
     const applyBtn = document.getElementById("applyAccountChanges");
     if (applyBtn) {
       applyBtn.addEventListener("click", () => {
-        BahcedenCart.setSub(subDraft);
+        const draft = subDraft;
         const saved = BahcedenCart.getSub();
-        if ((saved.extras || []).length) {
-          saved.extrasCutoff = BahcedenCart.nextCutoff().getTime();
-          BahcedenCart.setSub(saved);
+        if (!draft) return;
+        const steps = [];
+        if (draft.deliveryDay && draft.deliveryDay !== saved.deliveryDay) {
+          steps.push(() => BahcedenCart.remote.patchSubscription({ deliveryDay: draft.deliveryDay }));
         }
-        subDraft = null;
-        renderSub();
+        if (draft.freq && draft.freq !== saved.freq) {
+          steps.push(() => BahcedenCart.remote.patchSubscription({ freq: draft.freq }));
+        }
+        if (JSON.stringify(draft.extras || []) !== JSON.stringify(saved.extras || [])) {
+          steps.push(() =>
+            BahcedenCart.remote.patchCycle({
+              extras: (draft.extras || []).map((ex) => ({ id: ex.id, factor: ex.factor, label: ex.label || "" })),
+            }),
+          );
+        }
+        if (!steps.length) { subDraft = null; renderSub(); return; }
+        runSub(() => steps.reduce((p, step) => p.then(step), Promise.resolve()), T("savedNote"));
       });
       document.getElementById("discardAccountChanges").addEventListener("click", () => {
         subDraft = null;
+        setSubMsg("");
         renderSub();
       });
     }
 
+    // Atlama: geri almak güvenli (soru yok), atlamak onay sorusundan geçer — ikisi de doğrudan API'ye.
     const skipWeekBtn = document.getElementById("skipWeekBtn");
     if (skipWeekBtn) {
       skipWeekBtn.addEventListener("click", () => {
         if (BahcedenCart.getSub().skipThisWeek) {
-          // Atlamayı geri almak zaten güvenli — soru sormadan aç.
-          BahcedenCart.subToggleSkip();
-          if (subDraft) {
-            const s2 = BahcedenCart.getSub();
-            subDraft.skipThisWeek = s2.skipThisWeek;
-            subDraft.skipUsed = s2.skipUsed;
-          }
-        } else {
-          skipConfirmOpen = true;
+          runSub(() => BahcedenCart.remote.unskip(), "Atlama geri alındı.");
+          return;
         }
+        skipConfirmOpen = true;
         renderSub();
       });
     }
     const skipYesBtn = document.getElementById("skipYesBtn");
     if (skipYesBtn) {
-      skipYesBtn.addEventListener("click", () => {
-        BahcedenCart.subToggleSkip();
-        if (subDraft) {
-          const s2 = BahcedenCart.getSub();
-          subDraft.skipThisWeek = s2.skipThisWeek;
-          subDraft.skipUsed = s2.skipUsed;
-        }
-        skipConfirmOpen = false;
-        renderSub();
-      });
+      skipYesBtn.addEventListener("click", () => runSub(() => BahcedenCart.remote.skip(), "Bu haftaki kutun atlandı."));
       document.getElementById("skipNoBtn").addEventListener("click", () => {
         skipConfirmOpen = false;
         renderSub();
       });
     }
 
+    // PAST_DUE / UNPAID: "kartını güncelle" → ödeme yöntemi sekmesi (yeni kart ekleme akışı orada).
+    const updateCardBtn = document.getElementById("updateCardBtn");
+    if (updateCardBtn) {
+      updateCardBtn.addEventListener("click", () => {
+        const tab = accountTabs.querySelector('[data-panel="payment"]');
+        if (tab) tab.click();
+        const panel = document.getElementById("paymentCard");
+        if (panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+
+    // İptal akışı: bağlantı → neden formu → POST /cancel (teklif sunucudan) → kabul / onay / vazgeç.
     const cancelSubLink = document.getElementById("cancelSubLink");
     if (cancelSubLink) {
       cancelSubLink.addEventListener("click", (e) => {
         e.preventDefault();
         cancelFlowOpen = true;
-        // Teklif üye başına tek sefer — ama hak yalnızca "indirimi kullan"a
-        // basılınca yanar; bakıp vazgeçmek ya da yine de iptal etmek hakkı
-        // harcamaz, sonraki iptal denemesinde teklif yeniden çıkar.
-        cancelOfferThisFlow = !localStorage.getItem(RETENTION_KEY);
+        setSubMsg("");
         renderSub();
       });
     }
@@ -426,37 +644,72 @@
           cancelReasons.querySelectorAll(".toggle").forEach((b) => b.classList.toggle("active", b === btn));
         });
       });
-      document.getElementById("confirmCancelBtn").addEventListener("click", () => {
-        BahcedenCart.subCancel();
-        subDraft = null;
-        cancelFlowOpen = false;
-        skipConfirmOpen = false;
+      document.getElementById("requestCancelBtn").addEventListener("click", () => {
+        const picked = cancelReasons.querySelector(".toggle.active");
+        const reason = picked ? picked.getAttribute("data-reason") : "OTHER";
+        const noteEl = document.getElementById("cancelReasonText");
+        const note = noteEl ? noteEl.value.trim() : "";
+        subBusy = true;
+        setSubMsg("");
         renderSub();
+        BahcedenCart.remote.cancel(reason, note).then(
+          (res) => {
+            cancelOffer = res && res.offer ? res.offer : null;
+            cancelFlowOpen = false;
+            // Talep açıldı: güncel DTO (CANCEL_REQUESTED + cancellation) sunucudan tazelenir.
+            return BahcedenCart.remote.load(true).then(() => {
+              subBusy = false;
+              renderSub();
+            });
+          },
+          (err) => {
+            subBusy = false;
+            setSubMsg((err && err.message) || T("genericError"));
+            renderSub();
+          },
+        );
       });
-      document.getElementById("cancelFlowBack").addEventListener("click", (e) => {
-        e.preventDefault();
-        cancelFlowOpen = false;
-        renderSub();
-      });
-      const useOfferBtn = document.getElementById("useOfferBtn");
-      if (useOfferBtn) {
-        useOfferBtn.addEventListener("click", () => {
-          const s2 = BahcedenCart.getSub();
-          s2.nextBoxDiscount = true;
-          BahcedenCart.setSub(s2);
-          if (subDraft) subDraft.nextBoxDiscount = true;
-          // Hak burada, gerçekten kullanınca yanar.
-          localStorage.setItem(RETENTION_KEY, "1");
+      const cancelFlowBack = document.getElementById("cancelFlowBack");
+      if (cancelFlowBack) {
+        cancelFlowBack.addEventListener("click", (e) => {
+          e.preventDefault();
           cancelFlowOpen = false;
           renderSub();
         });
       }
     }
+    const useOfferBtn = document.getElementById("useOfferBtn");
+    if (useOfferBtn) {
+      useOfferBtn.addEventListener("click", () =>
+        runSub(() => BahcedenCart.remote.acceptRetention(), "İndirim hakkın tanımlandı — aboneliğin devam ediyor."),
+      );
+    }
+    const confirmCancelBtn = document.getElementById("confirmCancelBtn");
+    if (confirmCancelBtn) {
+      confirmCancelBtn.addEventListener("click", () =>
+        runSub(() => BahcedenCart.remote.confirmCancel(), "Aboneliğin iptal edildi."),
+      );
+    }
+    const abandonCancelBtn = document.getElementById("abandonCancelBtn");
+    if (abandonCancelBtn) {
+      abandonCancelBtn.addEventListener("click", () =>
+        runSub(() => BahcedenCart.remote.abandonCancel(), "İptalden vazgeçildi — aboneliğin devam ediyor."),
+      );
+    }
   }
-  // Abonelik kartı: önce sunucudaki satın alınmış abonelik (varsa) yüklenir, sonra çizilir.
+
+  // Abonelik kartı: bootstrap `sub` doluysa doğrudan çizilir; boşsa (C'nin bootstrap alanı gelmeden ya da
+  // oturum sonrası tazeleme) GET /me/subscription ile bir kez çekilir (F9 yedek yolu).
   function loadAndRenderSub() {
+    subLoadError = "";
     if (!BahcedenCart.isLoggedIn()) { renderSub(); return; }
-    BahcedenCart.loadSubscription().catch(() => null).then(renderSub);
+    if (window.__BAGDAM__ && window.__BAGDAM__.sub) { renderSub(); return; }
+    subCard.innerHTML = '<p class="pcard-meta mono">ABONELİK</p><p class="account-empty">' + escText(T("loading")) + "</p>";
+    BahcedenCart.remote.load(true).then(renderSub, (err) => {
+      // 404/NO_SUBSCRIPTION "abonelik yok" demektir — hata metni gösterilmez.
+      subLoadError = err && err.status && err.status !== 404 ? (err.message || T("loadError")) : "";
+      renderSub();
+    });
   }
   loadAndRenderSub();
 
@@ -677,7 +930,11 @@
     subDraft = null;
     skipConfirmOpen = false;
     cancelFlowOpen = false;
-    if (!BahcedenCart.isLoggedIn() && window.__BAGDAM__) window.__BAGDAM__.sub = null; // F8 checkout: çıkışta sunucu aboneliği görünmez
+    cancelOffer = null;
+    subBusy = false;
+    setSubMsg("");
+    // F8 checkout / F9 remote: çıkışta sunucu aboneliği görünmez (kayıt durur, arayüz misafir görünümüne döner).
+    if (!BahcedenCart.isLoggedIn()) BahcedenCart.applyServerSub(null);
     loadAndRenderSub();
     renderOrders();
     loadAndRenderAddress();

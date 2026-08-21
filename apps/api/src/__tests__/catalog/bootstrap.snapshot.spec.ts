@@ -173,7 +173,7 @@ describe('CatalogService.getBootstrap — products.js snapshot paritesi (F3)', (
   it('me/sub: anonimde null; parametre verilince geçer; cache’teki anonim yük değişmez', async () => {
     expect(payload.me).toBeNull();
     expect(payload.sub).toBeNull();
-    const me: BootstrapMe = { loggedIn: true, email: 'test@example.com', name: null };
+    const me: BootstrapMe = { loggedIn: true, id: 'u_test', email: 'test@example.com', name: null };
     const sub = { id: 'sub_test', purchased: true, active: false } as unknown as BootstrapSub;
     const personal = await service.getBootstrap({ me, sub });
     expect(personal.me).toEqual(me);
@@ -182,6 +182,9 @@ describe('CatalogService.getBootstrap — products.js snapshot paritesi (F3)', (
     const anonymous = await service.getBootstrap();
     expect(anonymous.me).toBeNull();
     expect(anonymous.sub).toBeNull();
+    // F9 [B49]: serverNow cache'lenmez — her yanıtta taze mutlak ISO an
+    expect(Number.isNaN(Date.parse(anonymous.serverNow))).toBe(false);
+    expect(Date.parse(anonymous.serverNow)).toBeGreaterThanOrEqual(Date.parse(personal.serverNow));
   });
 
   it('buildBootstrap (cache’siz) katalog kısmı cache’li çıktıyla aynı', async () => {

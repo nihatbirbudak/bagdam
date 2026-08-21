@@ -40,6 +40,8 @@ import { CatalogRepository, type ActiveCategoryRecord, type ZoneRecord } from '.
 export interface BootstrapOptions {
   me?: BootstrapMe | null;
   sub?: BootstrapSub | null;
+  /** `serverNow` için an (testlerde sabitlenir); yoksa `new Date()`. */
+  now?: Date;
 }
 
 /** Takvim gününün içinde bulunduğu haftanın Pazartesi'si (TZ'siz takvim aritmetiği; seed `thisWeekMonday` ile aynı). */
@@ -58,6 +60,8 @@ export function weekMondayOf(date: IsoDate): IsoDate {
  *   öğeleri görünür ürünlere süzülür, yoksa (ya da hepsi görünmezse) anahtar yazılmaz → cart.js eski davranış.
  * - deliveryDates: varsayılan bölge (urla) için bugünden itibaren 4 hafta; locked/full DB'deki kesim/kapasiteden.
  * - Zaman: `now` tek noktadan (`new Date()`) alınır ve aşağı geçirilir (ADR-0004; ham SQL yok).
+ * - F9: `serverNow` (mutlak ISO) her yanıtta tazelenir — cart.js kesim geri sayımı istemci saatine güvenmez [B49];
+ *   `sub` çağırandan gelir (WebController: oturumlu ve satın alınmış abonelik → SubscriptionsService.getForUser DTO'su).
  */
 @Injectable()
 export class CatalogService {
@@ -68,10 +72,13 @@ export class CatalogService {
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
-  /** Bootstrap yükü — anonim kısım cache'li; `me`/`sub` parametreden (yoksa null). */
+  /**
+   * Bootstrap yükü — anonim kısım cache'li; `me`/`sub` parametreden (yoksa null), `serverNow` HER yanıtta taze.
+   * `serverNow` cache'lenmez: cart.js kesim geri sayımını bu anla kurar (istemci saatine güvenilmez) [B49].
+   */
   async getBootstrap(opts?: BootstrapOptions): Promise<BootstrapPayload> {
     const base = await this.getAnonymousBootstrap();
-    return { ...base, me: opts?.me ?? null, sub: opts?.sub ?? null };
+    return { ...base, me: opts?.me ?? null, sub: opts?.sub ?? null, serverNow: (opts?.now ?? new Date()).toISOString() };
   }
 
   /**
@@ -152,6 +159,8 @@ export class CatalogService {
       pairIds,
       recommendedTier: tiers.find((t) => t.isRecommended)?.slug ?? null,
       commerce: toBootstrapCommerce(settings, zone),
+      // Cache'ten dönen yükte bu alan bayattır; `getBootstrap` her yanıtta üzerine taze değeri yazar [B49].
+      serverNow: now.toISOString(),
     };
   }
 

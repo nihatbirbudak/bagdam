@@ -28,7 +28,7 @@ export function Toaster() {
   }, []);
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[9999] flex flex-col-reverse gap-2" aria-live="polite">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[9999] flex flex-col-reverse gap-2 print:hidden" aria-live="polite">
       {items.map((t) => {
         const Icon = ICONS[t.type];
         return (

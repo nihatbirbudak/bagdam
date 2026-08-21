@@ -2,10 +2,12 @@ import {
   CHARGE_STRATEGY_VALUES,
   CYCLE_STATUS_VALUES,
   DELIVERY_DAY_VALUES,
+  OPS_BULK_STATUS_VALUES,
   SUBSCRIPTION_STATUS_VALUES,
   type ChargeStrategy,
   type CycleStatus,
   type DeliveryDay,
+  type OpsBulkStatus,
   type SubscriptionStatus,
 } from '@bagdam/shared';
 import { Transform, Type } from 'class-transformer';
@@ -114,6 +116,38 @@ export class OpsDateQueryDto {
   @TrimString()
   @Matches(SLUG_RE, { message: 'zone geçersiz' })
   zone?: string;
+}
+
+/**
+ * `POST /admin/ops/bulk-status` — seçili cycle'ları ve/veya siparişleri aynı duruma ilerletir (ekran 20).
+ * `DELIVERY_FAILED` yalnız siparişlerde geçerlidir (cycle makinesinde yoktur) → cycleIds ile birlikte 409.
+ * `skipInvalid` verilmezse hep-ya-hiç: bir satırın geçişi bile geçersizse hiçbiri uygulanmaz (409).
+ */
+export class OpsBulkStatusDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @Matches(ID_RE, { each: true, message: 'cycleIds[] geçersiz' })
+  cycleIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @Matches(ID_RE, { each: true, message: 'orderIds[] geçersiz' })
+  orderIds?: string[];
+
+  @IsIn(OPS_BULK_STATUS_VALUES)
+  status!: OpsBulkStatus;
+
+  @IsOptional()
+  @TrimString()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  skipInvalid?: boolean;
 }
 
 /** `PATCH /admin/cycles/:id/status {status, note?}`. */

@@ -11,15 +11,16 @@ import { SubscriptionsAdminController } from './controllers/subscriptions-admin.
 import { CancellationService } from './services/cancellation.service';
 import { CyclesService } from './services/cycles.service';
 import { ManualCheckoutService } from './services/manual-checkout.service';
+import { OpsService } from './services/ops.service';
 import { SubscriptionsService } from './services/subscriptions.service';
 import { SubscriptionNotifier } from './subscription-notifier';
 import { SubscriptionsDepsAdapter } from './subscriptions-deps.adapter';
 import { SUBSCRIPTIONS_DEPS } from './subscriptions.deps';
 import { SubscriptionsRepository } from './subscriptions.repository';
 
-const CORE_PROVIDERS: Provider[] = [SubscriptionsRepository, SubscriptionNotifier, CyclesService, SubscriptionsService, CancellationService, ManualCheckoutService];
+const CORE_PROVIDERS: Provider[] = [SubscriptionsRepository, SubscriptionNotifier, CyclesService, SubscriptionsService, CancellationService, ManualCheckoutService, OpsService];
 const CONTROLLERS = [MeSubscriptionController, SubscriptionsAdminController, OpsAdminController];
-const EXPORTS = [SubscriptionsService, CyclesService, CancellationService, ManualCheckoutService, SubscriptionNotifier, SubscriptionsRepository, SUBSCRIPTIONS_DEPS];
+const EXPORTS = [SubscriptionsService, CyclesService, CancellationService, ManualCheckoutService, OpsService, SubscriptionNotifier, SubscriptionsRepository, SUBSCRIPTIONS_DEPS];
 /** Motorun dış bağımlılıklarını sağlayan modüller (B1 pricing/payments/delivery, B2 orders) — varsayılan adapter bunlara bağlanır. */
 const DEPS_MODULES: NonNullable<ModuleMetadata['imports']> = [PricingModule, PaymentsModule, OrdersModule, DeliveryModule];
 
@@ -30,6 +31,7 @@ const DEPS_MODULES: NonNullable<ModuleMetadata['imports']> = [PricingModule, Pay
  *  PricingService (cycleCharge) · DeliveryDatesService (rezerv/iade/tarih) · OrdersService (cycle Order'ları, geçişler) ·
  *  MerchantInitiatedCharge / PaymentLinkCharge / PaymentsService (tahsilat). Tahsilat sağlayıcısı PaymentProviderFactory'den
  *  (Setting payment.provider → env PAYMENT_PROVIDER → manual; iyzico/PayTR F8).
+ * `OpsService` (F9): `GET /admin/ops/day-summary` + `POST /admin/ops/bulk-status` (ekran 20/21; toplu geçiş hep-ya-hiç).
  * `ManualCheckoutService`: admin `POST /admin/subscriptions` — ofis/havale siparişi: fiyat (PricingService.quote) → Order (OrdersService) →
  *  MANUAL ödeme (PaymentsService) → Subscription + cycle#1 → aktivasyon (F8 checkout'un sunucu tarafı iskeleti; e2e simülasyonu da bunu kullanır).
  * `withDeps(provider, imports)`: testler/özel kurulumlar için sahte kapı (tek yönlü: kapı imzası `subscriptions.deps.ts`).

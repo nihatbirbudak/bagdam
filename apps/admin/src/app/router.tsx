@@ -24,6 +24,11 @@ import { AdminMailGunluguPage } from '../pages/sistem/AdminMailGunluguPage';
 import { AdminSiparislerListePage } from '../pages/siparisler/AdminSiparislerListePage';
 import { AdminSiparisDetayPage } from '../pages/siparisler/AdminSiparisDetayPage';
 import { AdminKuponlarPage } from '../pages/kuponlar/AdminKuponlarPage';
+import { AdminTeslimatTarihleriPage } from '../pages/ayarlar/AdminTeslimatTarihleriPage';
+import { AdminOdemeProblemleriPage } from '../pages/odeme-problemleri/AdminOdemeProblemleriPage';
+import { AdminAboneliklerListePage } from '../pages/abonelikler/AdminAboneliklerListePage';
+import { AdminAbonelikDetayPage } from '../pages/abonelikler/AdminAbonelikDetayPage';
+import { AdminTeslimatGunuPage } from '../pages/teslimat-gunu/AdminTeslimatGunuPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
@@ -51,7 +56,7 @@ export function RequireAdminAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Menüde yer tutucu kalan ekranlar (F9+); F4/F5/F6/F8 ekranları aşağıda gerçek sayfaya bağlı. */
+/** Menüde yer tutucu kalan ekranlar (F10: Sistem Durumu); F4/F5/F6/F8/F9 ekranları aşağıda gerçek sayfaya bağlı. */
 const placeholderLeaves = getAllNavLeaves().filter((leaf) => leaf.to !== ADMIN_ROOT && leaf.comingSoon);
 
 export function AdminRouter() {
@@ -106,6 +111,13 @@ export function AdminRouter() {
         <Route path="/siparisler" element={<AdminSiparislerListePage />} />
         <Route path="/siparisler/:id" element={<AdminSiparisDetayPage />} />
         <Route path="/kuponlar" element={<AdminKuponlarPage />} />
+
+        {/* F9 — ekran 14b Teslimat tarihleri, 18 Ödeme problemleri, 19 Abonelikler, 20 Teslimat Günü (21 Özet = index) */}
+        <Route path="/ayarlar/teslimat-tarihleri" element={<AdminTeslimatTarihleriPage />} />
+        <Route path="/odeme-problemleri" element={<AdminOdemeProblemleriPage />} />
+        <Route path="/abonelikler" element={<AdminAboneliklerListePage />} />
+        <Route path="/abonelikler/:id" element={<AdminAbonelikDetayPage />} />
+        <Route path="/operasyon/teslimat-gunu" element={<AdminTeslimatGunuPage />} />
 
         {placeholderLeaves.map((leaf) => (
           <Route key={leaf.to} path={leaf.to} element={<PlaceholderPage />} />

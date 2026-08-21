@@ -307,7 +307,16 @@ export interface SubscriptionCancellation {
   refundDueAt: IsoDateTime | null;
 }
 
-/** Ops `GET /admin/ops/pick-list?date=` satırı. */
+/** Ops toplama listesinde bir ürünün tercih dağılımı ("olgun 3 · ham 2") — F9 ekran 20. */
+export interface PickListPref {
+  pref: string;
+  /** Bu tercihi isteyen satırların miktar toplamı. */
+  qty: number;
+  /** Kaç kutuda geçiyor. */
+  count: number;
+}
+
+/** Ops `GET /admin/ops/pick-list?date=&zone=` satırı. */
 export interface PickListRow {
   productId: Id;
   productSlug: string;
@@ -318,9 +327,31 @@ export interface PickListRow {
   totalQty: number;
   boxCount: number;
   extraCount: number;
+  /** F9: kutu (TEMPLATE/SWAP) satırlarının miktar toplamı. */
+  boxQty: number;
+  /** F9: ekstra (EXTRA/CART_MERGE) satırlarının miktar toplamı. */
+  extraQty: number;
+  /** F9: paketlemede basılan birim etiketleri (CycleItem.label ?? Product.boxAmount) — tekrarsız. */
+  labels: string[];
+  /** F9: tercih dağılımı (tercihsiz satırlar girmez); tercih adına göre sıralı. */
+  prefs: PickListPref[];
 }
 
-/** Ops `GET /admin/ops/packing-list?date=` öğesi (kutu başına fiş). */
+/** Ops paketleme fişi satırı (kutu içeriği) — F9: ürün kimliği, miktar ve birim eklendi. */
+export interface PackingListItem {
+  productId: Id;
+  productSlug: string;
+  name: string;
+  label: string | null;
+  pref: string | null;
+  source: CycleItemSource;
+  lotCode: string | null;
+  /** EXTRA/CART_MERGE çarpanı; kutu satırlarında 1. */
+  qty: number;
+  unit: string | null;
+}
+
+/** Ops `GET /admin/ops/packing-list?date=&zone=` öğesi (kutu başına fiş). */
 export interface PackingListEntry {
   cycleId: Id;
   subscriptionId: Id;
@@ -333,8 +364,26 @@ export interface PackingListEntry {
   tierLabel: string;
   curatorName: string | null;
   status: CycleStatus;
-  items: Array<{ name: string; label: string | null; pref: string | null; source: CycleItemSource; lotCode: string | null }>;
+  items: PackingListItem[];
   note: string | null;
+  // ── F9 ekleri (ekran 20 paketleme fişi + yazdırma görünümü) — sunucu hepsini doldurur ──────
+  cycleNo: number;
+  isOneTime: boolean;
+  deliveryOn: IsoDate;
+  deliveryDay: DeliveryDaySlug;
+  zoneSlug: string;
+  customerEmail: string;
+  addressZip: string | null;
+  /** Aboneliğin kalıcı ürün tercihleri (kutuda olmayanlar dahil) [B4]. */
+  itemPrefs: Record<string, string>;
+  /** Siparişin durumu (cycle ile birlikte ilerler); sipariş yoksa null. */
+  orderStatus: string | null;
+  /** Ops notu — telafi kayıtları da burada [B19]. */
+  adminNote: string | null;
+  /** Kilit snapshot toplamı ("bu haftaki ödeme"); kilitlenmemişse null. */
+  total: Money | null;
+  boxItemCount: number;
+  extraItemCount: number;
 }
 
 // ── F7 ekleri (SubscriptionsModule / JobsModule) — yalnız EKLEME ─────────────────────────────────────────────
@@ -452,4 +501,96 @@ export interface AdminCreateSubscriptionResult {
   cycle: SubscriptionCycle;
   order: { id: Id; orderNo: number; status: string; grandTotal: Money; prepaidAmount: Money };
   payment: { id: Id; status: string; amount: Money };
+}
+
+// ── F9 ekleri (ops ekranları 20/21 — `/admin/ops/*`) — yalnız EKLEME ─────────────────────────────────────────
+// Ekran 20 "Teslimat Günü": pick/packing listelerinin yanında günün özeti ve toplu durum ilerletme.
+// Zaman: tüm anlar mutlak ISO (istemci saatine güvenilmez — bootstrap `serverNow` ile fark hesaplanır) [B49].
+
+/** Ops gün özetinde bir bölgenin teslimat tarihi satırı (kapasite/kesim durumu). */
+export interface OpsDaySummaryZone {
+  zoneId: Id;
+  zoneSlug: string;
+  zoneName: string;
+  /** O gün için DeliveryDate satırı yoksa null (hiç sipariş üretilmemiş). */
+  deliveryDateId: Id | null;
+  cutoffAtIso: IsoDateTime | null;
+  /** cutoffAt <= now ya da status !== OPEN. */
+  locked: boolean;
+  status: string | null;
+  capacity: number | null;
+  reserved: number | null;
+  /** Bu bölgede o güne düşen cycle sayısı (tüm durumlar). */
+  cycleCount: number;
+  /** Teslimata girecek (CHARGED/PREPARING/OUT_FOR_DELIVERY) cycle sayısı. */
+  fulfillableCount: number;
+}
+
+/** `GET /admin/ops/day-summary?date=&zone=` — ekran 20 üst şeridi + ekran 21 "bu haftanın kesim durumu". */
+export interface OpsDaySummary {
+  date: IsoDate;
+  /** Filtrelenen bölge slug'ı; tüm bölgeler ise null. */
+  zone: string | null;
+  serverNowIso: IsoDateTime;
+  /** Cycle durum dağılımı (yalnız o gün, sıfır olanlar yazılmaz). */
+  cycleCountsByStatus: Partial<Record<CycleStatus, number>>;
+  cycleCount: number;
+  /** CHARGED + PREPARING + OUT_FOR_DELIVERY (pick/packing listesine giren kutular). */
+  fulfillableCount: number;
+  deliveredCount: number;
+  skippedCount: number;
+  /** Ödeme sorunlu cycle'lar (o gün). */
+  unpaidCount: number;
+  awaitingPaymentCount: number;
+  /** Teslimata giren kutuların tier dağılımı. */
+  boxCountByTier: Array<{ tierSlug: string; tierLabel: string; count: number }>;
+  /** Teslimata giren kutulardaki toplam kutu içi satır ve ekstra satırı. */
+  boxItemCount: number;
+  extraItemCount: number;
+  /** Teslimata giren cycle'ların sipariş toplamı (ana + delta). */
+  revenue: Money;
+  /** Aboneliğe bağlı olmayan (tekil ürün) siparişler — aynı teslimat günü. */
+  standaloneOrderCount: number;
+  standaloneOrderRevenue: Money;
+  zones: OpsDaySummaryZone[];
+}
+
+/** Toplu durum ilerletmede hedef durumlar (ekran 20): cycle'lar için ilk üçü, siparişler için dördü de geçerli. */
+export const OPS_BULK_STATUS_VALUES = ['PREPARING', 'OUT_FOR_DELIVERY', 'DELIVERED', 'DELIVERY_FAILED'] as const;
+export type OpsBulkStatus = (typeof OPS_BULK_STATUS_VALUES)[number];
+
+/**
+ * `POST /admin/ops/bulk-status` — seçili cycle'ları ve/veya siparişleri aynı duruma ilerletir.
+ * Varsayılan davranış hep-ya-hiç: bir tanesinin geçişi bile geçersizse hiçbiri uygulanmaz → 409
+ * `{error:'OPS_BULK_TRANSITION_INVALID'}`. `skipInvalid:true` verilirse geçersizler atlanır, sonuçta raporlanır.
+ * `DELIVERY_FAILED` cycle makinesinde yoktur → cycleIds ile birlikte gönderilirse 409.
+ */
+export interface OpsBulkStatusRequest {
+  cycleIds?: Id[];
+  orderIds?: Id[];
+  status: OpsBulkStatus;
+  note?: string;
+  skipInvalid?: boolean;
+}
+
+export interface OpsBulkStatusItemResult {
+  kind: 'cycle' | 'order';
+  id: Id;
+  ok: boolean;
+  from: string | null;
+  to: string;
+  /** Başarısızsa hata kodu (CYCLE_TRANSITION_INVALID / ORDER_TRANSITION_INVALID / …). */
+  error?: string;
+  message?: string;
+  /** Bilgi amaçlı: cycle satırında sipariş numarası. */
+  orderNo?: number | null;
+}
+
+export interface OpsBulkStatusResult {
+  status: OpsBulkStatus;
+  requested: number;
+  updated: number;
+  failed: number;
+  skipped: number;
+  items: OpsBulkStatusItemResult[];
 }

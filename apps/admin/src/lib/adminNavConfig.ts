@@ -9,7 +9,7 @@ export type AdminNavLeaf = {
   label: string;
   to: string;
   phase?: AdminPhase;
-  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: 1–8, F5: 9–15, F6: 16 + e-posta günlüğü, F8: 17 Siparişler + 23 Kuponlar bağlı). */
+  /** Yer tutucu ekran; gerçek sayfa bağlanınca false yapılır (F4: 1–8, F5: 9–15, F6: 16 + e-posta günlüğü, F8: 17 + 23, F9: 21 Özet + 14b + 18 + 19 + 20 bağlı). */
   comingSoon?: boolean;
   /** Yer tutucu sayfada gösterilen kısa kapsam notu (BACKEND-PLANI §4). */
   hint?: string;
@@ -36,8 +36,8 @@ export const adminNavItems: AdminNavItem[] = [
     label: 'Özet',
     to: ADMIN_ROOT,
     phase: 'F9',
-    comingSoon: true,
-    hint: 'Türetilmiş göstergeler: bugünkü teslimatlar, bekleyen ödemeler, haftalık kutu doluluğu.',
+    comingSoon: false,
+    hint: 'Türetilmiş göstergeler: bugünkü/haftalık sipariş ve ciro, aktif abonelikler, bu haftanın kesim durumu, ödeme problemleri, son olaylar.',
   },
   {
     label: 'Katalog',
@@ -98,14 +98,14 @@ export const adminNavItems: AdminNavItem[] = [
       },
       { label: 'Siparişler', to: '/siparisler', phase: 'F8', comingSoon: false, hint: 'Liste (durum/tür/tarih/arama, CSV), detay: satırlar, ödemeler, iade, durum geçişleri, notlar, fatura no/PDF, kurumsal fatura alanları.' },
       { label: 'Kuponlar', to: '/kuponlar', phase: 'F8', comingSoon: false, hint: 'İndirim kuponları: oluştur/düzenle, aktif-pasif, kullanımlar (CouponRedemption).' },
-      { label: 'Abonelikler', to: '/abonelikler', phase: 'F9', comingSoon: true, hint: 'Abonelik, cycle, cycle içerikleri, olaylar, iptaller; tek seferlik kutular da burada.' },
-      { label: 'Ödeme Problemleri', to: '/odeme-problemleri', phase: 'F9', comingSoon: true, hint: "UNPAID / AWAITING_PAYMENT cycle'lar: link gönder, yeniden çek." },
+      { label: 'Abonelikler', to: '/abonelikler', phase: 'F9', comingSoon: false, hint: 'Liste (durum/tier/gün/sonraki teslimat/dunning); detay: cycle geçmişi, olay günlüğü, iptal kayıtları, düzenleme, telafi. Tek seferlik kutular da burada (isOneTime).' },
+      { label: 'Ödeme Problemleri', to: '/odeme-problemleri', phase: 'F9', comingSoon: false, hint: "UNPAID / AWAITING_PAYMENT cycle'lar ve PAYMENT_FAILED siparişler: yeniden çek, ödeme linki gönder, müşteriye not." },
     ],
   },
   {
     label: 'Operasyon',
     children: [
-      { label: 'Teslimat Günü', to: '/operasyon/teslimat-gunu', phase: 'F9', comingSoon: true, hint: 'Pick / packing / etiket; toplu durum; telafi.' },
+      { label: 'Teslimat Günü', to: '/operasyon/teslimat-gunu', phase: 'F9', comingSoon: false, hint: 'Tarih + bölge; kutu ve sipariş listesi, toplama/paketleme listeleri (yazdırma), toplu durum ilerletme, telafi.' },
     ],
   },
   {
@@ -113,7 +113,7 @@ export const adminNavItems: AdminNavItem[] = [
     children: [
       { label: 'Genel', to: '/ayarlar', phase: 'F5', comingSoon: false, hint: 'Genel ayar grupları (ticaret/kampanya, site, çerez) — registry’den üretilen grup formu.' },
       { label: 'Bölgeler', to: '/ayarlar/bolgeler', phase: 'F5', comingSoon: false, hint: 'Teslimat bölgeleri: ücret / eşik / kapasite; teslimat tarihleri önizleme.' },
-      { label: 'Teslimat Tarihleri', to: '/ayarlar/teslimat-tarihleri', phase: 'F9', comingSoon: true, hint: 'Doluluk, günü kapat.' },
+      { label: 'Teslimat Tarihleri', to: '/ayarlar/teslimat-tarihleri', phase: 'F9', comingSoon: false, hint: 'Bölge + hafta; gün/tarih/kesim/rezerve/kapasite/durum; kapasite düzenle, günü kapat-aç, tarih üret.' },
       { label: 'E-posta', to: '/ayarlar/e-posta', phase: 'F5', comingSoon: false, hint: 'E-posta ve SMS sağlayıcı ayarları (şifreli); test gönderimi.' },
       { label: 'Ödeme', to: '/ayarlar/odeme', phase: 'F5', comingSoon: false, hint: 'PayTR mağaza bilgileri (şifreli), test modu, callback IP listesi, kayıtlı kart (ADR-0019).' },
       { label: 'SEO', to: '/ayarlar/seo', phase: 'F5', comingSoon: false, hint: 'Sayfa başlıkları/açıklama, OG görseli; sitemap/robots API’den.' },

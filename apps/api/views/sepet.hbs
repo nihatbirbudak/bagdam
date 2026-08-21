@@ -186,6 +186,40 @@
 </main>
 
 {{> site_footer}}
+<!-- F9 CMS — sepet (checkout) metinleri (SiteContent `sepet.texts`). <template> hiçbir zaman RENDER EDİLMEZ
+     (piksel parite etkilenmez) ve dataset okuması HTML varlıklarını çözer; SiteContent metin alanları sunucuda
+     kaçışlanır, bu yüzden üç süslü parantezli (ham) yazım kullanılır. Anahtar yoksa/boşsa sayfa kendi Türkçe
+     varsayılanına düşer (SEPET_TEXT_DEFAULTS) — markup'taki sabit metinler de aynı varsayılanlardır. -->
+<template id="sepetTexts"
+  data-step-summary-label="{{{site.sepet.texts.stepSummaryLabel}}}"
+  data-step-customer-label="{{{site.sepet.texts.stepCustomerLabel}}}"
+  data-step-delivery-label="{{{site.sepet.texts.stepDeliveryLabel}}}"
+  data-step-payment-label="{{{site.sepet.texts.stepPaymentLabel}}}"
+  data-summary-title="{{{site.sepet.texts.summaryTitle}}}"
+  data-customer-title="{{{site.sepet.texts.customerTitle}}}"
+  data-delivery-title="{{{site.sepet.texts.deliveryTitle}}}"
+  data-payment-title="{{{site.sepet.texts.paymentTitle}}}"
+  data-empty-cart="{{{site.sepet.texts.emptyCart}}}"
+  data-complete-cta="{{{site.sepet.texts.completeCta}}}"
+  data-add-to-box-cta="{{{site.sepet.texts.addToBoxCta}}}"
+  data-shipping-label="{{{site.sepet.texts.shippingLabel}}}"
+  data-shipping-included-label="{{{site.sepet.texts.shippingIncludedLabel}}}"
+  data-customer-required-error="{{{site.sepet.texts.customerRequiredError}}}"
+  data-cart-empty-error="{{{site.sepet.texts.cartEmptyError}}}"
+  data-delivery-day-required-error="{{{site.sepet.texts.deliveryDayRequiredError}}}"
+  data-delivery-date-error="{{{site.sepet.texts.deliveryDateError}}}"
+  data-legal-required-error="{{{site.sepet.texts.legalRequiredError}}}"
+  data-legal-single-required-error="{{{site.sepet.texts.legalSingleRequiredError}}}"
+  data-quote-error="{{{site.sepet.texts.quoteError}}}"
+  data-order-error="{{{site.sepet.texts.orderError}}}"
+  data-order-response-error="{{{site.sepet.texts.orderResponseError}}}"
+  data-order-not-found-error="{{{site.sepet.texts.orderNotFoundError}}}"
+  data-payment-pending-note="{{{site.sepet.texts.paymentPendingNote}}}"
+  data-payment-verifying-note="{{{site.sepet.texts.paymentVerifyingNote}}}"
+  data-payment-timeout-note="{{{site.sepet.texts.paymentTimeoutNote}}}"
+  data-payment-failed-note="{{{site.sepet.texts.paymentFailedNote}}}"
+  data-success-order="{{{site.sepet.texts.successOrder}}}"
+  data-success-subscription="{{{site.sepet.texts.successSubscription}}}"></template>
 
 {{> bootstrap}}
 <script>window.__BAGDAM_CHECKOUT__ = {{{checkoutJson}}};</script>
@@ -203,6 +237,70 @@
   function money(n) { return Number(n || 0).toLocaleString("tr-TR", { maximumFractionDigits: 2 }); }
   function escText(v) { return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function escAttr(v) { return escText(v).replace(/"/g, "&quot;"); }
+  // ---- F9 CMS: sepet metinleri (SiteContent `sepet.texts` → <template id="sepetTexts" data-*>) ----
+  // Anahtar yoksa/boşsa aşağıdaki varsayılan kullanılır; varsayılanlar markup'taki sabit metinlerle BİREBİR
+  // aynıdır → anonim görünüm (ve piksel paritesi) değişmez. Yer tutucular JS tarafında doldurulur:
+  // {no} sipariş numarası (successOrder/successSubscription), {belge} onay bekleyen yasal belge adı.
+  const SEPET_TEXT_DEFAULTS = {
+    stepSummaryLabel: "Özet",
+    stepCustomerLabel: "Müşteri",
+    stepDeliveryLabel: "Teslimat",
+    stepPaymentLabel: "Ödeme",
+    summaryTitle: "Sipariş Özeti",
+    customerTitle: "Müşteri Bilgileri",
+    deliveryTitle: "Teslimat Bilgileri",
+    paymentTitle: "Ödeme Bilgileri",
+    emptyCart: "sepetin boş.",
+    completeCta: "siparişi tamamla — ödeme yükümlülüğü doğurur",
+    addToBoxCta: "bu haftaki kutuma ekle",
+    shippingLabel: "Kargo",
+    shippingIncludedLabel: "Dahil",
+    customerRequiredError: "Müşteri bilgilerini tamamla.",
+    cartEmptyError: "Sepetin boş.",
+    deliveryDayRequiredError: "Teslimat gününü seç.",
+    deliveryDateError: "Teslimat tarihi alınamadı — sayfayı yenileyip tekrar dene.",
+    legalRequiredError: "Devam etmek için belgeleri onayla.",
+    legalSingleRequiredError: "{belge} onayı gerekli.",
+    quoteError: "Tutar hesaplanamadı — tekrar dene.",
+    orderError: "Sipariş oluşturulamadı — tekrar dene.",
+    orderResponseError: "Sipariş yanıtı alınamadı — üyelik sayfandan siparişlerini kontrol et.",
+    orderNotFoundError: "Sipariş bulunamadı — üyelik sayfandaki \"önceki siparişler\"den kontrol edebilirsin.",
+    paymentPendingNote: "Ödemeni güvenli ekranda tamamla — sonucu burada göreceğiz.",
+    paymentVerifyingNote: "Ödemen doğrulanıyor — birkaç saniye…",
+    paymentTimeoutNote: "Ödeme sonucu henüz bize ulaşmadı — siparişinin durumunu üyelik sayfandaki \"önceki siparişler\"den takip edebilirsin.",
+    paymentFailedNote: "Ödeme alınamadı — kartını kontrol edip \"siparişi tamamla\" ile yeniden deneyebilirsin.",
+    successOrder: "Siparişin alındı (#{no}) — teşekkürler! Siparişlerini <a href=\"uyelik.html\">üyelik sayfandan</a> takip edebilirsin.",
+    successSubscription: "Siparişin alındı (#{no}) — teşekkürler! Aboneliğini <a href=\"uyelik.html\">üyelik sayfandan</a> yönetebilirsin.",
+  };
+  // Manuel sağlayıcı (lokal/e2e) notu CMS'te değil: gerçek tahsilat yapılmayan ortamlarda önüne eklenir.
+  const MANUAL_PAYMENT_PREFIX = "Test ödeme onaylandı — ";
+  const sepetTextsEl = document.getElementById("sepetTexts");
+  function T(key) {
+    const raw = sepetTextsEl && sepetTextsEl.dataset ? sepetTextsEl.dataset[key] : "";
+    return raw && String(raw).trim() ? String(raw) : SEPET_TEXT_DEFAULTS[key];
+  }
+  function fill(text, vars) {
+    return String(text).replace(/\{(\w+)\}/g, (m, k) => (vars && vars[k] !== undefined ? String(vars[k]) : m));
+  }
+  // Markup'ta duran sabit metinler (adım sekmeleri, bölüm başlıkları, "siparişi tamamla") CMS değeriyle
+  // değiştirilir. Anahtar boşken varsayılan = markup metni → hiçbir şey değişmez (parite korunur).
+  function applyStaticTexts() {
+    const map = [
+      ['#checkoutSteps [data-step="summary"] span:last-child', "stepSummaryLabel"],
+      ['#checkoutSteps [data-step="customer"] span:last-child', "stepCustomerLabel"],
+      ['#checkoutSteps [data-step="delivery"] span:last-child', "stepDeliveryLabel"],
+      ['#checkoutSteps [data-step="payment"] span:last-child', "stepPaymentLabel"],
+      ["#customerSection .section-title-left > span:last-child", "customerTitle"],
+      ["#deliverySection .section-title-left > span:last-child", "deliveryTitle"],
+      ["#paymentSection .section-title-left > span:last-child", "paymentTitle"],
+      ["#checkoutComplete", "completeCta"],
+    ];
+    map.forEach((pair) => {
+      const el = document.querySelector(pair[0]);
+      if (el) el.textContent = T(pair[1]);
+    });
+  }
+  applyStaticTexts();
   var stepsEl = null, stepBtns = null, stepPanels = null; // mobil adım sekmeleri (aşağıda kurulur)
 
   // ---- F8 checkout durumu (aşağıdaki bölümler okur/yazar; ilk refreshSections() çağrısından önce tanımlı olmalı) ----
@@ -570,7 +668,7 @@
     dayNoteEl.hidden = !note;
     dayNoteEl.textContent = note || "";
     const fee = quote ? Number(quote.shippingFee || 0) : null;
-    shippingNoteEl.textContent = fee === null ? "" : "Kargo: " + (fee > 0 ? money(fee) + " TL" : "Dahil");
+    shippingNoteEl.textContent = fee === null ? "" : T("shippingLabel") + ": " + (fee > 0 ? money(fee) + " TL" : T("shippingIncludedLabel"));
   }
 
   // ---- Yasal onaylar (ADR-0003 istisna 3) — requiresAck belgeler; abonelik sözleşmesi yalnız abonelik kutusu varken ----
@@ -674,12 +772,12 @@
       el.classList.toggle("invalid", !filled);
       if (!filled) valid = false;
     });
-    if (!valid) return "Müşteri bilgilerini tamamla.";
-    if (!BahcedenCart.hasCheckoutItems()) return "Sepetin boş.";
-    if (!selectedDate || !selectedDate.date) return selectedDate ? "Teslimat tarihi alınamadı — sayfayı yenileyip tekrar dene." : "Teslimat gününü seç.";
+    if (!valid) return T("customerRequiredError");
+    if (!BahcedenCart.hasCheckoutItems()) return T("cartEmptyError");
+    if (!selectedDate || !selectedDate.date) return selectedDate ? T("deliveryDateError") : T("deliveryDayRequiredError");
     const missing = legalMissing();
-    if (missing.length) return missing.length === 1 ? missing[0].title + " onayı gerekli." : "Devam etmek için belgeleri onayla.";
-    if (quoteError && !quote) return "Tutar hesaplanamadı — tekrar dene.";
+    if (missing.length) return missing.length === 1 ? fill(T("legalSingleRequiredError"), { belge: missing[0].title }) : T("legalRequiredError");
+    if (quoteError && !quote) return T("quoteError");
     return null;
   }
   checkoutCompleteBtn.addEventListener("click", () => {
@@ -703,16 +801,16 @@
       .catch((err) => {
         setBusy(false);
         const code = err && err.code;
-        let text = (err && err.message) || "Sipariş oluşturulamadı — tekrar dene.";
+        let text = (err && err.message) || T("orderError");
         if (code === "DAY_FULL" || code === "DAY_LOCKED") { text = "Seçtiğin teslimat günü doldu ya da kesimi geçti — başka bir gün seç."; selectedDate = null; loadDatesForZone(); }
         else if (code === "SUBSCRIPTION_EXISTS" || code === "ACTIVE_SUBSCRIPTION_EXISTS") text = "Zaten aktif bir aboneliğin var — kutuyu sepetten kaldırıp yalnızca tekil ürünleri sipariş edebilirsin.";
-        else if (code === "CONSENT_REQUIRED" || code === "ACK_REQUIRED") text = "Devam etmek için belgeleri onayla.";
+        else if (code === "CONSENT_REQUIRED" || code === "ACK_REQUIRED") text = T("legalRequiredError");
         else if (code === "COUPON_INVALID") text = "Kupon kodu geçersiz — kaldırıp tekrar dene.";
         showMsg(checkoutMsgEl, text);
       });
   });
   function handleCheckoutResponse(res) {
-    if (!res || !res.orderNo) { showMsg(checkoutMsgEl, "Sipariş yanıtı alınamadı — üyelik sayfandan siparişlerini kontrol et."); return; }
+    if (!res || !res.orderNo) { showMsg(checkoutMsgEl, T("orderResponseError")); return; }
     checkoutState.orderNo = res.orderNo;
     // Sağlayıcı adı `payment.providerName` ("manual" | "paytr"); `payment.provider` enum'dur (MANUAL/PAYTR) → küçük harfe indirgenir.
     checkoutState.provider = res.payment ? String(res.payment.providerName || res.payment.provider || "").toLowerCase() || null : null;
@@ -729,7 +827,7 @@
       showPaymentTestNote("Test ödeme onaylandı — siparişin işleniyor…");
     } else {
       showPaymentFrame(res.payment);
-      showMsg(paymentMsgEl, "Ödemeni güvenli ekranda tamamla — sonucu burada göreceğiz.", true);
+      showMsg(paymentMsgEl, T("paymentPendingNote"), true);
     }
     startPolling(res.orderNo);
   }
@@ -741,12 +839,12 @@
       if (r.ok) { onPaid(orderNo, r.status); return; }
       if (r.timedOut) {
         stopAwaiting();
-        showMsg(paymentMsgEl, "Ödeme sonucu henüz bize ulaşmadı — siparişinin durumunu üyelik sayfandaki \"önceki siparişler\"den takip edebilirsin.");
+        showMsg(paymentMsgEl, T("paymentTimeoutNote"));
         return;
       }
       if (r.error) {
         stopAwaiting();
-        showMsg(paymentMsgEl, r.error.status === 404 ? "Sipariş bulunamadı — üyelik sayfandaki \"önceki siparişler\"den kontrol edebilirsin." : (r.error.message || "Ödeme durumu alınamadı."));
+        showMsg(paymentMsgEl, r.error.status === 404 ? T("orderNotFoundError") : (r.error.message || "Ödeme durumu alınamadı."));
         return;
       }
       onPaymentFailed();
@@ -772,7 +870,7 @@
     checkoutSuccessEl.hidden = true;
     checkoutCompleteBtn.hidden = false;
     resetPaymentFrame();
-    showMsg(paymentMsgEl, "Ödeme alınamadı — kartını kontrol edip \"siparişi tamamla\" ile yeniden deneyebilirsin.");
+    showMsg(paymentMsgEl, T("paymentFailedNote"));
     refreshSections();
   }
   function onPaid(orderNo, statusInfo) {
@@ -785,10 +883,9 @@
     BahcedenCart.clearSubDraft();
     // Abonelikli kutu ödemesinde üyelik yönlendirmesi eklenir; yalnızca
     // tekli ürün siparişinde kısa teşekkür yeter.
-    const prefix = checkoutState.provider === "manual" ? "Test ödeme onaylandı — siparişin alındı" : "Siparişin alındı";
-    checkoutSuccessEl.innerHTML = isSubscription
-      ? prefix + " (#" + escText(orderNo) + ") — teşekkürler! Aboneliğini <a href=\"uyelik.html\">üyelik sayfandan</a> yönetebilirsin."
-      : prefix + " (#" + escText(orderNo) + ") — teşekkürler! Siparişlerini <a href=\"uyelik.html\">üyelik sayfandan</a> takip edebilirsin.";
+    // F9 CMS: teşekkür metni sepet.texts'ten ({no} sipariş numarasıyla dolar); manuel sağlayıcıda test notu önüne eklenir.
+    const prefix = checkoutState.provider === "manual" ? MANUAL_PAYMENT_PREFIX : "";
+    checkoutSuccessEl.innerHTML = prefix + fill(T(isSubscription ? "successSubscription" : "successOrder"), { no: escText(orderNo) });
     checkoutCompleteBtn.hidden = true;
     checkoutSuccessEl.hidden = false;
     showMsg(checkoutMsgEl, "");
@@ -826,7 +923,7 @@
     returnHandled = true;
     checkoutState.orderNo = returnInfo.orderNo;
     if (returnInfo.result === "hata") {
-      showMsg(paymentMsgEl, "Ödeme alınamadı — kartını kontrol edip \"siparişi tamamla\" ile yeniden deneyebilirsin.");
+      showMsg(paymentMsgEl, T("paymentFailedNote"));
       sectionState.payment.manual = true; sectionState.payment.collapsed = false;
       refreshSections();
       stripReturnQuery();
@@ -835,7 +932,7 @@
     // ok: callback sunucuya birkaç saniye sonra düşebilir — doğrulanana kadar bekle.
     checkoutState.awaiting = true;
     checkoutCompleteBtn.hidden = true;
-    checkoutSuccessEl.textContent = "Ödemen doğrulanıyor — birkaç saniye…";
+    checkoutSuccessEl.textContent = T("paymentVerifyingNote");
     checkoutSuccessEl.hidden = false;
     document.body.classList.add("order-done");
     if (stepsEl) stepsEl.hidden = true;
@@ -872,10 +969,10 @@
 
     if (!tier && items.length === 0) {
       wrap.innerHTML = BahcedenCart.hasPurchasedSub()
-        ? '<h2 class="checkout-section-title">Sipariş Özeti</h2>' +
+        ? '<h2 class="checkout-section-title">' + escText(T("summaryTitle")) + "</h2>" +
           (justAddedToBox
             ? '<p class="checkout-shipping-note mono">Ürünler bu haftaki kutuna eklendi — ödemesi kutu ücretiyle birlikte çekilecek, kutunla aynı gün teslim edilecek.</p>'
-            : '<p class="cart-empty mono">sepetin boş.</p>') +
+            : '<p class="cart-empty mono">' + escText(T("emptyCart")) + "</p>") +
           '<a class="btn" href="uyelik.html">aboneliğini görüntüle</a>'
         : '<p class="cart-empty mono">henüz bir aboneliğin yok.</p>' +
           '<a class="btn" href="urunler.html">aboneliği başlat</a>';
@@ -961,7 +1058,7 @@
     const addToBoxHtml = BahcedenCart.hasPurchasedSub() && items.length > 0
       ? '<div class="addon-choice">' +
           '<p><b>Aktif aboneliğin var.</b> Bu ürünleri hemen ödemek için aşağıdaki sipariş adımlarını tamamla — ayrı bir sipariş olarak işlenir, teslimat gününü seçersin. İstersen bu haftaki kutuna ekle: ücreti kutu ödemenle aynı gün çekilir, kutunla aynı gün teslim edilir.</p>' +
-          '<button class="btn" id="addToBoxBtn" type="button">bu haftaki kutuma ekle</button>' +
+          '<button class="btn" id="addToBoxBtn" type="button">' + escText(T("addToBoxCta")) + "</button>" +
           (mergeError ? '<p class="checkout-auth-msg mono">' + escText(mergeError) + "</p>" : "") +
         "</div>"
       : "";
@@ -999,13 +1096,13 @@
       "</div>";
 
     wrap.innerHTML =
-      '<h2 class="checkout-section-title">Sipariş Özeti</h2>' +
+      '<h2 class="checkout-section-title">' + escText(T("summaryTitle")) + "</h2>" +
       '<div class="cart-rows">' + subBlock + rows + "</div>" +
       addToBoxHtml +
       couponHtml +
       '<div class="cart-summary">' +
         '<div class="cart-total"><span>Toplam</span><span class="mono">' + fmtMaybe(grandTotal) + "</span></div>" +
-        '<div class="cart-vat-row"><span>Kargo</span><span class="mono">' + (shippingFee === null ? "…" : (shippingFee > 0 ? money(shippingFee) + " TL" : "Dahil")) + "</span></div>" +
+        '<div class="cart-vat-row"><span>' + escText(T("shippingLabel")) + '</span><span class="mono">' + (shippingFee === null ? "…" : (shippingFee > 0 ? money(shippingFee) + " TL" : escText(T("shippingIncludedLabel")))) + "</span></div>" +
         discountLines +
         vatLines +
         errorLine +
